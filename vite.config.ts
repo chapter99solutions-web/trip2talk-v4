@@ -9,11 +9,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Trip2Talk Australia V4',
+        name: 'Trip2Talk',
         short_name: 'Trip2Talk',
-        description: 'Tour management system for Thai student tours in Australia',
-        theme_color: '#0a0a0a',
-        background_color: '#0a0a0a',
+        description: 'Trip2Talk — Private Photo Journeys by Chapter 99 Photography',
+        theme_color: '#0d1b2a',
+        background_color: '#0d1b2a',
         display: 'standalone',
         orientation: 'portrait-primary',
         scope: '/',
@@ -33,7 +33,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/rvcwprxnqwscgjusmjvj\.supabase\.co\/.*/i,
+            urlPattern: /^https:\/\/niuibpznjvytprbrzvnn\.supabase\.co\/.*/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'supabase-cache',
