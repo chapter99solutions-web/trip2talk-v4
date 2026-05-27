@@ -2,11 +2,8 @@ import { useState, useEffect, useCallback, FormEvent } from 'react';
 import { ATOCategory, Expense, Tour } from '../../types/tour';
 import { formatAUD, generateReceiptFilename } from '../../lib/payidCalc';
 import { saveExpenseLocally } from '../../lib/expenseDb';
-import {
-  syncExpenseToGoogleWorkspace,
-  syncSettlementToGoogleSheets,
-  buildSettlementForTour,
-} from '../../lib/googleSync';
+import { syncExpenseToGoogleWorkspace } from '../../lib/googleSync';
+import { runPhase4InsertExpense, runPhase5PostTrip } from '../../lib/customerJourney';
 import { supabase } from '../../lib/supabase';
 import {
   fetchOwnerDashboardData,
@@ -153,12 +150,15 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
 
       for (const tour of completedTours) {
         setSyncMessage(`Syncing settlement for ${tour.trip_code}...`);
-        const settlement = buildSettlementForTour(tour, bookings, expenses);
-        const result = await syncSettlementToGoogleSheets(settlement);
-        if (!result.success) {
-          throw new Error(result.error ?? `Settlement sync failed for ${tour.trip_code}`);
+        const { warnings } = await runPhase5PostTrip({
+          tour,
+          bookings,
+          expenses,
+          storagePath: `tour-photos/${tour.id}/`,
+        });
+        if (warnings.length > 0) {
+          console.warn(`[Trip2Talk] Phase 5 (${tour.trip_code}):`, warnings);
         }
-        if (result.spreadsheetUrl) lastUrl = result.spreadsheetUrl;
       }
 
       if (lastUrl) setSpreadsheetUrl(lastUrl);
@@ -193,7 +193,13 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
       };
       const blob = new Blob(['receipt_stream'], { type: 'image/jpeg' });
       await saveExpenseLocally(item, blob);
-      if (navigator.onLine) await syncExpenseToGoogleWorkspace(item, blob);
+      if (navigator.onLine) {
+        await syncExpenseToGoogleWorkspace(item, blob);
+        const matchedTour = tours.find((t) => t.id === tourId || t.trip_code === tourId);
+        if (matchedTour) {
+          void runPhase4InsertExpense(matchedTour.id, item);
+        }
+      }
 
       setLog((prev) => [
         {

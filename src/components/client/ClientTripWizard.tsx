@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { Tour } from '../../types/tour';
 import { STRINGS, HubLang } from '../../lib/clientVIPStrings';
 import { formatAUD } from '../../lib/payidCalc';
-import { computeWaiverContentHash, saveClientWaiver } from '../../lib/waiverApi';
+import { computeWaiverContentHash, saveClientWaiverBundle } from '../../lib/waiverApi';
+import { runPhase3Prepare } from '../../lib/customerJourney';
 import { saveWaiverLocally } from '../../lib/waiverDb';
 import { toStoredWaiver } from '../../lib/waiverApi';
 import SignaturePad, { SignaturePadHandle } from '../waiver/SignaturePad';
@@ -18,6 +19,11 @@ const EXCLUDED = ['RAW files', 'Flights', 'Personal travel insurance (non-OSHC)'
 interface ClientTripWizardProps {
   trip: Tour;
   tripRef: string;
+  booking?: {
+    pickup_location?: string | null;
+    hotel_name?: string | null;
+    preferred_pickup?: string | null;
+  } | null;
 }
 
 function generateBookingRef(): string {
@@ -25,7 +31,7 @@ function generateBookingRef(): string {
   return `BK-T2T-${n}`;
 }
 
-export default function ClientTripWizard({ trip, tripRef }: ClientTripWizardProps) {
+export default function ClientTripWizard({ trip, tripRef, booking }: ClientTripWizardProps) {
   const [lang, setLang] = useState<HubLang>('th');
   const [step, setStep] = useState<Step>(1);
   const s = STRINGS[lang];
@@ -65,8 +71,16 @@ export default function ClientTripWizard({ trip, tripRef }: ClientTripWizardProp
   const balanceDue = Math.max(0, trip.price_aud * 2 - 500);
   const paymentStatus: 'paid' | 'pending' = 'paid';
 
-  const allWaiversChecked = Object.values(waivers).every(Boolean);
-  const canSubmitStep4 = allWaiversChecked && Boolean(signature);
+  const checkAll = () =>
+    waivers.c1 &&
+    waivers.c2 &&
+    waivers.c3 &&
+    waivers.c4 &&
+    waivers.c5 &&
+    waivers.c6 &&
+    Boolean(signature);
+
+  const canSubmitStep4 = checkAll();
   const canProceedStep3 =
     fullName.trim() && phone.trim() && emergencyPhone.trim() && (visaType !== 'student' || oshcMembership.trim());
 
@@ -89,43 +103,105 @@ export default function ClientTripWizard({ trip, tripRef }: ClientTripWizardProp
     const signed_at = new Date().toISOString();
     const client_id = crypto.randomUUID();
 
-    const waiverBase = {
+    const language = lang === 'th' ? 'TH' : 'EN';
+    const waiverText = {
+      c1: s.step4.c1,
+      c2: s.step4.c2,
+      c3: s.step4.c3,
+      c4: s.step4.c4,
+      c5: s.step4.c5,
+      c6: s.step4.c6,
+      c5_driving: waivers.c5 ? 'yes' : 'no',
+      c6_portfolio: waivers.c6 ? 'yes' : 'no',
+    };
+
+    const shared = {
       client_id,
-      agreed_terms: waivers.c1,
-      agreed_risk: waivers.c2,
-      agreed_medical: waivers.c3,
-      agreed_media: waivers.c6,
-      agreed_privacy: waivers.c4,
       digital_signature: signature,
       signed_at,
     };
 
-    const content_hash = await computeWaiverContentHash({
-      waiver: waiverBase,
+    const coreBase = {
+      ...shared,
+      waiver_type: 'core' as const,
+      agreed_terms: waivers.c1,
+      agreed_risk: waivers.c2,
+      agreed_medical: waivers.c3,
+      agreed_privacy: waivers.c4,
+      agreed_media: false,
+      agreed_transport: false,
+    };
+    const coreHash = await computeWaiverContentHash({
+      waiver: coreBase,
       tour_id: trip.id,
-      language: lang === 'th' ? 'TH' : 'EN',
-      waiver_text: {
-        c1: s.step4.c1,
-        c2: s.step4.c2,
-        c3: s.step4.c3,
-        c4: s.step4.c4,
-        c5: s.step4.c5,
-        c6: s.step4.c6,
-        c5_driving: waivers.c5 ? 'yes' : 'no',
-      },
+      language,
+      waiver_text: waiverText,
     });
+    const coreWaiver = { ...coreBase, content_hash: coreHash };
 
-    const waiverData = { ...waiverBase, content_hash };
+    const transportBase = {
+      ...shared,
+      waiver_type: 'transport' as const,
+      agreed_terms: false,
+      agreed_risk: false,
+      agreed_medical: false,
+      agreed_privacy: false,
+      agreed_media: false,
+      agreed_transport: waivers.c5,
+    };
+    const transportHash = await computeWaiverContentHash({
+      waiver: transportBase,
+      tour_id: trip.id,
+      language,
+      waiver_text: { ...waiverText, waiver_type: 'transport' },
+    });
+    const transportWaiver = { ...transportBase, content_hash: transportHash };
+
+    const portfolioBase = {
+      ...shared,
+      waiver_type: 'portfolio' as const,
+      agreed_terms: false,
+      agreed_risk: false,
+      agreed_medical: false,
+      agreed_privacy: false,
+      agreed_media: waivers.c6,
+      agreed_transport: false,
+    };
+    const portfolioHash = await computeWaiverContentHash({
+      waiver: portfolioBase,
+      tour_id: trip.id,
+      language,
+      waiver_text: { ...waiverText, waiver_type: 'portfolio' },
+    });
+    const portfolioWaiver = { ...portfolioBase, content_hash: portfolioHash };
 
     try {
-      await saveClientWaiver(waiverData, trip.id, lang === 'th' ? 'TH' : 'EN');
+      await saveClientWaiverBundle([
+        { waiver: coreWaiver, tourId: trip.id, language },
+        { waiver: transportWaiver, tourId: trip.id, language },
+        { waiver: portfolioWaiver, tourId: trip.id, language },
+      ]);
     } catch {
       console.warn('[Trip2Talk] Supabase waiver save failed; offline backup used');
     }
 
-    await saveWaiverLocally(
-      toStoredWaiver(waiverData, trip.id, lang === 'th' ? 'TH' : 'EN')
-    );
+    const { warnings: prepareWarnings } = await runPhase3Prepare({
+      clientId: client_id,
+      tourId: trip.id,
+      fullName,
+      phone,
+      email,
+      health,
+      oshcMembership,
+      safetyAcknowledged: safetyChecks,
+    });
+    if (prepareWarnings.length > 0) {
+      console.warn('[Trip2Talk] Phase 3 (prepare) warnings:', prepareWarnings);
+    }
+
+    await saveWaiverLocally(toStoredWaiver(coreWaiver, trip.id, language));
+    await saveWaiverLocally(toStoredWaiver(transportWaiver, trip.id, language));
+    await saveWaiverLocally(toStoredWaiver(portfolioWaiver, trip.id, language));
 
     // ACL-compliant — timestamp+IP stored in client_waivers table (via record-waiver edge function)
     setBookingRef(generateBookingRef());
@@ -145,12 +221,12 @@ export default function ClientTripWizard({ trip, tripRef }: ClientTripWizardProp
           <div key={label} className="flex-1">
             <div
               className={`h-1 rounded-full transition-colors ${
-                done ? 'bg-emerald-500' : active ? 'bg-emerald-600' : 'bg-slate-200'
+                done ? 'bg-teal' : active ? 'bg-teal' : 'bg-white/15'
               }`}
             />
             <p
               className={`text-[10px] mt-1.5 leading-tight ${
-                active ? 'text-emerald-700 font-semibold' : 'text-slate-400'
+                active ? 'text-white font-semibold' : 'text-white/50'
               }`}
             >
               {label}
@@ -163,34 +239,34 @@ export default function ClientTripWizard({ trip, tripRef }: ClientTripWizardProp
 
   if (step === 5) {
     return (
-      <div className="text-center space-y-6 py-4">
-        <div className="w-16 h-16 mx-auto rounded-full bg-emerald-100 flex items-center justify-center text-3xl">
+      <div className="text-center space-y-6 py-4 text-white">
+        <div className="w-16 h-16 mx-auto rounded-full bg-teal/15 border border-white/10 flex items-center justify-center text-3xl text-teal">
           ✓
         </div>
-        <h2 className="font-serif text-2xl text-slate-900">{s.step5.title}</h2>
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-left space-y-3 text-sm">
+        <h2 className="font-serif text-2xl text-white">{s.step5.title}</h2>
+        <div className="rounded-2xl border border-white/10 bg-[#132333] p-5 text-left space-y-3 text-sm">
           <p>
-            <span className="text-slate-500">{s.step5.ref}</span>
+            <span className="text-white/60">{s.step5.ref}</span>
             <br />
-            <span className="font-mono font-semibold text-emerald-700">{bookingRef}</span>
+            <span className="font-mono font-semibold text-teal">{bookingRef}</span>
           </p>
           <p>
-            <span className="text-slate-500">{s.step5.signed}</span>
+            <span className="text-white/60">{s.step5.signed}</span>
             <br />
-            <span className="font-mono text-slate-800">
+            <span className="font-mono text-white/90">
               {new Date(signedAt).toLocaleString(lang === 'th' ? 'th-TH' : 'en-AU')}
             </span>
           </p>
           <p>
-            <span className="text-slate-500">{s.step5.ip}</span>
+            <span className="text-white/60">{s.step5.ip}</span>
             <br />
-            <span className="font-mono text-slate-600 text-xs">{signedIp}</span>
+            <span className="font-mono text-white/70 text-xs">{signedIp}</span>
           </p>
-          <p className="text-emerald-700 font-medium pt-2 border-t border-slate-200">{s.step5.sms}</p>
+          <p className="text-teal font-medium pt-2 border-t border-white/10">{s.step5.sms}</p>
         </div>
         <Link
           to={`/trip/${tripRef}`}
-          className="inline-block px-6 py-3 rounded-full bg-emerald-600 text-white font-semibold text-sm"
+          className="inline-block px-6 py-3 rounded-xl bg-teal text-navy font-semibold text-sm"
         >
           {s.step5.done}
         </Link>
@@ -199,13 +275,13 @@ export default function ClientTripWizard({ trip, tripRef }: ClientTripWizardProp
   }
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-lg mx-auto text-white">
       <div className="flex justify-between items-center mb-4">
-        <p className="font-mono text-xs text-emerald-600">{trip.trip_code}</p>
+        <p className="font-mono text-xs text-teal">{trip.trip_code}</p>
         <button
           type="button"
           onClick={toggleLang}
-          className="px-3 py-1 rounded-full border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+          className="px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs font-semibold text-white/80 hover:bg-white/10"
         >
           {s.langToggle}
         </button>
@@ -215,30 +291,41 @@ export default function ClientTripWizard({ trip, tripRef }: ClientTripWizardProp
 
       {step === 1 && (
         <section className="space-y-4">
-          <h2 className="font-serif text-xl font-semibold text-slate-900">{s.step1.title}</h2>
+          <h2 className="font-serif text-xl font-semibold text-white">{s.step1.title}</h2>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-3 text-sm">
-            <h3 className="font-serif text-lg text-slate-900">{trip.destination}</h3>
-            <p className="text-slate-500 font-mono text-xs">
+          <div className="rounded-2xl border border-white/10 bg-[#132333] p-5 shadow-sm space-y-3 text-sm">
+            <h3 className="font-serif text-lg text-white">{trip.destination}</h3>
+            <p className="text-white/60 font-mono text-xs">
               {trip.start_date} → {trip.end_date}
             </p>
-            <dl className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+            <dl className="grid grid-cols-2 gap-2 pt-2 border-t border-white/10">
               <div>
-                <dt className="text-slate-400 text-xs">{s.step1.meeting}</dt>
-                <dd className="font-medium">Warrawee Studio · 07:00</dd>
+                <dt className="text-white/50 text-xs">{s.step1.meeting}</dt>
+                <dd className="font-medium text-white/90">Warrawee Studio · 07:00</dd>
               </div>
               <div>
-                <dt className="text-slate-400 text-xs">{s.step1.returnLabel}</dt>
-                <dd className="font-medium">~18:00 same day</dd>
+                <dt className="text-white/50 text-xs">{s.step1.returnLabel}</dt>
+                <dd className="font-medium text-white/90">~18:00 same day</dd>
               </div>
               <div>
-                <dt className="text-slate-400 text-xs">{s.step1.guide}</dt>
-                <dd className="font-medium">แสน (Saen)</dd>
+                <dt className="text-white/50 text-xs">{s.step1.guide}</dt>
+                <dd className="font-medium text-white/90">แสน (Saen)</dd>
               </div>
               <div>
-                <dt className="text-slate-400 text-xs">{s.step1.seats}</dt>
-                <dd className="font-medium">
+                <dt className="text-white/50 text-xs">{s.step1.seats}</dt>
+                <dd className="font-medium text-white/90">
                   {trip.current_pax}/{trip.max_pax}
+                </dd>
+              </div>
+              <div className="col-span-2">
+                <dt className="text-white/50 text-xs">จุดนัดรับ</dt>
+                <dd className="font-medium text-white/90">
+                  {booking?.preferred_pickup === 'custom_accommodation' ||
+                  booking?.pickup_location === 'custom_accommodation'
+                    ? `🏨 ${booking?.hotel_name || 'ที่พักในเขต CBD'}`
+                    : booking?.preferred_pickup || booking?.pickup_location
+                      ? '📍 Thai Town, Sydney'
+                      : '📍 Thai Town, Sydney'}
                 </dd>
               </div>
             </dl>
@@ -246,34 +333,34 @@ export default function ClientTripWizard({ trip, tripRef }: ClientTripWizardProp
               <span
                 className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
                   paymentStatus === 'paid'
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : 'bg-amber-100 text-amber-800'
+                    ? 'bg-teal/15 text-teal border border-white/10'
+                    : 'bg-white/10 text-white/80 border border-white/10'
                 }`}
               >
                 {paymentStatus === 'paid' ? s.paymentPaid : s.paymentPending}
               </span>
-              <span className="text-xs text-slate-500">
-                {s.step1.balance}: <strong className="text-slate-800">{formatAUD(balanceDue)}</strong>
+              <span className="text-xs text-white/60">
+                {s.step1.balance}: <strong className="text-white/90">{formatAUD(balanceDue)}</strong>
               </span>
             </div>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-3 text-sm">
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
-              <p className="font-semibold text-emerald-800 mb-2">{s.step1.included}</p>
+            <div className="rounded-xl border border-white/10 bg-[#132333] p-4">
+              <p className="font-semibold text-teal mb-2">{s.step1.included}</p>
               <ul className="space-y-1">
                 {INCLUDED.map((item) => (
-                  <li key={item} className="text-slate-700">
+                  <li key={item} className="text-white/80">
                     ✓ {item}
                   </li>
                 ))}
               </ul>
             </div>
-            <div className="rounded-xl border border-slate-200 p-4">
-              <p className="font-semibold text-slate-600 mb-2">{s.step1.excluded}</p>
+            <div className="rounded-xl border border-white/10 bg-[#132333] p-4">
+              <p className="font-semibold text-white/70 mb-2">{s.step1.excluded}</p>
               <ul className="space-y-1">
                 {EXCLUDED.map((item) => (
-                  <li key={item} className="text-slate-500">
+                  <li key={item} className="text-white/60">
                     ✗ {item}
                   </li>
                 ))}
@@ -281,8 +368,8 @@ export default function ClientTripWizard({ trip, tripRef }: ClientTripWizardProp
             </div>
           </div>
 
-          <div className="rounded-xl bg-orange-50 border border-orange-200 p-4 text-sm text-orange-900 font-medium">
-            ⚠️ {s.step1.alert15}
+          <div className="rounded-xl bg-white/5 border border-white/10 p-4 text-sm text-white/80 font-medium">
+            <span className="text-teal">⚠️</span> {s.step1.alert15}
           </div>
         </section>
       )}
@@ -499,12 +586,12 @@ export default function ClientTripWizard({ trip, tripRef }: ClientTripWizardProp
         </section>
       )}
 
-      <div className="flex gap-3 mt-8 pt-4 border-t border-slate-100">
+      <div className="flex gap-3 mt-8 pt-4 border-t border-white/10">
         {step > 1 && step < 5 && (
           <button
             type="button"
             onClick={() => setStep((st) => (st - 1) as Step)}
-            className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-medium text-sm"
+            className="flex-1 py-3 rounded-xl border border-white/10 bg-white/5 text-white/80 font-medium text-sm hover:bg-white/10"
           >
             {s.back}
           </button>
@@ -514,7 +601,7 @@ export default function ClientTripWizard({ trip, tripRef }: ClientTripWizardProp
             type="button"
             onClick={() => setStep((st) => (st + 1) as Step)}
             disabled={step === 3 && !canProceedStep3}
-            className="flex-1 py-3 rounded-xl bg-emerald-600 text-white font-semibold text-sm disabled:opacity-40"
+            className="flex-1 py-3 rounded-xl bg-teal text-navy font-semibold text-sm disabled:opacity-40"
           >
             {s.next}
           </button>
@@ -524,7 +611,7 @@ export default function ClientTripWizard({ trip, tripRef }: ClientTripWizardProp
             type="button"
             disabled={!canSubmitStep4 || submitting}
             onClick={handleSubmit}
-            className="flex-1 py-3 rounded-xl bg-emerald-600 text-white font-semibold text-sm disabled:opacity-40"
+            className="flex-1 py-3 rounded-xl bg-teal text-navy font-semibold text-sm disabled:opacity-40"
           >
             {submitting ? '…' : s.submit}
           </button>
@@ -534,15 +621,17 @@ export default function ClientTripWizard({ trip, tripRef }: ClientTripWizardProp
       <style>{`
         .field-input {
           width: 100%;
-          border: 1px solid #e2e8f0;
+          border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 0.75rem;
           padding: 0.625rem 0.875rem;
           font-size: 0.875rem;
+          background: rgba(255, 255, 255, 0.05);
+          color: rgba(255, 255, 255, 0.9);
         }
         .field-input:focus {
           outline: none;
-          border-color: #059669;
-          box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.15);
+          border-color: rgba(77, 216, 160, 0.6);
+          box-shadow: 0 0 0 2px rgba(77, 216, 160, 0.18);
         }
       `}</style>
     </div>
@@ -562,10 +651,10 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-sm font-medium text-slate-700">
+      <span className="text-sm font-medium text-white/80">
         {label}
-        {required && <span className="text-red-500 ml-0.5">*</span>}
-        {hint && <span className="text-slate-400 font-normal text-xs ml-1">({hint})</span>}
+        {required && <span className="text-red-300 ml-0.5">*</span>}
+        {hint && <span className="text-white/50 font-normal text-xs ml-1">({hint})</span>}
       </span>
       <div className="mt-1">{children}</div>
     </label>

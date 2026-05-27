@@ -1,6 +1,6 @@
 import { Tour } from '../types/tour';
 
-/** Tier 2 Private is priced above list (Tier 1 Standard). Adjust in one place. */
+/** Tier 2 Private (1–3 pax, incl. solo) is priced above list (Tier 1 Standard 4–6). */
 export const PRIVATE_PRICE_MULTIPLIER = 1.3;
 
 export type TripSizeTier = 'STANDARD' | 'PRIVATE';
@@ -18,7 +18,7 @@ export const TRIP_SIZE_TIERS = {
   PRIVATE: {
     id: 'PRIVATE' as const,
     tierLabel: 'Tier 2 Private',
-    paxMin: 2,
+    paxMin: 1,
     paxMax: 3,
     pricingNoteTh: 'Guaranteed Departure (ราคาสูงกว่า)',
     pricingNoteEn: 'Guaranteed Departure (premium pricing)',
@@ -113,12 +113,12 @@ export const TRIP_TIER_POLICY = {
   EN: {
     title: 'Trip size tiers',
     standard: 'Tier 1 Standard: 4–6 guests — standard list price per person.',
-    private: 'Tier 2 Private: 2–3 guests — Guaranteed Departure (premium price per person).',
+    private: 'Tier 2 Private: 1–3 guests — Guaranteed Departure (premium price per person; solo = this tier).',
   },
   TH: {
     title: 'ระดับขนาดทริป',
     standard: 'Tier 1 Standard: 4–6 คน — ราคาปกติต่อคน',
-    private: 'Tier 2 Private: 2–3 คน — Guaranteed Departure (ราคาสูงกว่าต่อคน)',
+    private: 'Tier 2 Private: 1–3 คน — Guaranteed Departure (ราคาสูงกว่าต่อคน; เดินคนเดียวใช้ tier นี้)',
   },
 } as const;
 

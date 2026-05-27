@@ -35,7 +35,9 @@ Deno.serve(async (req) => {
 
   const ip = getClientIp(req);
 
-  const insertRow = {
+  const waiverType = (body.waiver_type as string) ?? 'core';
+
+  const insertRow: Record<string, unknown> = {
     client_id: body.client_id as string,
     tour_id: body.tour_id as string,
     agreed_terms: Boolean(body.agreed_terms),
@@ -48,6 +50,8 @@ Deno.serve(async (req) => {
     signed_at: body.signed_at as string,
     content_hash: body.content_hash as string,
     ip_address: ip,
+    waiver_type: waiverType,
+    agreed_transport: Boolean(body.agreed_transport),
   };
 
   const { error } = await client.from('client_waivers').insert(insertRow);

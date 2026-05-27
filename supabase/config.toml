@@ -6,3 +6,9 @@ verify_jwt = false
 
 [functions.record-waiver]
 verify_jwt = false
+
+[functions.deliver-album]
+verify_jwt = false
+
+[functions.send-retarget-sms]
+verify_jwt = false

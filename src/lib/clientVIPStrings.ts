@@ -54,8 +54,8 @@ export const STRINGS = {
       c2: 'ยอมรับความเสี่ยงและข้อจำกัดความรับผิด (ACL)',
       c3: 'ยอมรับข้อจำกัด OSHC (สำหรับนักเรียนเท่านั้น)',
       c4: 'ข้อมูลถูกต้อง และอายุ 18 ปีขึ้นไป',
-      c5: 'สิทธิ์ขับรถเช่า — เฉพาะช่างภาพเท่านั้น',
-      c6: 'สิทธิ์ Portfolio — ช่างภาพใช้ภาพโปรโมตได้',
+      c5: 'สิทธิ์ขับรถเช่า — ผู้จัดทริปเท่านั้น (ลูกค้าไม่มีสิทธิ์ขับรถเช่า)',
+      c6: 'Portfolio rights — ยินยอมให้ใช้รูปเพื่อการโปรโมต/โฆษณา',
     },
     step5: {
       title: 'ลงทะเบียนสำเร็จ',
@@ -121,8 +121,8 @@ export const STRINGS = {
       c2: 'Risk & liability limitation (ACL binding)',
       c3: 'OSHC limitation (student travellers only)',
       c4: 'Information is accurate and I am 18+',
-      c5: 'Rental driving — photographers only may drive',
-      c6: 'Portfolio rights — photographer may use images for promotion',
+      c5: 'Rental vehicle — trip host (organiser) drives only; guests may not drive',
+      c6: 'Portfolio rights — I consent to promotional / advertising use of my images',
     },
     step5: {
       title: 'Registration complete',

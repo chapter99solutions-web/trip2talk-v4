@@ -4,6 +4,7 @@ export type { AppRole, AppRole as StaffRole } from './platform';
 export type ATOCategory = 'Transport' | 'Accommodation' | 'Meals' | 'Attractions' | 'Marketing' | 'Insurance' | 'Other';
 export type VisaStatus = 'NOT_REQUIRED' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'PENDING_NZ_VISA';
 export type ClientTier = 'STANDARD' | 'VIP' | 'VVIP';
+export type VipTier = 'standard' | 'silver' | 'gold' | 'platinum';
 
 export interface Tour {
   id: string;
@@ -34,6 +35,10 @@ export interface CRMClient {
   medical_conditions: string;
   dietary_requirements: string;
   client_tier: ClientTier;
+  vip_tier?: VipTier;
+  total_trips?: number;
+  lifetime_value?: number;
+  album_delivered_at?: string;
   email?: string;
   phone?: string;
 }

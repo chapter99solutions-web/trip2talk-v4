@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { findTripById } from '../lib/publicTours';
 import {
@@ -21,7 +21,6 @@ import {
   LandscapePreset,
 } from '../lib/albumPrepData';
 
-const ALBUM_LINK_DAYS = 60;
 const NAVY = '#0d1b2a';
 
 function ExpandableCard({
@@ -35,7 +34,7 @@ function ExpandableCard({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+    <div className="rounded-xl border border-white/10 bg-[#132333] overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -65,7 +64,7 @@ function FaqList({ items, accent }: { items: { q: string; a: string }[]; accent:
   return (
     <div className="space-y-2">
       {items.map((item, i) => (
-        <div key={item.q} className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+        <div key={item.q} className="rounded-xl border border-white/10 bg-[#132333] overflow-hidden">
           <button
             type="button"
             onClick={() => setOpenIdx(openIdx === i ? null : i)}
@@ -117,13 +116,6 @@ export default function AlbumPrep() {
 
   const settings = LANDSCAPE_SETTINGS[preset];
 
-  const expiryLabel = useMemo(() => {
-    if (!trip) return '';
-    const d = new Date(trip.end_date);
-    d.setDate(d.getDate() + ALBUM_LINK_DAYS);
-    return d.toLocaleDateString('th-TH', { dateStyle: 'long' });
-  }, [trip]);
-
   if (!trip) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4" style={{ background: NAVY }}>
@@ -172,18 +164,15 @@ export default function AlbumPrep() {
           </button>
         </div>
 
-        {/* Gallery ready notification */}
+        {/* Gallery ready — both Model & Landscape modes */}
         {albumReady && (
-          <div className="rounded-2xl p-4 mb-6 border bg-[#E1F5EE] border-[#5DCAA5] text-[#1a4d3a] text-sm space-y-2">
+          <div className="bg-[#E1F5EE] border border-[#5DCAA5] rounded-xl p-4 mb-4 text-[#1a4d3a] text-sm space-y-2">
             <p className="font-semibold">📸 คลังภาพพร้อมดาวน์โหลดแล้วครับ!</p>
             <p className="text-[#2d6b52] leading-relaxed">
-              ส่งลิงก์ทาง Facebook Inbox ส่วนตัวแล้ว หรือเข้าผ่านทางลัดในแอปนี้
+              ส่งลิงก์ทาง Facebook Inbox ส่วนตัวแล้ว / เข้าผ่านทางลัดในแอปได้เช่นกัน
             </p>
-            <p className="text-xs font-medium">
-              ดาวน์โหลด .JPG ทั้งหมดภายใน {ALBUM_LINK_DAYS} วัน (ลิงก์หมดอายุอัตโนมัติ)
-              {expiryLabel && (
-                <span className="block mt-1 font-mono opacity-80">หมดอายุประมาณ: {expiryLabel}</span>
-              )}
+            <p className="text-xs font-medium text-[#2d6b52]">
+              ดาวน์โหลด .JPG ทั้งหมดภายใน 60 วัน (ลิงก์หมดอายุอัตโนมัติ)
             </p>
           </div>
         )}

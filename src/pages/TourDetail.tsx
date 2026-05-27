@@ -1,88 +1,260 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { formatAUD } from '../lib/payidCalc';
 import { findTripById } from '../lib/publicTours';
-import { quoteTripTotal } from '../lib/bookingPolicy';
-import TripSizeTierBadge from '../components/cyber/TripSizeTierBadge';
-import { useState } from 'react';
+import { formatAUD } from '../lib/payidCalc';
+import { PORTFOLIO_TOURS } from '../lib/portfolioTours';
+import { supabase } from '../lib/supabase';
+
+type TourTab = 'details' | 'included' | 'reviews';
+
+const FALLBACK_HERO =
+  'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1600&q=80';
+
+function dayCount(start: string, end: string) {
+  const a = new Date(start);
+  const b = new Date(end);
+  const ms = b.getTime() - a.getTime();
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  return Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)));
+}
 
 export default function TourDetail() {
   const { tourId } = useParams<{ tourId: string }>();
   const trip = tourId ? findTripById(tourId) : undefined;
-  const [partyPax, setPartyPax] = useState(4);
+  const [activeTab, setActiveTab] = useState<TourTab>('details');
+  const [saved, setSaved] = useState(false);
+  const [photos, setPhotos] = useState<string[]>([]);
 
   if (!trip) {
     return (
       <div className="max-w-lg mx-auto px-4 py-16 text-center">
-        <p className="text-red-400 font-sans">Trip not found.</p>
-        <Link to="/" className="inline-block mt-4 text-[color:var(--teal)] text-sm">
+        <p className="text-red-600 font-sans">Trip not found.</p>
+        <Link to="/" className="inline-block mt-4 text-teal text-sm">
           ← Back to journeys
         </Link>
       </div>
     );
   }
 
-  const quote = quoteTripTotal(trip.price_aud, partyPax);
+  const tripId = trip.id;
+
+  const portfolio = PORTFOLIO_TOURS.find((t) => t.id === trip.id || t.id === tourId);
+  const heroImage = portfolio?.image ?? FALLBACK_HERO;
+  const title = portfolio?.title ?? trip.destination;
+  const location = portfolio?.location ?? `${trip.destination}`;
+  const rating = portfolio?.rating ?? 4.8;
+  const duration = portfolio?.duration ?? (() => {
+    const days = dayCount(trip.start_date, trip.end_date);
+    return days ? `${days} days` : '—';
+  })();
+
+  const saveKey = useMemo(() => `t2t:savedTours:v1`, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(saveKey);
+      const set = new Set<string>(raw ? JSON.parse(raw) : []);
+      setSaved(set.has(tripId));
+    } catch {
+      setSaved(false);
+    }
+  }, [saveKey, tripId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPhotos() {
+      try {
+        // Bucket: tour-photos, path: tour-photos/{tourId}/...
+        const prefix = `${tripId}/`;
+        const { data, error } = await supabase.storage.from('tour-photos').list(prefix, {
+          limit: 24,
+          sortBy: { column: 'name', order: 'asc' },
+        });
+        if (error) return;
+        const urls =
+          data
+            ?.filter((f) => f.name && !f.name.endsWith('/'))
+            .map((f) => supabase.storage.from('tour-photos').getPublicUrl(`${prefix}${f.name}`).data.publicUrl) ??
+          [];
+        if (!cancelled) setPhotos(urls);
+      } catch {
+        // Ignore: bucket may be private or not created yet
+      }
+    }
+
+    loadPhotos();
+    return () => {
+      cancelled = true;
+    };
+  }, [tripId]);
+
+  const toggleSave = () => {
+    try {
+      const raw = localStorage.getItem(saveKey);
+      const set = new Set<string>(raw ? JSON.parse(raw) : []);
+      if (set.has(tripId)) set.delete(tripId);
+      else set.add(tripId);
+      localStorage.setItem(saveKey, JSON.stringify([...set]));
+      setSaved(set.has(tripId));
+    } catch {
+      setSaved((s) => !s);
+    }
+  };
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-10 space-y-6">
-      <Link to="/" className="text-xs text-neutral-500 hover:text-[color:var(--teal)]">
-        ← All journeys
-      </Link>
+    <div className="min-h-screen bg-white text-slate-900 pb-24">
+      {/* Hero (55vh) */}
+      <section className="relative h-[55vh] min-h-[360px] overflow-hidden">
+        <img src={heroImage} alt={title} className="absolute inset-0 w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/60" />
 
-      <header>
-        <p className="font-mono text-xs text-[color:var(--teal)]">{trip.trip_code}</p>
-        <h1 className="font-serif text-2xl font-semibold text-[color:var(--gold)] mt-1">
-          {trip.destination}
-        </h1>
-        <p className="text-sm text-neutral-400 mt-2 font-mono">
-          {trip.start_date} — {trip.end_date}
-        </p>
-      </header>
+        <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-white/90 backdrop-blur border border-white/40 text-slate-900 text-sm font-semibold"
+          >
+            ← back
+          </Link>
+          <button
+            type="button"
+            onClick={toggleSave}
+            className="w-11 h-11 rounded-full bg-white/90 backdrop-blur border border-white/40 flex items-center justify-center text-lg"
+            aria-label={saved ? 'Unsave' : 'Save'}
+          >
+            {saved ? '❤️' : '🤍'}
+          </button>
+        </div>
+      </section>
 
-      <div className="cyber-card p-5 space-y-4">
-        <p className="text-sm text-neutral-300">
-          List price <span className="font-mono text-[color:var(--gold)]">{formatAUD(trip.price_aud)}</span>{' '}
-          per person
-        </p>
+      <section className="max-w-2xl mx-auto px-4 -mt-10 relative z-20">
+        <div className="rounded-3xl bg-white border border-slate-100 shadow-sm p-5">
+          <p className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white border border-slate-200 text-xs font-semibold text-slate-700">
+            <span aria-hidden>📍</span> {location}
+          </p>
 
-        <div>
-          <label className="text-xs text-neutral-500 block mb-2">Party size (2–6)</label>
-          <input
-            type="number"
-            min={2}
-            max={6}
-            value={partyPax}
-            onChange={(e) => setPartyPax(Number(e.target.value))}
-            className="cyber-input w-24 text-center"
-          />
-          {quote.tier && (
-            <div className="mt-2 flex items-center gap-2">
-              <TripSizeTierBadge tier={quote.tier} />
-              {quote.valid && (
-                <span className="font-mono text-sm text-[color:var(--teal)]">
-                  Total {formatAUD(quote.totalAud)}
-                </span>
-              )}
+          <h1 className="mt-3 text-[24px] leading-snug font-semibold text-slate-900">{title}</h1>
+
+          {/* Stats row */}
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+              <p className="text-xs text-slate-500 flex items-center gap-1">
+                <span aria-hidden>⏱</span> Duration
+              </p>
+              <p className="text-sm font-semibold text-slate-900 mt-1">{duration}</p>
             </div>
-          )}
-          {!quote.valid && (
-            <p className="text-xs text-red-400 mt-2">Party must be 2–3 (Private) or 4–6 (Standard).</p>
-          )}
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+              <p className="text-xs text-slate-500 flex items-center gap-1">
+                <span aria-hidden>👥</span> Max Pax
+              </p>
+              <p className="text-sm font-semibold text-slate-900 mt-1">{trip.max_pax}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+              <p className="text-xs text-slate-500 flex items-center gap-1">
+                <span aria-hidden>⭐</span> Rating
+              </p>
+              <p className="text-sm font-semibold text-slate-900 mt-1">{rating.toFixed(1)}</p>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div className="mt-5 flex gap-2">
+            {(
+              [
+                ['details', 'Details'],
+                ['included', "What's Included"],
+                ['reviews', 'Reviews'],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setActiveTab(key)}
+                className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+                  activeTab === key ? 'bg-navy text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab content */}
+          <div className="mt-4">
+            {activeTab === 'details' && (
+              <div className="text-sm text-slate-700 leading-relaxed space-y-3">
+                <p>
+                  A Private Photo Journey designed around light and pacing — small group, calm schedule, and a finished .JPG
+                  delivery.
+                </p>
+                <p className="text-xs text-slate-500 font-mono">
+                  {trip.start_date} → {trip.end_date} · {trip.trip_code}
+                </p>
+              </div>
+            )}
+
+            {activeTab === 'included' && (
+              <ul className="text-sm text-slate-700 space-y-2">
+                <li>✓ Private photo guide</li>
+                <li>✓ Finished .JPG delivery (no RAW)</li>
+                <li>✓ Trip briefing + safety checklist</li>
+              </ul>
+            )}
+
+            {activeTab === 'reviews' && (
+              <div className="space-y-3">
+                <div className="rounded-2xl border border-slate-100 bg-white p-4">
+                  <p className="text-amber-400 text-sm">★★★★★</p>
+                  <p className="text-sm text-slate-700 mt-2">
+                    “Pacing was perfect and the gallery felt editorial. Worth every dollar.”
+                  </p>
+                  <p className="text-xs text-slate-500 mt-2">— Verified guest</p>
+                </div>
+                <div className="rounded-2xl border border-slate-100 bg-white p-4">
+                  <p className="text-amber-400 text-sm">★★★★★</p>
+                  <p className="text-sm text-slate-700 mt-2">“Clear prep checklist, smooth day, beautiful light.”</p>
+                  <p className="text-xs text-slate-500 mt-2">— Verified guest</p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
-        <Link
-          to={`/book/${trip.id}?pax=${partyPax}`}
-          className={`cyber-btn-gold block text-center ${!quote.valid ? 'pointer-events-none opacity-40' : ''}`}
-        >
-          Book this journey
-        </Link>
-      </div>
+        {/* Gallery */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-serif text-lg font-semibold text-slate-900">Gallery</h2>
+            <p className="text-xs text-slate-500">Supabase Storage: `tour-photos/{tripId}/`</p>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-2 pr-2">
+            {(photos.length ? photos : [heroImage]).map((src, idx) => (
+              <img
+                key={`${src}-${idx}`}
+                src={src}
+                alt=""
+                className="h-40 w-64 object-cover rounded-2xl border border-slate-100 flex-shrink-0"
+                loading="lazy"
+              />
+            ))}
+          </div>
+        </div>
+      </section>
 
-      <p className="text-xs text-neutral-500 text-center">
-        <Link to="/package-terms" className="underline hover:text-[color:var(--teal)]">
-          Package & cancellation terms
-        </Link>
-      </p>
+      {/* Sticky bottom */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/92 backdrop-blur border-t border-slate-100">
+        <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs text-slate-500">From</p>
+            <p className="text-lg font-semibold text-slate-900">{formatAUD(trip.price_aud)}/person</p>
+          </div>
+          <Link
+            to={`/book/${trip.id}`}
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-teal text-navy font-semibold text-sm hover:opacity-90 transition-opacity"
+          >
+            Book this trip <span aria-hidden>→</span>
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

@@ -286,13 +286,14 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
                   <th className="p-3 cyber-table-th text-neutral-500 tracking-wide">OSHC</th>
                   <th className="p-3 cyber-table-th text-neutral-500 tracking-wide">MEDICAL</th>
                   <th className="p-3 cyber-table-th text-neutral-500 tracking-wide">TIER</th>
+                  <th className="p-3 cyber-table-th text-neutral-500 tracking-wide">PICKUP</th>
                   <th className="p-3 cyber-table-th text-neutral-500 tracking-wide">WAIVER</th>
                 </tr>
               </thead>
               <tbody>
                 {activeBookings.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-4 cyber-table-td text-neutral-500 text-sm text-center">
+                    <td colSpan={8} className="p-4 cyber-table-td text-neutral-500 text-sm text-center">
                       NO MANIFEST ENTRIES
                     </td>
                   </tr>
@@ -301,6 +302,8 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
                     const c = b.crm_clients!;
                     const t = b.tours!;
                     const oshc = oshcStatusLabel(c, t);
+                    const pickupLocation = (b as unknown as { pickup_location?: string | null; preferred_pickup?: string | null })
+                      .pickup_location ?? (b as unknown as { preferred_pickup?: string | null }).preferred_pickup;
                     return (
                       <tr key={b.id} className="cyber-table-row border-b border-white/5">
                         <td className="p-3">
@@ -334,6 +337,9 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
                         </td>
                         <td className="p-3">
                           <TierBadge tier={c.client_tier} />
+                        </td>
+                        <td className="p-3 cyber-table-td text-sm text-neutral-300">
+                          {pickupLocation === 'custom_accommodation' ? '🏨' : '📍'}
                         </td>
                         <td className="p-3">
                           {signedClientIds.has(c.id) ? (

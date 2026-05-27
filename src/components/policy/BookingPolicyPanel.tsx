@@ -62,7 +62,7 @@ export default function BookingPolicyPanel({
             </label>
             <input
               type="number"
-              min={2}
+              min={1}
               max={6}
               value={partyPax}
               onChange={(e) => onPartyPaxChange(Number(e.target.value))}
@@ -72,7 +72,7 @@ export default function BookingPolicyPanel({
               <TripSizeTierBadge tier={tier} />
             ) : (
               <span className="text-red-400 font-sans text-xs">
-                {L === 'TH' ? 'ต้อง 2–3 หรือ 4–6 คน' : 'Must be 2–3 or 4–6 guests'}
+                {L === 'TH' ? 'ต้อง 1–3 หรือ 4–6 คน' : 'Must be 1–3 or 4–6 guests'}
               </span>
             )}
           </div>

@@ -1,10 +1,11 @@
-import { WaiverData } from '../types/compliance';
+import { WaiverData, WaiverType } from '../types/compliance';
 import { initDB } from './expenseDb';
 
 export interface StoredWaiver extends WaiverData {
   id: string;
   tour_id: string;
   language: 'EN' | 'TH';
+  waiver_type?: WaiverType;
 }
 
 export const saveWaiverLocally = async (waiver: StoredWaiver): Promise<void> => {

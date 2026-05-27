@@ -37,6 +37,9 @@ npx supabase db query --file supabase/00-schema-auth.sql       --project-ref $RE
 npx supabase db query --file supabase/01-schema-tours-staff.sql --project-ref $REF
 npx supabase db query --file supabase/02-schema-crm-safety.sql  --project-ref $REF
 npx supabase db query --file supabase/03-schema-saas-mrr.sql    --project-ref $REF
+npx supabase db query --file supabase/04-schema-waiver-types.sql --project-ref $REF
+npx supabase db query --file supabase/05-schema-customer-journey.sql --project-ref $REF
+npx supabase db query --file supabase/06-schema-album-expires.sql --project-ref $REF
 ```
 
 **Linked project shortcut:**
@@ -67,7 +70,25 @@ $REF = "YOUR_NEW_REF"
 npx supabase functions deploy google-workspace-sync --project-ref $REF
 npx supabase functions deploy send-trip-receipt       --project-ref $REF
 npx supabase functions deploy record-waiver           --project-ref $REF
+npx supabase functions deploy deliver-album           --project-ref $REF
+npx supabase functions deploy send-retarget-sms       --project-ref $REF
 ```
+
+## Customer lifecycle (TASK 15)
+
+| Phase | Route / surface | DB / edge |
+|-------|-----------------|-----------|
+| 1 Discover | `/`, `/tours/:id` | `SELECT tours` |
+| 2 Book | `/book/:id` | `crm_clients`, `tour_bookings`, `send-trip-receipt` |
+| 3 Prepare | `/trip/:ref` | `client_waivers` (×3 types), `safety_briefings` |
+| 4 On trip | Owner / Co-host | `tour_bookings`, `expenses` |
+| 5 Post-trip | Owner sync | `net_settlements`, `sheets_sync_log` |
+| 6 Receive | `deliver-album` | Signed URL 60d; DB `expires_at = now() + interval '60 days'` |
+| 7 Review | `send-retarget-sms` | `vip_tier`, `lifetime_value` |
+
+VIP auto-upgrade (`resolve_vip_tier`): ≥10 platinum, ≥5 gold, ≥3 silver, else standard.
+
+App helpers: `src/lib/customerJourney.ts`.
 
 `record-waiver` is required for client waiver signing (`signed_at`, `ip_address`, `content_hash`).
 

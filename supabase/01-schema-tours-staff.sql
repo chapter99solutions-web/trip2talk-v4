@@ -36,6 +36,12 @@ CREATE TABLE IF NOT EXISTS tour_bookings (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- TASK 17 — Pickup points
+-- pickup_location: 'thaitown_main' | 'custom_accommodation'
+ALTER TABLE tour_bookings
+  ADD COLUMN IF NOT EXISTS pickup_location TEXT,
+  ADD COLUMN IF NOT EXISTS hotel_name TEXT;
+
 CREATE TABLE IF NOT EXISTS staff_assignments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,

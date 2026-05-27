@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatAUD } from '../lib/payidCalc';
 import { PORTFOLIO_TOURS, TOUR_FILTERS, TourFilter } from '../lib/portfolioTours';
+import PublicBottomNav from '../components/public/PublicBottomNav';
 
 const HERO_IMAGE =
   'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1920&q=85';
@@ -25,7 +26,7 @@ const FEATURES = [
   },
   {
     title: 'Expert Guides',
-    desc: 'Led by working photographers — not generic tour operators.',
+    desc: 'Led by working photographers — not generic mass-market trip operators.',
     icon: '📷',
   },
   {
@@ -107,7 +108,7 @@ function TourCard({
               {tour.title}
             </h3>
           </div>
-          <p className="font-semibold text-emerald-700 whitespace-nowrap">{formatAUD(tour.priceAud)}</p>
+          <p className="font-semibold text-teal whitespace-nowrap">{formatAUD(tour.priceAud)}</p>
         </div>
         <p className="text-sm text-slate-500 mt-2 flex items-center gap-1">
           <span aria-hidden>📍</span> {tour.location} · {tour.duration}
@@ -115,9 +116,9 @@ function TourCard({
         <p className="text-xs text-slate-400 mt-1">{tour.reviewCount} reviews</p>
         <Link
           to={`/tours/${tour.id}`}
-          className="mt-4 inline-flex w-full justify-center items-center py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-emerald-800 transition-colors"
+          className="mt-4 inline-flex w-full justify-center items-center gap-2 py-2.5 rounded-full bg-navy text-white text-sm font-semibold hover:bg-navy-dark transition-colors"
         >
-          Book Now
+          Book this trip <span aria-hidden>→</span>
         </Link>
       </div>
     </article>
@@ -143,7 +144,7 @@ export default function PublicPortfolio() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans antialiased">
+    <div className="min-h-screen bg-white text-slate-900 font-sans antialiased pb-20">
       {/* Sticky nav */}
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-100">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
@@ -152,7 +153,7 @@ export default function PublicPortfolio() {
           </Link>
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
             <a href="#tours" className="hover:text-emerald-600 transition-colors">
-              Tours
+              Trips
             </a>
             <a href="#gallery" className="hover:text-emerald-600 transition-colors">
               Gallery
@@ -166,9 +167,9 @@ export default function PublicPortfolio() {
           </nav>
           <Link
             to="/tours/nz-aut-2026"
-            className="shrink-0 px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm"
+            className="shrink-0 px-4 py-2 rounded-full bg-navy text-white text-sm font-semibold hover:bg-navy-dark transition-colors shadow-sm"
           >
-            Book a Tour
+            Explore Now <span aria-hidden>→</span>
           </Link>
         </div>
       </header>
@@ -193,6 +194,14 @@ export default function PublicPortfolio() {
           <p className="mt-6 text-lg text-white/80 max-w-xl mx-auto">
             Private Photo Journeys for small groups — curated light, finished .JPG galleries, Chapter 99 Photography.
           </p>
+          <div className="mt-8 flex justify-center">
+            <a
+              href="#tours"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white text-navy font-semibold text-sm hover:bg-slate-50 transition-colors shadow-sm"
+            >
+              Explore Now <span aria-hidden>→</span>
+            </a>
+          </div>
           <div className="mt-12 grid grid-cols-3 gap-6 max-w-lg mx-auto border-t border-white/20 pt-8">
             {STATS.map((s) => (
               <div key={s.label}>
@@ -208,7 +217,7 @@ export default function PublicPortfolio() {
       <section id="tours" className="max-w-6xl mx-auto px-4 py-20">
         <div className="text-center mb-10">
           <h2 className="font-serif text-3xl md:text-4xl font-semibold text-slate-900">Curated journeys</h2>
-          <p className="text-slate-500 mt-2 text-sm">Tier 1 Standard (4–6) · Tier 2 Private (2–3) Guaranteed Departure</p>
+          <p className="text-slate-500 mt-2 text-sm">Tier 1 Standard (4–6) · Tier 2 Private (1–3) Guaranteed Departure</p>
         </div>
         <div className="flex flex-wrap justify-center gap-2 mb-10">
           {TOUR_FILTERS.map((f) => (
@@ -218,11 +227,11 @@ export default function PublicPortfolio() {
               onClick={() => setFilter(f.id)}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                 filter === f.id
-                  ? 'bg-slate-900 text-white'
+                  ? 'bg-navy text-white'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              {f.label}
+              {f.label === 'One Day' ? 'One Day Trip' : f.label}
             </button>
           ))}
         </div>
@@ -313,7 +322,7 @@ export default function PublicPortfolio() {
           </div>
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5">
             <p className="text-xs font-semibold uppercase text-emerald-700">Tier 2 Private</p>
-            <p className="font-serif text-xl mt-2">2–3 guests</p>
+            <p className="font-serif text-xl mt-2">1–3 guests</p>
             <p className="text-sm text-slate-500 mt-1">Guaranteed Departure · premium rate</p>
           </div>
         </div>
@@ -328,20 +337,20 @@ export default function PublicPortfolio() {
           Ready to frame your next chapter?
         </h2>
         <p className="mt-4 text-emerald-100/90 text-sm max-w-md mx-auto">
-          Private Photo Journeys from Warrawee — not a mass-market tour operator.
+          Private Photo Journeys from Warrawee — not a mass-market escorted travel service (บริการนำเที่ยวทั่วไป).
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-4">
           <Link
             to="/tours/nz-aut-2026"
-            className="px-6 py-3 rounded-full bg-white text-emerald-900 font-semibold text-sm hover:bg-emerald-50 transition-colors"
+            className="px-6 py-3 rounded-full bg-white text-navy font-semibold text-sm hover:bg-slate-50 transition-colors"
           >
-            Explore tours
+            Explore trips <span aria-hidden>→</span>
           </Link>
           <Link
             to="/book/nz-aut-2026"
             className="px-6 py-3 rounded-full border border-white/40 text-white font-semibold text-sm hover:bg-white/10 transition-colors"
           >
-            Request a quote
+            Book this trip <span aria-hidden>→</span>
           </Link>
         </div>
       </section>
@@ -354,19 +363,21 @@ export default function PublicPortfolio() {
             <p className="mt-1">Chapter 99 Photography</p>
             <p className="mt-1">ABN: XX XXX XXX XXX · Warrawee NSW 2074</p>
           </div>
-          <div className="flex flex-wrap justify-center gap-4 font-medium">
-            <Link to="/terms" className="hover:text-emerald-600">
+          <nav className="flex flex-wrap justify-center gap-4 font-medium" aria-label="Legal">
+            <Link to="/terms" className="hover:text-teal">
               Photo delivery terms
             </Link>
-            <Link to="/package-terms" className="hover:text-emerald-600">
-              Package terms
+            <Link to="/package-terms" className="hover:text-teal">
+              Package &amp; cancellation terms
             </Link>
             <Link to="/dashboard" className="text-slate-400 hover:text-slate-600">
               Staff
             </Link>
-          </div>
+          </nav>
         </div>
       </footer>
+
+      <PublicBottomNav />
     </div>
   );
 }

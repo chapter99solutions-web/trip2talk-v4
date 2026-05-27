@@ -3,8 +3,7 @@ import { BookingStatus, CRMClient, Tour } from '../../types/tour';
 import { validateOSHC } from '../../lib/compliance';
 import { fetchCashierPOSData, CashierPOSData } from '../../lib/supabaseData';
 import { formatAUD } from '../../lib/payidCalc';
-import { dispatchTransactionNotification } from '../../lib/notifications';
-import { supabase } from '../../lib/supabase';
+import { runPhase4OnTrip } from '../../lib/customerJourney';
 import CyberViewport from '../layout/CyberViewport';
 import LiveClock from '../cyber/LiveClock';
 import AwaitingSync from '../cyber/AwaitingSync';
@@ -174,7 +173,7 @@ export default function CashierPOS({
       return;
     }
     if (!selectedTour) {
-      showError('Select a tour');
+      showError('Select a trip');
       return;
     }
     if (amountNum <= 0) {
@@ -189,49 +188,22 @@ export default function CashierPOS({
     const tripCode = selectedTour.trip_code;
 
     try {
-      const { data: existing } = await supabase
-        .from('tour_bookings')
-        .select('id, amount_paid_aud')
-        .eq('tour_id', selectedTour.id)
-        .eq('client_id', selectedClient.id)
-        .maybeSingle();
-
-      const newPaid = (existing?.amount_paid_aud ?? 0) + amountNum;
-
-      if (existing?.id) {
-        const { error: updateErr } = await supabase
-          .from('tour_bookings')
-          .update({
-            amount_paid_aud: newPaid,
-            booking_status: bookingStatus,
-            payment_method: paymentMethod,
-          })
-          .eq('id', existing.id);
-        if (updateErr) throw updateErr;
-      } else {
-        const { error: insertErr } = await supabase.from('tour_bookings').insert({
-          tour_id: selectedTour.id,
-          client_id: selectedClient.id,
-          amount_paid_aud: amountNum,
-          booking_status: bookingStatus,
-          payment_method: paymentMethod,
-        });
-        if (insertErr) throw insertErr;
-      }
-
-      // To activate SMS/Email receipts, set these secrets in Supabase Dashboard:
-      // Dashboard → Settings → Edge Functions → send-trip-receipt → Secrets
-      // RESEND_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER
-      void dispatchTransactionNotification({
-        client_name: clientFullName(selectedClient),
-        client_email: selectedClient.email ?? '',
-        client_phone: selectedClient.phone ?? '',
-        amount_aud: amountNum,
-        reference_number: reference,
-        trip_code: tripCode,
-        payment_method: paymentMethod,
-        booking_status: bookingStatus,
+      const { warnings } = await runPhase4OnTrip({
+        tourId: selectedTour.id,
+        clientId: selectedClient.id,
+        amountAud: amountNum,
+        paymentMethod,
+        bookingStatus,
+        referenceNumber: reference,
+        clientName: clientFullName(selectedClient),
+        clientEmail: selectedClient.email,
+        clientPhone: selectedClient.phone,
+        tripCode,
       });
+
+      if (warnings.length > 0) {
+        console.warn('[Trip2Talk] Phase 4 (on trip) warnings:', warnings);
+      }
 
       setTxnRef(reference);
     } catch (err) {
