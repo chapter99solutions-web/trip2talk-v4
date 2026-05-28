@@ -34,8 +34,7 @@ const EXCLUDED = [
 ];
 
 const CANCEL_ROWS = [
-  { range: 'มากกว่า 90 วัน', fee: 'หัก 10%', refund: 'คืน 90%', highlight: false },
-  { range: '61–90 วัน', fee: 'หัก 30%', refund: 'คืน 70%', highlight: false },
+  { range: 'มากกว่า 60 วัน', fee: 'หัก 10%', refund: 'คืน 90%', highlight: false },
   { range: '31–60 วัน', fee: 'หัก 50%', refund: 'คืน 50%', highlight: false },
   { range: '≤30 วัน', fee: 'ไม่คืน', refund: '—', highlight: true },
 ];

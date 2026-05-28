@@ -94,6 +94,33 @@ async function appendToSheet(
   }
 }
 
+async function createDriveFolder(
+  accessToken: string,
+  name: string,
+  parentId?: string
+): Promise<{ id: string; webViewLink?: string }> {
+  const body: Record<string, unknown> = {
+    name,
+    mimeType: 'application/vnd.google-apps.folder',
+  };
+  if (parentId) body.parents = [parentId];
+
+  const res = await fetch('https://www.googleapis.com/drive/v3/files?fields=id,webViewLink', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.id) {
+    throw new Error(`Drive folder create failed: ${JSON.stringify(json)}`);
+  }
+  return json as { id: string; webViewLink?: string };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -159,6 +186,32 @@ serve(async (req) => {
         JSON.stringify({
           success: true,
           spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}`,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (action === 'APPEND_ROW') {
+      const row = Array.isArray(payload?.values) ? payload.values : [];
+      await appendToSheet(accessToken, SPREADSHEET_ID, sheetName, row);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}`,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (action === 'CREATE_FOLDER') {
+      const name = payload?.name ?? 'Trip2Talk Folder';
+      const parentId = payload?.parentId;
+      const folder = await createDriveFolder(accessToken, name, parentId);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          folderId: folder.id,
+          folderUrl: folder.webViewLink ?? `https://drive.google.com/drive/folders/${folder.id}`,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

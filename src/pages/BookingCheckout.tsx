@@ -518,7 +518,7 @@ export default function BookingCheckout() {
               <span className="font-semibold">⚠️ ไม่รวม:</span> ตั๋วเครื่องบิน / อาหาร / Travel Insurance
             </p>
             <p>
-              <span className="font-semibold">📋 ยกเลิก:</span> &gt;90วัน-10% / 31-60วัน-50% / ≤30วัน-ไม่คืน
+              <span className="font-semibold">📋 ยกเลิก:</span> &gt;60วัน-10% / 31-60วัน-50% / ≤30วัน-ไม่คืน
             </p>
           </div>
 

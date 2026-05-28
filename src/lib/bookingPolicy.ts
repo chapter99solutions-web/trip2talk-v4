@@ -64,7 +64,6 @@ export function calcRefundPercent(cancelledBy: CancellationBy, daysBeforeStart: 
   // ยกเลิกโดยลูกค้า
   if (daysBeforeStart <= 30) return 0;
   if (daysBeforeStart <= 60) return 50;
-  if (daysBeforeStart <= 90) return 70;
   return 90;
 }
 
@@ -91,8 +90,7 @@ export const CANCELLATION_POLICY = {
     title: 'Cancellation & Refund Policy',
     owner: 'Cancelled by Trip2Talk (Saen): if less than 45 days before departure — 100% refund.',
     customerRows: [
-      'More than 90 days before departure: 10% fee (90% refund)',
-      '61–90 days: 30% fee (70% refund)',
+      'More than 60 days before departure: 10% fee (90% refund)',
       '31–60 days: 50% fee (50% refund)',
       '30 days or less: no refund',
     ],
@@ -101,8 +99,7 @@ export const CANCELLATION_POLICY = {
     title: 'นโยบายยกเลิกและคืนเงิน',
     owner: 'ยกเลิกโดยพี่แสน (Trip2Talk): น้อยกว่า 45 วันก่อนออกทริป — คืน 100%',
     customerRows: [
-      'มากกว่า 90 วันก่อนออกทริป: หัก 10% (คืน 90%)',
-      '61–90 วัน: หัก 30% (คืน 70%)',
+      'มากกว่า 60 วันก่อนออกทริป: หัก 10% (คืน 90%)',
       '31–60 วัน: หัก 50% (คืน 50%)',
       '30 วันหรือน้อยกว่า: ไม่คืนเงิน',
     ],

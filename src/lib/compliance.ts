@@ -9,7 +9,7 @@ export const WAIVER_TEXT = {
     media: 'I consent to photographic and video recording. I understand delivery is final edited .JPG only (no RAW files) and album links expire after 60 days.',
     privacy: 'I confirm my visa and personal details match official documents.',
     cancellation:
-      'I accept trip tiers (Standard 4–6 guests, Private 1–3 guests Guaranteed Departure; solo = Private rate) and the cancellation policy: owner cancellation <45 days before departure — 100% refund; client cancellation >90d 10% fee, 61–90d 30%, 31–60d 50%, ≤30d no refund.',
+      'I accept trip tiers (Standard 4–6 guests, Private 1–3 guests Guaranteed Departure; solo = Private rate) and the cancellation policy: owner cancellation <45 days before departure — 100% refund; client cancellation >60d 10% fee, 31–60d 50%, ≤30d no refund.',
   },
   TH: {
     title: 'หนังสือยินยอมสละสิทธิ์ความรับผิดชอบและข้อตกลงความปลอดภัย',
@@ -19,7 +19,7 @@ export const WAIVER_TEXT = {
     media: 'ข้าพเจ้ายินยอมให้ถ่ายภาพ/วิดีโอ และรับทราบว่าจะส่งมอบเฉพาะไฟล์ .JPG สำเร็จรูปเท่านั้น (ไม่ส่งไฟล์ RAW) และลิงก์อัลบั้มหมดอายุภายใน 60 วัน',
     privacy: 'ข้าพเจ้ายืนยันว่าข้อมูลวีซ่าและข้อมูลส่วนตัวตรงกับเอกสารทางการ',
     cancellation:
-      'ข้าพเจ้ายอมรับระดับทริป (Standard 4–6 คน, Private 1–3 คน Guaranteed Departure — เดินคนเดียวใช้ราคา Private) และนโยบายยกเลิก: ยกเลิกโดยพี่แสน <45 วันก่อนออกทริป คืน 100%; ลูกค้ายกเลิก >90 วัน หัก 10%, 61–90 หัก 30%, 31–60 หัก 50%, ≤30 วัน ไม่คืน',
+      'ข้าพเจ้ายอมรับระดับทริป (Standard 4–6 คน, Private 1–3 คน Guaranteed Departure — เดินคนเดียวใช้ราคา Private) และนโยบายยกเลิก: ยกเลิกโดยพี่แสน <45 วันก่อนออกทริป คืน 100%; ลูกค้ายกเลิก >60 วัน หัก 10%, 31–60 หัก 50%, ≤30 วัน ไม่คืน',
   },
 } as const;
 
