@@ -14,8 +14,8 @@ export default function PublicShell() {
             <Link to="/" className="text-emerald-600 hover:underline">
               ← Home
             </Link>
-            <Link to="/dashboard" className="text-slate-500 hover:text-slate-800">
-              Staff
+            <Link to="/ops" className="text-slate-500 hover:text-slate-800">
+              Ops
             </Link>
           </div>
         </div>

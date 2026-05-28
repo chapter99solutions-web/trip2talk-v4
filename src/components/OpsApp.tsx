@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import PINGate from './PINGate';
 import { AppRole } from '../types/platform';
 
@@ -7,6 +7,7 @@ const StaffDashboard = lazy(() => import('./staff/StaffDashboard'));
 const CohostDashboard = lazy(() => import('./cohost/CohostDashboard'));
 const OwnerDashboard = lazy(() => import('./owner/OwnerDashboard'));
 const PlatformHub = lazy(() => import('./superadmin/PlatformHub'));
+const CmsPage = lazy(() => import('../pages/Cms'));
 
 const IDLE_MS = 30 * 60 * 1000;
 
@@ -25,9 +26,32 @@ function RoleRouter({ role, onLogout }: { role: AppRole; onLogout: () => void })
   }
 }
 
-/** Staff / owner consoles behind PIN (/dashboard). */
+function CmsGate({ role, onLogout }: { role: AppRole; onLogout: () => void }) {
+  if (role === 'OWNER' || role === 'PLATFORM_ADMIN') {
+    return <CmsPage onLogout={onLogout} />;
+  }
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6">
+      <div className="cyber-card p-6 max-w-md w-full">
+        <p className="text-amber-400 font-semibold tracking-wide">ACCESS DENIED</p>
+        <p className="text-neutral-500 text-sm mt-2">CMS is only available for Owner (9999) and Platform Admin (3501).</p>
+        <div className="mt-4 flex gap-2">
+          <Link to="/dashboard" className="cyber-btn-ghost text-xs">
+            Back to dashboard
+          </Link>
+          <button type="button" onClick={onLogout} className="cyber-btn-exit text-xs">
+            [ EXIT ]
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Staff / owner consoles behind PIN (/ops). */
 export default function OpsApp() {
   const [currentRole, setCurrentRole] = useState<AppRole | null>(null);
+  const location = useLocation();
 
   const logout = useCallback(() => {
     setCurrentRole(null);
@@ -75,7 +99,13 @@ export default function OpsApp() {
           </div>
         }
       >
-        <RoleRouter role={currentRole} onLogout={logout} />
+        <Routes>
+          <Route path="/ops" element={<RoleRouter role={currentRole} onLogout={logout} />} />
+          <Route path="/ops/*" element={<RoleRouter role={currentRole} onLogout={logout} />} />
+          <Route path="/cms" element={<CmsGate role={currentRole} onLogout={logout} />} />
+          <Route path="/cms/*" element={<CmsGate role={currentRole} onLogout={logout} />} />
+          <Route path="*" element={<Navigate to={location.pathname.startsWith('/cms') ? '/cms' : '/ops'} replace />} />
+        </Routes>
       </Suspense>
     </div>
   );

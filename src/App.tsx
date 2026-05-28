@@ -5,6 +5,7 @@ import OfflineBanner from './components/shared/OfflineBanner';
 import PublicShell from './components/layout/PublicShell';
 
 const PublicPortfolio = lazy(() => import('./pages/PublicPortfolio'));
+const ClientPortal = lazy(() => import('./pages/ClientPortal'));
 const TourDetail = lazy(() => import('./pages/TourDetail'));
 const BookingCheckout = lazy(() => import('./pages/BookingCheckout'));
 const ClientVIPHub = lazy(() => import('./pages/ClientVIPHub'));
@@ -33,6 +34,7 @@ export default function App() {
           <Routes>
             {/* PUBLIC — no PIN */}
             <Route path="/" element={<PublicPortfolio />} />
+            <Route path="/dashboard" element={<ClientPortal />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/album/:tourId" element={<AlbumPrep />} />
@@ -46,10 +48,11 @@ export default function App() {
               <Route path="/package-terms" element={<TravelPackageTerms />} />
             </Route>
 
-            {/* PROTECTED — PIN → role dashboard (9999 = Owner CMS) */}
-            <Route path="/dashboard" element={<OpsApp />} />
-            <Route path="/dashboard/*" element={<OpsApp />} />
-            <Route path="/ops/*" element={<Navigate to="/dashboard" replace />} />
+            {/* PROTECTED — PIN → ops console + CMS */}
+            <Route path="/ops" element={<OpsApp />} />
+            <Route path="/ops/*" element={<OpsApp />} />
+            <Route path="/cms" element={<OpsApp />} />
+            <Route path="/cms/*" element={<OpsApp />} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

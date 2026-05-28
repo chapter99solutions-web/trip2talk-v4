@@ -52,6 +52,10 @@ export type CustomerBookingRow = {
   bookingId: string;
   customerName: string;
   tourCode: string;
+  phone: string;
+  pickupLocation: string;
+  departTime: string;
+  guests: number | null;
 };
 
 export type ConsentStatus = 'CHECKED_IN';
@@ -254,7 +258,70 @@ function normalizeBookingRow(raw: unknown): CustomerBookingRow | null {
   if (!bookingId) return null;
   const customerName = asString(r.customerName || r.customer_name || r['Customer Name'] || r['Name']).trim();
   const tourCode = asString(r.tourCode || r.tour_code || r['Tour Code'] || r['Package']).trim();
-  return { bookingId, customerName, tourCode };
+  const phone = asString(r.phone || r.phoneNumber || r['Phone'] || r['Phone Number'] || r['Mobile']).trim();
+  const pickupLocation = asString(r.pickupLocation || r.pickup_location || r['Pickup'] || r['Pickup Location']).trim();
+  const departTime = asString(r.departTime || r.depart_time || r['Depart'] || r['Depart Time']).trim();
+  const guests = asNumber(r.guests || r.pax || r['Guests'] || r['Pax']);
+  return { bookingId, customerName, tourCode, phone, pickupLocation, departTime, guests };
+}
+
+export async function fetchCustomerBookingsFromSheet(): Promise<CustomerBookingRow[]> {
+  const url = import.meta.env.VITE_GAS_WEBAPP_URL as string | undefined;
+  if (!url) throw new Error('Missing VITE_GAS_WEBAPP_URL');
+
+  const urls = [
+    `${url}?sheet=Customer_Bookings`,
+    `${url}?tab=Customer_Bookings`,
+    `${url}?action=list&sheet=Customer_Bookings`,
+    url,
+  ];
+
+  let lastErr: unknown = null;
+  for (const u of urls) {
+    try {
+      const res = await fetch(u, { method: 'GET' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = (await res.json()) as unknown;
+      const rows = extractBookings(json);
+      const normalized = rows.map(normalizeBookingRow).filter((x): x is CustomerBookingRow => Boolean(x));
+      if (normalized.length > 0) return normalized;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw new Error(lastErr instanceof Error ? lastErr.message : 'Could not load Customer_Bookings');
+}
+
+function normalizePhone(input: string): string {
+  return (input || '').replace(/[^\d+]/g, '').replace(/^00/, '+').trim();
+}
+
+export async function fetchCustomerBookingByBookingIdOrPhone(query: string): Promise<CustomerBookingRow | null> {
+  const q = query.trim();
+  if (!q) return null;
+  const qPhone = normalizePhone(q);
+
+  // Fast path: bookingId lookup
+  try {
+    const byId = await fetchCustomerBookingByIdFromSheet(q);
+    if (byId) {
+      return {
+        ...byId,
+        phone: '',
+        pickupLocation: '',
+        departTime: '',
+        guests: null,
+      };
+    }
+  } catch {
+    // fall back to full scan below
+  }
+
+  const all = await fetchCustomerBookingsFromSheet();
+  const match =
+    all.find((b) => b.bookingId.toLowerCase() === q.toLowerCase()) ??
+    (qPhone ? all.find((b) => normalizePhone(b.phone) === qPhone) : undefined);
+  return match ?? null;
 }
 
 async function postToAppsScript(payload: unknown): Promise<void> {

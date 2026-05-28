@@ -12,7 +12,7 @@ const NAV: NavItem[] = [
   { to: '/tours/nz-aut-2026', label: 'Calendar', icon: '📅' },
   { to: '/tours/nz-aut-2026', label: 'Camera', icon: '📷', kind: 'primary' },
   { to: '/tours/nz-aut-2026', label: 'Saved', icon: '♡' },
-  { to: '/dashboard', label: 'Profile', icon: '👤' },
+  { to: '/dashboard', label: 'Portal', icon: '👤' },
 ];
 
 export default function PublicBottomNav() {
