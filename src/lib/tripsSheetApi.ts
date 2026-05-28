@@ -346,6 +346,9 @@ export async function fetchTripsFromSheet(): Promise<TripSheetRow[]> {
 
   // Try a few common Apps Script patterns without requiring a specific backend implementation.
   const urls = [
+    // Most explicit: a backend that routes by action name.
+    `${url}?action=getTrips`,
+    `${url}?action=getTrips&sheet=Trips_Data`,
     `${url}?sheet=Trips_Data`,
     `${url}?tab=Trips_Data`,
     `${url}?action=list&sheet=Trips_Data`,
@@ -356,12 +359,25 @@ export async function fetchTripsFromSheet(): Promise<TripSheetRow[]> {
   for (const u of urls) {
     try {
       const res = await fetch(u, { method: 'GET' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const bodyText = await res.text().catch(() => '');
+        console.error('[GAS][Trips_Data] HTTP error', {
+          url: u,
+          status: res.status,
+          statusText: res.statusText,
+          bodyText: bodyText.slice(0, 2000),
+        });
+        throw new Error(`HTTP ${res.status}`);
+      }
       const json = (await res.json()) as unknown;
       const rows = extractTrips(json);
       const normalized = rows.map(normalizeTripRow).filter((x): x is TripSheetRow => Boolean(x));
       if (normalized.length > 0) return normalized;
     } catch (e) {
+      console.error('[GAS][Trips_Data] fetch attempt failed', {
+        url: u,
+        error: e instanceof Error ? { name: e.name, message: e.message } : e,
+      });
       lastErr = e;
     }
   }
