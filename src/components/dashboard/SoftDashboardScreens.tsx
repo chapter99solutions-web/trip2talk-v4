@@ -6,6 +6,16 @@ function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(' ');
 }
 
+// Premium AU travel placeholders (avoid black/empty cards)
+const FALLBACK_HERO_AU =
+  'https://images.unsplash.com/photo-1506973035872-a4f23f7a5a4b?w=900&q=80&auto=format&fit=crop';
+const FALLBACK_CARD_AU_1 =
+  'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=900&q=80&auto=format&fit=crop';
+const FALLBACK_CARD_AU_2 =
+  'https://images.unsplash.com/photo-1469854523086-cc02afe5c88?w=900&q=80&auto=format&fit=crop';
+const FALLBACK_CARD_AU_3 =
+  'https://images.unsplash.com/photo-1459478309853-2c33a60058e7?w=900&q=80&auto=format&fit=crop';
+
 function GlassWeatherPill({
   label = 'Weather',
   tempC,
@@ -109,6 +119,7 @@ export function ActiveTripHomeScreen({
   capacityLabel: string;
   onStartTrip?: () => void;
 }) {
+  const heroSrc = heroImageUrl?.trim() || FALLBACK_HERO_AU;
   return (
     <div className="min-h-screen bg-sage-50 text-[#1C1C1E] font-sans pb-24">
       <div className="max-w-md mx-auto px-4 pt-6 space-y-5">
@@ -134,7 +145,7 @@ export function ActiveTripHomeScreen({
 
         <div className="relative rounded-[32px] overflow-hidden shadow-xl bg-neutral-900">
           <div className="relative aspect-[4/5]">
-            <img src={heroImageUrl} alt={tripTitle} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+            <img src={heroSrc} alt={tripTitle} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
 
             <div className="absolute top-4 left-4 right-4 flex justify-between items-start gap-4">
@@ -233,6 +244,8 @@ export function TripExplorerStackScreen({
 
         <div className="relative h-[min(70vh,520px)]">
           {layers.map(({ card, depth, idx }) => {
+            const imgFallback = depth === 0 ? FALLBACK_CARD_AU_1 : depth === 1 ? FALLBACK_CARD_AU_2 : FALLBACK_CARD_AU_3;
+            const cardSrc = card.imageUrl?.trim() || imgFallback;
             const scale = depth === 0 ? 1 : depth === 1 ? 0.95 : 0.9;
             const translateY = depth === 0 ? 0 : depth === 1 ? -14 : -26;
             const opacity = depth === 0 ? 1 : depth === 1 ? 0.92 : 0.78;
@@ -252,7 +265,7 @@ export function TripExplorerStackScreen({
               >
                 <div className="relative rounded-[32px] overflow-hidden shadow-xl bg-neutral-900">
                   <div className="aspect-[4/5] relative">
-                    <img src={card.imageUrl} alt={card.title} className="absolute inset-0 w-full h-full object-cover" />
+                    <img src={cardSrc} alt={card.title} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
                     <div className="absolute top-4 left-4 right-4 flex items-start justify-between gap-3">
                       <span className="inline-flex items-center rounded-full bg-black/35 backdrop-blur-md border border-white/15 px-3 py-1.5 text-[10px] font-bold tracking-[0.18em] text-white uppercase">
