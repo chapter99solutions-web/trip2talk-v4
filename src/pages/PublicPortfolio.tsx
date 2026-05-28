@@ -5,6 +5,10 @@ import { fetchTripsFromSheet, TripSheetRow } from '../lib/tripsSheetApi';
 import MeetTheCrew from '../components/public/MeetTheCrew';
 import TestimonialsSection from '../components/public/TestimonialsSection';
 import MobileTripStack from '../components/public/MobileTripStack';
+import PortfolioGallery from '../components/public/PortfolioGallery';
+import LanguageToggle from '../components/i18n/LanguageToggle';
+import { usePublicStrings } from '../lib/publicI18n';
+import { filterTripsByCategory, TripFilterId } from '../lib/tripFilters';
 
 const HERO_IMAGE =
   'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1920&q=85';
@@ -109,11 +113,21 @@ function TourCard({
   );
 }
 
+const TRIP_FILTERS: { id: TripFilterId; labelKey: keyof ReturnType<typeof usePublicStrings> }[] = [
+  { id: 'all', labelKey: 'filter_all' },
+  { id: 'portrait', labelKey: 'filter_portrait' },
+  { id: 'landscape', labelKey: 'filter_landscape' },
+  { id: 'overnight', labelKey: 'filter_overnight' },
+  { id: 'wedding', labelKey: 'filter_wedding' },
+];
+
 export default function PublicPortfolio() {
+  const t = usePublicStrings();
   const [saved, setSaved] = useState<Set<string>>(() => new Set());
   const [trips, setTrips] = useState<TripSheetRow[]>([]);
   const [loadingTrips, setLoadingTrips] = useState(true);
   const [tripError, setTripError] = useState<string | null>(null);
+  const [tripFilter, setTripFilter] = useState<TripFilterId>('all');
 
   useEffect(() => {
     let cancelled = false;
@@ -149,11 +163,13 @@ export default function PublicPortfolio() {
     return first ? `/tours/${encodeURIComponent(first.tourCode)}` : '/';
   }, [trips]);
 
+  const filteredTrips = useMemo(() => filterTripsByCategory(trips, tripFilter), [trips, tripFilter]);
+
   const grouped = useMemo(() => {
-    const allYear = trips.filter((t) => t.seasonGroup !== 'seasonal');
-    const seasonal = trips.filter((t) => t.seasonGroup === 'seasonal');
+    const allYear = filteredTrips.filter((t) => t.seasonGroup !== 'seasonal');
+    const seasonal = filteredTrips.filter((t) => t.seasonGroup === 'seasonal');
     return { allYear, seasonal };
-  }, [trips]);
+  }, [filteredTrips]);
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans antialiased pb-20">
@@ -183,12 +199,15 @@ export default function PublicPortfolio() {
               Pricing
             </a>
           </nav>
-          <Link
-            to={exploreHref}
-            className="shrink-0 px-4 py-2 rounded-full bg-navy text-white text-sm font-semibold hover:bg-navy-dark transition-colors shadow-sm"
-          >
-            Explore Now <span aria-hidden>→</span>
-          </Link>
+          <div className="flex items-center gap-2 shrink-0">
+            <LanguageToggle />
+            <Link
+              to={exploreHref}
+              className="px-4 py-2 rounded-full bg-navy text-white text-sm font-semibold hover:bg-navy-dark transition-colors shadow-sm"
+            >
+              Explore Now <span aria-hidden>→</span>
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -218,14 +237,14 @@ export default function PublicPortfolio() {
               onClick={() => scrollToSection('tours')}
               className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full bg-slate-900 text-white text-sm font-semibold tracking-wide shadow-lg shadow-black/20 hover:bg-slate-800 hover:-translate-y-0.5 transition-all duration-300"
             >
-              ดูทริปทั้งหมด
+              {t.view_all_trips}
             </button>
             <button
               type="button"
               onClick={() => scrollToSection('reviews')}
               className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full border border-white/40 bg-transparent text-white text-sm font-semibold tracking-wide hover:bg-white/10 hover:border-white/60 transition-all duration-300"
             >
-              💬 อ่านรีวิวจากลูกทริป
+              {t.read_reviews}
             </button>
           </div>
           <div className="mt-12 grid grid-cols-3 gap-6 max-w-lg mx-auto border-t border-white/20 pt-8">
@@ -239,12 +258,30 @@ export default function PublicPortfolio() {
         </div>
       </section>
 
+      <PortfolioGallery title={t.portfolio_gallery} />
+
       {/* Trips */}
       <section id="tours" className="max-w-6xl mx-auto px-4 py-20">
         <div className="text-center mb-10">
-          <h2 className="font-serif text-3xl md:text-4xl font-semibold text-slate-900">Curated journeys</h2>
-          <p className="text-slate-500 mt-2 text-sm">Tier 1 Standard (4–6 guests) · Tier 2 Private (1–3 guests) Guaranteed</p>
+          <h2 className="font-serif text-3xl md:text-4xl font-semibold text-slate-900">{t.curated_journeys}</h2>
+          <p className="text-slate-500 mt-2 text-sm">{t.tier_subtitle}</p>
           {tripError && <p className="text-xs text-red-700 mt-2">Live trips unavailable: {tripError}</p>}
+        </div>
+        <div className="flex flex-wrap justify-center gap-2 mb-8">
+          {TRIP_FILTERS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setTripFilter(f.id)}
+              className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+                tripFilter === f.id
+                  ? 'bg-neutral-950 text-white'
+                  : 'bg-white text-slate-700 border border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              {t[f.labelKey]}
+            </button>
+          ))}
         </div>
         {loadingTrips ? (
           <>

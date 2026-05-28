@@ -5,6 +5,7 @@ import { findTripById } from '../lib/publicTours';
 import { quoteTripTotal, resolveTripSizeTier } from '../lib/bookingPolicy';
 import TripSizeTierBadge from '../components/cyber/TripSizeTierBadge';
 import BookingPolicyPanel from '../components/policy/BookingPolicyPanel';
+import { generateBookingRef } from '../lib/bookingRef';
 import { runPhase2Book } from '../lib/customerJourney';
 import { PORTFOLIO_TOURS } from '../lib/portfolioTours';
 import { PickupId, sydneyPickupPoints } from '../lib/pickup-options';
@@ -115,7 +116,7 @@ export default function BookingCheckout() {
     setSubmitting(true);
     setSubmitError(null);
 
-    const reference_number = `BK-${Math.floor(100000 + Math.random() * 900000)}`;
+    const reference_number = generateBookingRef();
 
     try {
       const { warnings } = await runPhase2Book({

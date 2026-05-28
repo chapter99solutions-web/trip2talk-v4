@@ -1,7 +1,11 @@
 import { Link, useParams } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import WeatherPill from '../components/shared/WeatherPill';
+import PhotoDeliveryTracker from '../components/shared/PhotoDeliveryTracker';
+import LanguageToggle from '../components/i18n/LanguageToggle';
 import { pickupShortLabel } from '../lib/pickup-options';
+import { fetchAlbumByBookingRef, type AlbumStatus } from '../lib/albumDelivery';
+import { usePublicStrings } from '../lib/publicI18n';
 import {
   fetchCustomerBookingByIdFromSheet,
   fetchTripByCodeFromSheet,
@@ -13,7 +17,16 @@ import { fetchCityWeather } from '../lib/weather';
 
 type TabId = 'pass' | 'portrait' | 'landscape';
 
-type BookingSheet = { bookingId: string; customerName: string; tourCode: string };
+type BookingSheet = {
+  bookingId: string;
+  customerName: string;
+  tourCode: string;
+  guests: number | null;
+  pickupLocation: string;
+  departTime: string;
+};
+
+type ClientViewMode = 'model' | 'photographer';
 
 function Pill({
   active,
@@ -99,6 +112,7 @@ function SwipeCheckIn({
 }
 
 export default function ClientVIPHubPage() {
+  const t = usePublicStrings();
   const { bookingRef, bookingId } = useParams<{ bookingRef?: string; bookingId?: string }>();
   const resolvedBookingId = (bookingId || bookingRef || '').trim();
 
@@ -108,6 +122,10 @@ export default function ClientVIPHubPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkedIn, setCheckedIn] = useState(false);
+  const [clientMode, setClientMode] = useState<ClientViewMode>('model');
+  const [albumStatus, setAlbumStatus] = useState<AlbumStatus>('pending');
+  const [albumUrl, setAlbumUrl] = useState<string | null>(null);
+  const [albumExpiresAt, setAlbumExpiresAt] = useState<string | null>(null);
   const [liveWeather, setLiveWeather] = useState<{ tempC: number; condition: 'sunny' | 'cloudy' | 'rainy'; city: string } | null>(
     null
   );
@@ -150,8 +168,29 @@ export default function ClientVIPHubPage() {
         const t = await fetchTripByCodeFromSheet(b.tourCode);
         if (!t) throw new Error('Trip not found for this booking');
         if (cancelled) return;
-        setBooking({ bookingId: b.bookingId, customerName: b.customerName, tourCode: b.tourCode });
+        setBooking({
+          bookingId: b.bookingId,
+          customerName: b.customerName,
+          tourCode: b.tourCode,
+          guests: b.guests,
+          pickupLocation: b.pickupLocation,
+          departTime: b.departTime,
+        });
         setTrip(t);
+
+        try {
+          const album = await fetchAlbumByBookingRef(b.bookingId);
+          if (album && !cancelled) {
+            setAlbumStatus(album.album_status);
+            setAlbumUrl(album.album_url);
+            setAlbumExpiresAt(album.album_expires_at);
+            if (album.facebook_chat_url) {
+              // messengerUrl comes from trip sheet by default
+            }
+          }
+        } catch {
+          // Supabase album fields optional when sheet-only booking
+        }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Load failed');
       } finally {
@@ -169,9 +208,16 @@ export default function ClientVIPHubPage() {
   const tripCode = trip?.tourCode ?? booking?.tourCode ?? 'TRIP';
   const destination = trip?.countryTag || 'Trip2Talk';
   const tripTitle = trip?.tourName || `${destination} Photo Journey`;
-  const pax = 1;
-  const pickup = pickupShortLabel(null);
-  const depart = '—';
+  const pax = booking?.guests ?? 1;
+  const pickup = pickupShortLabel(booking?.pickupLocation ?? null);
+  const depart = booking?.departTime?.trim() || '—';
+
+  const handleExpressRequest = (tier: '3day' | '24h') => {
+    const amount = tier === '24h' ? 150 : 80;
+    window.alert(
+      `ส่งคำขอ Express +A$${amount} แล้ว — ทีมงานจะยืนยันทาง Messenger (รายการจะบันทึกเมื่อชำระเงิน)`
+    );
+  };
 
   const doCheckIn = async () => {
     if (!booking) throw new Error('Booking not loaded');
@@ -209,11 +255,14 @@ export default function ClientVIPHubPage() {
               {greetingName} <span aria-hidden>👋</span>
             </h1>
           </div>
-          <WeatherPill
+          <div className="flex flex-col items-end gap-2">
+            <LanguageToggle />
+            <WeatherPill
             temp={liveWeather?.tempC ?? weather.temp}
             city={liveWeather?.city ?? trip?.city ?? 'Weather'}
             condition={liveWeather?.condition ?? weather.condition}
-          />
+            />
+          </div>
         </div>
 
         <div>
@@ -324,6 +373,27 @@ export default function ClientVIPHubPage() {
           </div>
         )}
 
+        {(tab === 'portrait' || tab === 'landscape') && (
+          <div className="flex gap-2">
+            <Pill active={clientMode === 'model'} onClick={() => setClientMode('model')}>
+              {t.model_mode}
+            </Pill>
+            <Pill active={clientMode === 'photographer'} onClick={() => setClientMode('photographer')}>
+              {t.photographer_mode}
+            </Pill>
+          </div>
+        )}
+
+        {tab === 'pass' && checkedIn && (
+          <PhotoDeliveryTracker
+            albumStatus={albumStatus}
+            albumUrl={albumUrl}
+            albumExpiresAt={albumExpiresAt}
+            bookingRef={booking?.bookingId ?? resolvedBookingId}
+            onExpressRequest={handleExpressRequest}
+          />
+        )}
+
         {tab === 'portrait' && (
           <div className="space-y-4">
             {(trip?.spots ?? []).map((spot, idx) => (
@@ -341,11 +411,18 @@ export default function ClientVIPHubPage() {
                     </p>
                   </div>
 
-                  <div className="rounded-2xl bg-pink-light border border-[#F4C0D1] p-3 space-y-2">
-                    <div className="rounded-2xl bg-white/60 border border-[#F4C0D1] px-3 py-2 text-sm text-[#993556] whitespace-pre-wrap">
-                      {spot.portraitGuide || '—'}
+                  {clientMode === 'model' ? (
+                    <div className="rounded-2xl bg-pink-light border border-[#F4C0D1] p-3 space-y-2">
+                      <p className="text-xs font-semibold text-[#993556]">Fashion &amp; pose guide</p>
+                      <div className="rounded-2xl bg-white/60 border border-[#F4C0D1] px-3 py-2 text-sm text-[#993556] whitespace-pre-wrap">
+                        {spot.portraitGuide || '—'}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="rounded-2xl bg-[#E6F1FB] border border-[#B5D4F4] p-3 text-sm text-[#0C447C]">
+                      Lighting &amp; lens: wide aperture portrait · guide client to catch rim light at this stop.
+                    </div>
+                  )}
 
                   {spot.mapsUrl ? (
                     <a
@@ -374,9 +451,16 @@ export default function ClientVIPHubPage() {
                   </p>
                   <p className="text-[18px] font-bold">{spot.spotName}</p>
 
-                  <div className="rounded-2xl bg-[#E6F1FB] border border-[#B5D4F4] p-3 space-y-2">
-                    <div className="text-sm text-[#0C447C] whitespace-pre-wrap">{spot.landscapeGuide || '—'}</div>
-                  </div>
+                  {clientMode === 'photographer' ? (
+                    <div className="rounded-2xl bg-[#E6F1FB] border border-[#B5D4F4] p-3 space-y-2">
+                      <p className="text-xs font-semibold text-[#0C447C]">Settings &amp; composition</p>
+                      <div className="text-sm text-[#0C447C] whitespace-pre-wrap">{spot.landscapeGuide || '—'}</div>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl bg-pink-light border border-[#F4C0D1] p-3 text-sm text-[#993556]">
+                      Model vibe: walk the frame, soft hands, look off-camera for editorial feel.
+                    </div>
+                  )}
 
                   {spot.mapsUrl ? (
                     <a

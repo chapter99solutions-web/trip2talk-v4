@@ -57,6 +57,7 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
     client: CRMClient;
     tour: Tour;
   } | null>(null);
+  const [checkedInIds, setCheckedInIds] = useState<Set<string>>(() => new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -349,12 +350,13 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
                   <th className="p-3 cyber-table-th text-neutral-500 tracking-wide">TIER</th>
                   <th className="p-3 cyber-table-th text-neutral-500 tracking-wide">PICKUP</th>
                   <th className="p-3 cyber-table-th text-neutral-500 tracking-wide">WAIVER</th>
+                  <th className="p-3 cyber-table-th text-neutral-500 tracking-wide">CHECK-IN</th>
                 </tr>
               </thead>
               <tbody>
                 {activeBookings.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-4 cyber-table-td text-neutral-500 text-sm text-center">
+                    <td colSpan={9} className="p-4 cyber-table-td text-neutral-500 text-sm text-center">
                       NO MANIFEST ENTRIES
                     </td>
                   </tr>
@@ -414,6 +416,25 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
                               className="px-3 py-1.5 rounded-lg font-mono text-xs font-semibold bg-amber-500 text-neutral-950 hover:bg-amber-400 transition-colors"
                             >
                               SIGN WAIVER
+                            </button>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {checkedInIds.has(b.id) ? (
+                            <span className="font-mono text-xs text-emerald-400">✓ IN</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setCheckedInIds((prev) => {
+                                  const next = new Set(prev);
+                                  next.add(b.id);
+                                  return next;
+                                })
+                              }
+                              className="px-3 py-1.5 rounded-lg font-mono text-xs font-semibold border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                            >
+                              CHECK IN
                             </button>
                           )}
                         </td>

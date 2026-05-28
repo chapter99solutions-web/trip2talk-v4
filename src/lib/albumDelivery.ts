@@ -98,6 +98,42 @@ export async function updateAlbumDelivery(
   if (updateErr) throw new Error(updateErr.message);
 }
 
+export async function fetchAlbumByBookingRef(bookingRef: string): Promise<{
+  id: string;
+  album_status: AlbumStatus;
+  album_url: string | null;
+  album_expires_at: string | null;
+  facebook_chat_url: string | null;
+} | null> {
+  const ref = bookingRef.trim();
+  if (!ref) return null;
+
+  const { data, error } = await supabase
+    .from('tour_bookings')
+    .select('id, album_status, album_url, album_expires_at, expires_at, facebook_chat_url')
+    .eq('reference_number', ref)
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  const row = data as {
+    id: string;
+    album_status?: AlbumStatus | null;
+    album_url?: string | null;
+    album_expires_at?: string | null;
+    expires_at?: string | null;
+    facebook_chat_url?: string | null;
+  };
+
+  return {
+    id: row.id,
+    album_status: (row.album_status ?? 'pending') as AlbumStatus,
+    album_url: row.album_url ?? null,
+    album_expires_at: row.album_expires_at ?? row.expires_at ?? null,
+    facebook_chat_url: row.facebook_chat_url ?? null,
+  };
+}
+
 export async function fetchAlbumBookingForTrip(tourIdOrCode: string): Promise<{
   album_status: AlbumStatus | null;
   album_expires_at: string | null;
