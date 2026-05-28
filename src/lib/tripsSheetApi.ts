@@ -40,6 +40,12 @@ export type TripSheetRow = {
   dormitoryPolicy: string;
   dormUpgradeNote: string;
   itinerary: TripItineraryDay[];
+
+  /** Optional departure window for public date pills (DD/MM/YYYY or ISO). */
+  departureStart: string;
+  departureEnd: string;
+  slotsBooked: number | null;
+  slotsMax: number | null;
 };
 
 export type CustomerBookingRow = {
@@ -211,6 +217,15 @@ function normalizeTripRow(raw: unknown): TripSheetRow | null {
     dormitoryPolicy: asString(r.dormitoryPolicy || r.dorm_policy || r['Dormitory Policy'] || r['Accommodation Policy']).trim(),
     dormUpgradeNote: asString(r.dormUpgradeNote || r.dorm_upgrade || r['Dorm Upgrade'] || r['Upgrade']).trim(),
     itinerary,
+
+    departureStart: asString(
+      r.departureStart || r.departure_start || r.startDate || r.start_date || r['Departure Start'] || r['Start Date']
+    ).trim(),
+    departureEnd: asString(
+      r.departureEnd || r.departure_end || r.endDate || r.end_date || r['Departure End'] || r['End Date']
+    ).trim(),
+    slotsBooked: asNumber(r.slotsBooked || r.slots_booked || r.booked || r['Slots Booked'] || r['Booked']),
+    slotsMax: asNumber(r.slotsMax || r.slots_max || r.capacity || r['Slots Max'] || r['Capacity']),
   };
 }
 

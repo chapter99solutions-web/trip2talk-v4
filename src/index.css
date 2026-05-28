@@ -38,3 +38,12 @@ body {
 .animate-slide-down {
   animation: slide-down 0.35s ease-out forwards;
 }
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}

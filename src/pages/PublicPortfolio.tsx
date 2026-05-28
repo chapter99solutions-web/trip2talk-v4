@@ -3,9 +3,15 @@ import { Link } from 'react-router-dom';
 import PublicBottomNav from '../components/public/PublicBottomNav';
 import { fetchTripsFromSheet, TripSheetRow } from '../lib/tripsSheetApi';
 import MeetTheCrew from '../components/public/MeetTheCrew';
+import TestimonialsSection from '../components/public/TestimonialsSection';
+import MobileTripStack from '../components/public/MobileTripStack';
 
 const HERO_IMAGE =
   'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1920&q=85';
+
+function scrollToSection(id: string) {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+}
 
 const STATS = [
   { value: '400+', label: 'Destinations' },
@@ -34,12 +40,6 @@ const FEATURES = [
     desc: 'Small groups, low impact, and respectful wildlife practices.',
     icon: '🌿',
   },
-];
-
-const TESTIMONIALS = [
-  { quote: 'The album felt like a magazine spread — every frame intentional.', name: 'M.K.', stars: 5 },
-  { quote: 'Small group, no rush. Saen found light we would never have seen.', name: 'P.S.', stars: 5 },
-  { quote: 'OSHC and waiver handled smoothly. Parents were reassured.', name: 'A.L.', stars: 5 },
 ];
 
 function TourCard({
@@ -170,6 +170,9 @@ export default function PublicPortfolio() {
             <a href="#gallery" className="hover:text-emerald-600 transition-colors">
               Gallery
             </a>
+            <a href="#reviews" className="hover:text-emerald-600 transition-colors">
+              Reviews
+            </a>
             <Link to="/about" className="hover:text-emerald-600 transition-colors">
               About
             </Link>
@@ -209,13 +212,21 @@ export default function PublicPortfolio() {
           <p className="mt-6 text-lg text-white/80 max-w-xl mx-auto">
             Private Photo Journeys for small groups — curated light, finished .JPG galleries, Chapter 99 Photography.
           </p>
-          <div className="mt-8 flex justify-center">
-            <a
-              href="#tours"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white text-navy font-semibold text-sm hover:bg-slate-50 transition-colors shadow-sm"
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
+            <button
+              type="button"
+              onClick={() => scrollToSection('tours')}
+              className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full bg-slate-900 text-white text-sm font-semibold tracking-wide shadow-lg shadow-black/20 hover:bg-slate-800 hover:-translate-y-0.5 transition-all duration-300"
             >
-              Explore Now <span aria-hidden>→</span>
-            </a>
+              ดูทริปทั้งหมด
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSection('reviews')}
+              className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full border border-white/40 bg-transparent text-white text-sm font-semibold tracking-wide hover:bg-white/10 hover:border-white/60 transition-all duration-300"
+            >
+              💬 อ่านรีวิวจากลูกทริป
+            </button>
           </div>
           <div className="mt-12 grid grid-cols-3 gap-6 max-w-lg mx-auto border-t border-white/20 pt-8">
             {STATS.map((s) => (
@@ -236,11 +247,21 @@ export default function PublicPortfolio() {
           {tripError && <p className="text-xs text-red-700 mt-2">Live trips unavailable: {tripError}</p>}
         </div>
         {loadingTrips ? (
-          <div id="gallery" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="rounded-2xl border border-slate-100 bg-slate-50 h-[360px] animate-pulse" />
-            ))}
-          </div>
+          <>
+            <div className="md:hidden space-y-4 px-4">
+              <div className="flex gap-3 overflow-hidden">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="h-10 w-28 rounded-full bg-slate-100 animate-pulse shrink-0" />
+                ))}
+              </div>
+              <div className="rounded-[32px] bg-slate-100 h-[min(72vh,520px)] animate-pulse" />
+            </div>
+            <div id="gallery" className="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="rounded-2xl border border-slate-100 bg-slate-50 h-[360px] animate-pulse" />
+              ))}
+            </div>
+          </>
         ) : trips.length === 0 ? (
           <div className="max-w-xl mx-auto text-center py-12">
             <p className="text-slate-700 font-semibold">No trips available right now.</p>
@@ -255,7 +276,12 @@ export default function PublicPortfolio() {
                   <h3 className="font-serif text-2xl font-semibold text-slate-900">All Year Round Trips</h3>
                 </div>
               </div>
-              <div id="gallery" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <MobileTripStack
+                trips={grouped.allYear}
+                saved={saved}
+                onToggleSave={toggleSave}
+              />
+              <div id="gallery" className="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {grouped.allYear.map((tour, idx) => (
                   <TourCard
                     key={tour.tourCode}
@@ -275,7 +301,12 @@ export default function PublicPortfolio() {
                   <h3 className="font-serif text-2xl font-semibold text-slate-900">Seasonal Trips</h3>
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <MobileTripStack
+                trips={grouped.seasonal}
+                saved={saved}
+                onToggleSave={toggleSave}
+              />
+              <div className="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {grouped.seasonal.map((tour) => (
                   <TourCard
                     key={tour.tourCode}
@@ -316,26 +347,7 @@ export default function PublicPortfolio() {
         </p>
       </section>
 
-      {/* Testimonials */}
-      <section className="bg-slate-50 py-20">
-        <div className="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-6">
-          {TESTIMONIALS.map((t) => (
-            <blockquote
-              key={t.name}
-              className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm"
-            >
-              <p className="text-amber-400 text-sm mb-3">{'★'.repeat(t.stars)}</p>
-              <p className="text-slate-600 italic leading-relaxed">&ldquo;{t.quote}&rdquo;</p>
-              <footer className="mt-4 flex items-center gap-3">
-                <span className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-sm font-semibold">
-                  {t.name}
-                </span>
-                <span className="text-sm font-medium text-slate-700">Verified guest</span>
-              </footer>
-            </blockquote>
-          ))}
-        </div>
-      </section>
+      <TestimonialsSection />
 
       {/* Pricing */}
       <section id="pricing" className="max-w-3xl mx-auto px-4 py-16 text-center">

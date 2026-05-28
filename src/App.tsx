@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import InstallPrompt from './components/pwa/InstallPrompt';
 import OfflineBanner from './components/shared/OfflineBanner';
 import PublicShell from './components/layout/PublicShell';
@@ -13,13 +13,7 @@ const PhotoDeliveryTerms = lazy(() => import('./pages/PhotoDeliveryTerms'));
 const TravelPackageTerms = lazy(() => import('./pages/TravelPackageTerms'));
 const About = lazy(() => import('./pages/About'));
 const Contact = lazy(() => import('./pages/Contact'));
-const OwnerDashboard = lazy(() => import('./components/owner/OwnerDashboard'));
 const OpsApp = lazy(() => import('./components/OpsApp'));
-
-function OwnerDashboardRoute() {
-  const navigate = useNavigate();
-  return <OwnerDashboard onLogout={() => navigate('/', { replace: true })} />;
-}
 
 function PageFallback() {
   return (
@@ -52,8 +46,8 @@ export default function App() {
               <Route path="/package-terms" element={<TravelPackageTerms />} />
             </Route>
 
-            {/* PROTECTED — PIN → role dashboard */}
-            <Route path="/dashboard" element={<OwnerDashboardRoute />} />
+            {/* PROTECTED — PIN → role dashboard (9999 = Owner CMS) */}
+            <Route path="/dashboard" element={<OpsApp />} />
             <Route path="/dashboard/*" element={<OpsApp />} />
             <Route path="/ops/*" element={<Navigate to="/dashboard" replace />} />
 
