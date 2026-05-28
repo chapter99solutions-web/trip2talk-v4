@@ -19,6 +19,10 @@ type TripDraft = {
   messengerUrl: string;
   coverUrl: string;
   durationDays: number;
+  departureStart: string;
+  departureEnd: string;
+  slotsBooked: string;
+  slotsMax: string;
   priceStandardAud: string;
   pricePrivateAud: string;
   categoryCode: string;
@@ -171,6 +175,10 @@ export default function InternalCmsDashboard() {
     messengerUrl: '',
     coverUrl: '',
     durationDays: 1,
+    departureStart: '',
+    departureEnd: '',
+    slotsBooked: '',
+    slotsMax: '',
     priceStandardAud: '1550',
     pricePrivateAud: '2300',
     categoryCode: '',
@@ -712,6 +720,61 @@ export default function InternalCmsDashboard() {
     }));
   };
 
+  const prefillObe1day = () => {
+    setTrip((p) => ({
+      ...p,
+      tourCode: 'OBE-1DAY',
+      tourName: 'ทริปด่วนล่าหิมะแรกวันเดียว Oberon, NSW (Oberon First Snow Hunt One Day Trip)',
+      countryTag: 'AU · Oberon NSW',
+      city: 'Oberon',
+      weather: '',
+      messengerUrl: 'https://m.me/trip2talk.chapter99',
+      coverUrl:
+        'https://images.unsplash.com/photo-1459478309853-2c33a60058e7?w=1400&q=85&auto=format&fit=crop',
+      durationDays: 1,
+      departureStart: '2026-05-08',
+      departureEnd: '2026-05-08',
+      slotsBooked: '0',
+      slotsMax: '4',
+      basePriceAud: '260',
+      depositAud: '',
+      categoryCode: 'OBE-1DAY',
+      categoryName: 'One Day Trip',
+      dormitoryPolicy: '',
+      itinerary: Array.from({ length: 4 }).map(() => ({ morning: '', afternoon: '', evening: '', night: '' })),
+      spots: [
+        {
+          name: 'Hunt the Snow (Oberon)',
+          proTip:
+            'ไม่การันตี 100% ว่าหิมะจะตกหนักแค่ไหน แต่นี่คือเสน่ห์ของ Snow Hunting — พื้นขาวช่วยเด้งแสง ทำให้หน้าดูไบรท์และถ่ายขึ้นกล้องมาก',
+          mapsUrl: '',
+          photoUrl: '',
+          portraitGuide:
+            'เสื้อโทนครีม/เอิร์ธโทน + หมวก/ผ้าพันคอเพิ่มเลเยอร์ · โพสเดิน/จับหมวก/มองไกลให้ฟีล cinematic',
+          landscapeGuide:
+            'เก็บ leading lines ของถนน/แนวต้นไม้ · ถ่าย wide + low angle ให้เห็น texture หิมะ/หมอก',
+        },
+        {
+          name: 'Pro Photographer Guide',
+          proTip:
+            'พี่แสนช่วยจัดท่า จัดทาง จัดมุมแสง แบบตัวต่อตัวตาม reference — ได้รูปสไตล์แมกกาซีน ไม่ต้องคิดโพสเอง',
+          mapsUrl: '',
+          photoUrl: '',
+          portraitGuide: 'ปล่อยมือผ่อนคลาย + เอียงไหล่/คางนิด ๆ · เดินช้า ๆ แล้วหยุดให้จังหวะกดชัตเตอร์',
+          landscapeGuide: 'ใช้ระยะ 24–35mm เก็บทั้งคนและบรรยากาศ · เน้น subject แยกจาก background ด้วยแสง/มุม',
+        },
+        {
+          name: 'Travel in Style (SUV Road Trip)',
+          proTip: 'ทริปเล็ก อบอุ่น ยืดหยุ่นสูง เหมือนเพื่อนสนิทชวนกันออกไปล่าหิมะและถ่ายรูปเล่นแก้หนาว',
+          mapsUrl: '',
+          photoUrl: '',
+          portraitGuide: 'ถ่าย candid ในรถ/ริมทาง · mood relaxed แต่ดูแพง',
+          landscapeGuide: 'เก็บ establishing shot ของ road trip · รถ + วิว + ท้องฟ้า',
+        },
+      ],
+    }));
+  };
+
   const saveTrip = async () => {
     setSyncing('trip');
     setSyncOk(null);
@@ -729,6 +792,10 @@ export default function InternalCmsDashboard() {
           messengerUrl: trip.messengerUrl.trim(),
           coverUrl: trip.coverUrl.trim(),
           durationDays,
+          departureStart: trip.departureStart.trim(),
+          departureEnd: trip.departureEnd.trim(),
+          slotsBooked: trip.slotsBooked.trim(),
+          slotsMax: trip.slotsMax.trim(),
           priceStandardAud: trip.priceStandardAud.trim(),
           pricePrivateAud: trip.pricePrivateAud.trim(),
           categoryCode: trip.categoryCode.trim(),
@@ -820,6 +887,9 @@ export default function InternalCmsDashboard() {
             <button type="button" onClick={prefillSyd1day} className="cyber-btn-ghost">
               PREFILL SYD-1DAY
             </button>
+            <button type="button" onClick={prefillObe1day} className="cyber-btn-ghost">
+              PREFILL OBE-1DAY
+            </button>
           <button type="button" onClick={() => void loadTourCodes()} className="cyber-btn-ghost">
             REFRESH TRIPS
           </button>
@@ -890,6 +960,48 @@ export default function InternalCmsDashboard() {
                 className="cyber-input mt-1"
                 value={trip.durationDays}
                 onChange={(e) => setTrip((p) => ({ ...p, durationDays: Number(e.target.value || 1) }))}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-neutral-500 font-mono">Departure Start (ISO)</label>
+              <input
+                className="cyber-input mt-1"
+                value={trip.departureStart}
+                onChange={(e) => setTrip((p) => ({ ...p, departureStart: e.target.value }))}
+                placeholder="2026-05-08"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-neutral-500 font-mono">Departure End (ISO)</label>
+              <input
+                className="cyber-input mt-1"
+                value={trip.departureEnd}
+                onChange={(e) => setTrip((p) => ({ ...p, departureEnd: e.target.value }))}
+                placeholder="2026-05-08"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-neutral-500 font-mono">Slots Booked</label>
+              <input
+                className="cyber-input mt-1"
+                value={trip.slotsBooked}
+                onChange={(e) => setTrip((p) => ({ ...p, slotsBooked: e.target.value }))}
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-neutral-500 font-mono">Slots Max</label>
+              <input
+                className="cyber-input mt-1"
+                value={trip.slotsMax}
+                onChange={(e) => setTrip((p) => ({ ...p, slotsMax: e.target.value }))}
+                placeholder="4"
               />
             </div>
           </div>
