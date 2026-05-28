@@ -237,6 +237,149 @@ export default function ClientPortal() {
 
   const highlights = useMemo(() => buildHighlights(trip), [trip]);
 
+  // UI Preview Mode (bypass auth entirely)
+  if (uiPreview) {
+    const previewTrip: TripSheetRow = {
+      tourCode: 'MEL-4D3N',
+      tourName: 'The Sounds of Nature',
+      countryTag: 'AU · Melbourne',
+      weather: '15°C ☀️',
+      messengerUrl: 'https://m.me/trip2talk.chapter99',
+      coverUrl: 'https://images.unsplash.com/photo-1469854523086-cc02afe5c88?w=1400&q=85&auto=format&fit=crop',
+      spots: [
+        {
+          spotName: 'Signature Lookout',
+          proTip: 'Golden hour + soft breeze',
+          mapsUrl: 'https://maps.google.com',
+          photoUrl: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=1400&q=85&auto=format&fit=crop',
+          portraitGuide: 'Editorial portrait framing',
+          landscapeGuide: 'Wide + layered depth',
+        },
+      ],
+      seasonGroup: 'seasonal',
+      city: 'Melbourne',
+      durationDays: 7,
+      priceStandardAud: null,
+      pricePrivateAud: null,
+      categoryCode: 'MEL-4D3N',
+      categoryName: 'Road Trip',
+      basePriceAud: 1550,
+      depositAud: 100,
+      dormitoryPolicy: 'Dorm setup (budget) · Upgrade available',
+      dormUpgradeNote: 'Upgrade to private room: +A$350–$550 (subject to availability)',
+      itinerary: [],
+      departureStart: '2026-05-08',
+      departureEnd: '2026-05-15',
+      slotsBooked: 8,
+      slotsMax: 10,
+    };
+
+    const previewSession: Session = {
+      query: 'ui',
+      bookingId: 'BK-PREVIEW',
+      customerName: 'Saen',
+      tourCode: previewTrip.tourCode,
+    };
+
+    const previewHighlights = buildHighlights(previewTrip).map((t) => {
+      const m = t.match(/^(\S+)\s+(.*)$/);
+      return { icon: m?.[1] ?? '✦', label: m?.[2] ?? t };
+    });
+
+    const durationLabel = '7 days';
+    const capacityLabel = '8/10';
+    const countryTag = '🇦🇺 AU · MELBOURNE';
+
+    return (
+      <div className="min-h-screen bg-sage-50 text-[#1C1C1E] font-sans antialiased">
+        <div className="max-w-md mx-auto px-4 pt-4 pb-2 flex items-center justify-between">
+          <p className="text-xs font-semibold text-[#9A9A9A]">UI Preview Mode</p>
+          <Link to="/dashboard" className="text-xs font-semibold text-sage-700 hover:underline">
+            Exit
+          </Link>
+        </div>
+
+        {tab === 'home' ? (
+          <ActiveTripHomeScreen
+            name={previewSession.customerName}
+            tempC={15}
+            tags={previewHighlights}
+            heroImageUrl={previewTrip.coverUrl}
+            tripTitle={previewTrip.tourName}
+            tripSubtitle="Private Photo Journey · premium edit"
+            durationLabel={durationLabel}
+            distanceLabel="10 km"
+            capacityLabel={capacityLabel}
+            onStartTrip={() => setTab('pass')}
+          />
+        ) : tab === 'itinerary' ? (
+          <TripDetailGroupScreen
+            bannerUrl={previewTrip.coverUrl}
+            countryTag={countryTag}
+            title="Discovering the Magic of Austrian Mountains"
+            metaLeft={durationLabel}
+            metaRight={capacityLabel}
+            hotelName="Hotel / Accommodation"
+            hotelNote="Floating details card — calm, minimal, editorial spacing."
+          />
+        ) : tab === 'profile' ? (
+          <TripExplorerStackScreen
+            heading="Popular"
+            datePills={[
+              { id: 'p1', label: '27/03 - 7/04' },
+              { id: 'p2', label: '10/04 - 15/04' },
+              { id: 'p3', label: '21/04 - 27/04' },
+            ]}
+            heroCards={[
+              {
+                id: 'c1',
+                imageUrl: previewTrip.coverUrl,
+                badge: '🇦🇺 TASMANIA',
+                title: 'First Snow Hunt',
+                meta: '7 days • 10 km • 8/10',
+              },
+              {
+                id: 'c2',
+                imageUrl: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1400&q=85&auto=format&fit=crop',
+                badge: '🇳🇿 QUEENSTOWN',
+                title: 'Autumn Road Trip',
+                meta: '6 days • 8 km • 4/5',
+              },
+              {
+                id: 'c3',
+                imageUrl: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1400&q=85&auto=format&fit=crop',
+                badge: '🇦🇺 SYDNEY',
+                title: 'One Day Highlights',
+                meta: '1 day • 3 km • 3/4',
+              },
+            ]}
+          />
+        ) : (
+          <div className="min-h-screen bg-sage-50 text-[#1C1C1E] font-sans antialiased pb-20">
+            <header className="sticky top-0 z-40 bg-sage-50/95 backdrop-blur border-b border-sage-100">
+              <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
+                <Link to="/" className="font-serif text-lg font-semibold">
+                  Trip2Talk
+                </Link>
+                <button type="button" onClick={() => setTab('home')} className="text-xs font-semibold text-[#9A9A9A]">
+                  Back
+                </button>
+              </div>
+            </header>
+            <main className="max-w-md mx-auto px-4 pt-5 space-y-5">
+              <h2 className="font-serif text-xl font-semibold">Pass &amp; Consent</h2>
+              <div className="rounded-[28px] border border-sage-100 bg-white p-5 text-sm text-[#6B6B6B]">
+                Preview: pass screen (existing production module remains).
+              </div>
+            </main>
+          </div>
+        )}
+
+        <PortalNav tab={tab} onChange={setTab} />
+      </div>
+    );
+  }
+
   useEffect(() => {
     const raw = localStorage.getItem(SESSION_KEY);
     if (!raw) return;
@@ -319,142 +462,6 @@ export default function ClientPortal() {
 
   // Unauthed view
   if (!session) {
-    if (uiPreview) {
-      const previewTrip: TripSheetRow = {
-        tourCode: 'MEL-4D3N',
-        tourName: 'The Sounds of Nature',
-        countryTag: 'AU · Melbourne',
-        weather: '15°C ☀️',
-        messengerUrl: 'https://m.me/trip2talk.chapter99',
-        coverUrl: 'https://images.unsplash.com/photo-1469854523086-cc02afe5c88?w=1400&q=85&auto=format&fit=crop',
-        spots: [
-          {
-            spotName: 'Signature Lookout',
-            proTip: 'Golden hour + soft breeze',
-            mapsUrl: 'https://maps.google.com',
-            photoUrl: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=1400&q=85&auto=format&fit=crop',
-            portraitGuide: 'Editorial portrait framing',
-            landscapeGuide: 'Wide + layered depth',
-          },
-        ],
-        seasonGroup: 'seasonal',
-        city: 'Melbourne',
-        durationDays: 7,
-        priceStandardAud: null,
-        pricePrivateAud: null,
-        categoryCode: 'MEL-4D3N',
-        categoryName: 'Road Trip',
-        basePriceAud: 1550,
-        depositAud: 100,
-        dormitoryPolicy: 'Dorm setup (budget) · Upgrade available',
-        dormUpgradeNote: 'Upgrade to private room: +A$350–$550 (subject to availability)',
-        itinerary: [],
-        departureStart: '2026-05-08',
-        departureEnd: '2026-05-15',
-        slotsBooked: 8,
-        slotsMax: 10,
-      };
-
-      const previewSession: Session = { query: 'ui', bookingId: 'BK-PREVIEW', customerName: 'Saen', tourCode: previewTrip.tourCode };
-      const previewHighlights = buildHighlights(previewTrip).map((t) => {
-        const m = t.match(/^(\S+)\s+(.*)$/);
-        return { icon: m?.[1] ?? '✦', label: m?.[2] ?? t };
-      });
-      const durationLabel = '7 days';
-      const capacityLabel = '8/10';
-      const countryTag = '🇦🇺 AU · MELBOURNE';
-
-      return (
-        <div className="min-h-screen bg-sage-50 text-[#1C1C1E] font-sans antialiased">
-          <div className="max-w-md mx-auto px-4 pt-4 pb-2 flex items-center justify-between">
-            <p className="text-xs font-semibold text-[#9A9A9A]">UI Preview Mode</p>
-            <Link to="/dashboard" className="text-xs font-semibold text-sage-700 hover:underline">
-              Exit
-            </Link>
-          </div>
-
-          {tab === 'home' ? (
-            <ActiveTripHomeScreen
-              name={previewSession.customerName}
-              tempC={15}
-              tags={previewHighlights}
-              heroImageUrl={previewTrip.coverUrl}
-              tripTitle={previewTrip.tourName}
-              tripSubtitle="Private Photo Journey · premium edit"
-              durationLabel={durationLabel}
-              distanceLabel="10 km"
-              capacityLabel={capacityLabel}
-              onStartTrip={() => setTab('pass')}
-            />
-          ) : tab === 'itinerary' ? (
-            <TripDetailGroupScreen
-              bannerUrl={previewTrip.coverUrl}
-              countryTag={countryTag}
-              title="Discovering the Magic of Austrian Mountains"
-              metaLeft={durationLabel}
-              metaRight={capacityLabel}
-              hotelName="Hotel / Accommodation"
-              hotelNote="Floating details card — calm, minimal, editorial spacing."
-            />
-          ) : tab === 'profile' ? (
-            <TripExplorerStackScreen
-              heading="Popular"
-              datePills={[
-                { id: 'p1', label: '27/03 - 7/04' },
-                { id: 'p2', label: '10/04 - 15/04' },
-                { id: 'p3', label: '21/04 - 27/04' },
-              ]}
-              heroCards={[
-                {
-                  id: 'c1',
-                  imageUrl: previewTrip.coverUrl,
-                  badge: '🇦🇺 TASMANIA',
-                  title: 'First Snow Hunt',
-                  meta: '7 days • 10 km • 8/10',
-                },
-                {
-                  id: 'c2',
-                  imageUrl: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1400&q=85&auto=format&fit=crop',
-                  badge: '🇳🇿 QUEENSTOWN',
-                  title: 'Autumn Road Trip',
-                  meta: '6 days • 8 km • 4/5',
-                },
-                {
-                  id: 'c3',
-                  imageUrl: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1400&q=85&auto=format&fit=crop',
-                  badge: '🇦🇺 SYDNEY',
-                  title: 'One Day Highlights',
-                  meta: '1 day • 3 km • 3/4',
-                },
-              ]}
-            />
-          ) : (
-            <div className="min-h-screen bg-sage-50 text-[#1C1C1E] font-sans antialiased pb-20">
-              <header className="sticky top-0 z-40 bg-sage-50/95 backdrop-blur border-b border-sage-100">
-                <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
-                  <Link to="/" className="font-serif text-lg font-semibold">
-                    Trip2Talk
-                  </Link>
-                  <button type="button" onClick={() => setTab('home')} className="text-xs font-semibold text-[#9A9A9A]">
-                    Back
-                  </button>
-                </div>
-              </header>
-              <main className="max-w-md mx-auto px-4 pt-5 space-y-5">
-                <h2 className="font-serif text-xl font-semibold">Pass &amp; Consent</h2>
-                <div className="rounded-[28px] border border-sage-100 bg-white p-5 text-sm text-[#6B6B6B]">
-                  Preview: pass screen (existing production module remains).
-                </div>
-              </main>
-              <PortalNav tab={tab} onChange={setTab} />
-            </div>
-          )}
-
-          <PortalNav tab={tab} onChange={setTab} />
-        </div>
-      );
-    }
-
     return (
       <div className="min-h-screen bg-sage-50 text-[#1C1C1E] font-sans antialiased pb-20">
         <header className="sticky top-0 z-40 bg-sage-50/95 backdrop-blur border-b border-sage-100">
