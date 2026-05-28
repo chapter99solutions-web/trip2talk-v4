@@ -318,12 +318,13 @@ export function TripDetailGroupScreen({
   hotelNote: string;
 }) {
   const avatars = useMemo(() => Array.from({ length: 5 }).map((_, i) => i), []);
+  const bannerSrc = bannerUrl?.trim() || FALLBACK_CARD_AU_2;
 
   return (
     <div className="min-h-screen bg-sage-50 text-[#1C1C1E] font-sans pb-24">
       <div className="relative">
         <div className="h-[40vh] w-full rounded-b-[32px] overflow-hidden">
-          <img src={bannerUrl} alt="" className="w-full h-full object-cover" />
+          <img src={bannerSrc} alt="" className="w-full h-full object-cover" loading="lazy" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/10 to-sage-50" />
         </div>
 
@@ -372,8 +373,15 @@ export function TripDetailGroupScreen({
           <div className="border-t border-sage-100 p-6">
             <div className="rounded-[24px] border border-sage-100 bg-sage-50 p-4">
               <p className="text-[11px] font-semibold tracking-[0.25em] text-[#9A9A9A] uppercase">Accommodation</p>
-              <p className="mt-2 font-semibold text-[#1C1C1E]">{hotelName}</p>
-              <p className="mt-1 text-sm text-[#6B6B6B] leading-relaxed">{hotelNote}</p>
+              <p className="mt-2 font-semibold text-[#1C1C1E]">Cradle Mountain Lodge</p>
+              <div className="mt-1 space-y-1 text-sm text-[#6B6B6B] leading-relaxed">
+                <p className="inline-flex items-center gap-2">
+                  <span aria-hidden>📍</span> Tasmania, AU · 4038 Cradle Mountain Rd, Cradle Mountain TAS
+                </p>
+                <p className="inline-flex items-center gap-2">
+                  <span aria-hidden>🗓️</span> Check-in: 27 Mar · Check-out: 7 Apr
+                </p>
+              </div>
             </div>
           </div>
         </div>
