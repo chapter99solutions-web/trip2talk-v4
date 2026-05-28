@@ -38,7 +38,7 @@ type BookingDraft = {
 };
 
 const MAX_SPOTS = 4;
-const BUCKET = 'tour-photos';
+const BUCKET = 'portfolio';
 
 function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(' ');
@@ -54,20 +54,17 @@ function slugify(input: string) {
 }
 
 async function uploadImageAndGetUrl(file: File, pathPrefix: string): Promise<string> {
-  const ext = file.name.split('.').pop() || 'jpg';
-  const safeName = slugify(file.name.replace(/\.[^/.]+$/, '')) || 'image';
-  const path = `${pathPrefix}/${Date.now()}-${safeName}.${ext}`;
+  const key = `cms/${Date.now()}_${file.name}`;
 
-  const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, {
-    upsert: true,
-    contentType: file.type || 'image/jpeg',
+  const { error } = await supabase.storage.from(BUCKET).upload(key, file, {
     cacheControl: '3600',
+    upsert: true,
   });
-  if (upErr) throw new Error(upErr.message);
+  if (error) throw error;
 
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  if (!data?.publicUrl) throw new Error('Could not generate image URL');
-  return data.publicUrl;
+  const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(key);
+  if (!urlData?.publicUrl) throw new Error('Could not generate image URL');
+  return urlData.publicUrl;
 }
 
 function UploadCard({
