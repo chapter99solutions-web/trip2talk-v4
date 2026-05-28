@@ -2,6 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import WeatherPill from '../components/shared/WeatherPill';
 import ItineraryTimeline from '../components/client/ItineraryTimeline';
+import {
+  ActiveTripHomeScreen,
+  TripDetailGroupScreen,
+  TripExplorerStackScreen,
+} from '../components/dashboard/SoftDashboardScreens';
 import { fetchCityWeather } from '../lib/weather';
 import {
   fetchCustomerBookingByBookingIdOrPhone,
@@ -122,6 +127,56 @@ function SpotCard({ spot }: { spot: { spotName: string; mapsUrl: string; photoUr
         ) : (
           <span className="text-xs text-[#9A9A9A]">📍 Open Maps</span>
         )}
+      </div>
+    </div>
+  );
+}
+
+function OneDayPlanCard({
+  title,
+  morning,
+  afternoon,
+  evening,
+}: {
+  title?: string;
+  morning: string;
+  afternoon: string;
+  evening: string;
+}) {
+  return (
+    <div className="rounded-[28px] border border-sage-100 bg-white shadow-sm overflow-hidden">
+      <div className="p-5">
+        <p className="text-[11px] font-semibold tracking-[0.25em] text-[#9A9A9A] uppercase">Itinerary</p>
+        <h3 className="mt-1 text-[18px] font-bold text-[#1C1C1E]">{title ?? 'One-day plan'}</h3>
+      </div>
+      <div className="border-t border-sage-100 p-5 space-y-4">
+        <div className="flex gap-3">
+          <span className="w-9 h-9 rounded-2xl bg-sage-50 border border-sage-100 flex items-center justify-center shrink-0" aria-hidden>
+            🌤️
+          </span>
+          <div className="min-w-0">
+            <p className="text-[11px] uppercase tracking-wide text-[#9A9A9A] font-semibold">Morning</p>
+            <p className="text-[14px] leading-[1.7] text-[#1C1C1E] whitespace-pre-wrap">{morning}</p>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <span className="w-9 h-9 rounded-2xl bg-sage-50 border border-sage-100 flex items-center justify-center shrink-0" aria-hidden>
+            🚗
+          </span>
+          <div className="min-w-0">
+            <p className="text-[11px] uppercase tracking-wide text-[#9A9A9A] font-semibold">Afternoon</p>
+            <p className="text-[14px] leading-[1.7] text-[#1C1C1E] whitespace-pre-wrap">{afternoon}</p>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <span className="w-9 h-9 rounded-2xl bg-sage-50 border border-sage-100 flex items-center justify-center shrink-0" aria-hidden>
+            📸
+          </span>
+          <div className="min-w-0">
+            <p className="text-[11px] uppercase tracking-wide text-[#9A9A9A] font-semibold">Evening</p>
+            <p className="text-[14px] leading-[1.7] text-[#1C1C1E] whitespace-pre-wrap">{evening}</p>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -310,6 +365,18 @@ export default function ClientPortal() {
 
   const messengerUrl = trip?.messengerUrl?.trim() || 'https://m.me/trip2talk.chapter99';
   const cover = trip?.coverUrl?.trim() || 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&q=80';
+  const oneDay = (trip?.durationDays ?? 1) === 1;
+  const tempC = weather?.tempC ?? 15;
+  const tagPills = highlights.map((t) => {
+    const m = t.match(/^(\S+)\s+(.*)$/);
+    return { icon: m?.[1] ?? '✦', label: m?.[2] ?? t };
+  });
+  const durationLabel = trip ? (trip.durationDays === 1 ? '1 day' : `${trip.durationDays} days`) : '—';
+  const distanceLabel = '— km';
+  const capacityLabel = trip?.slotsMax ? `${trip.slotsBooked ?? 1}/${trip.slotsMax}` : '—';
+  const countryTag = (trip?.countryTag || 'Trip2Talk').toUpperCase();
+  const hotelName = trip?.dormitoryPolicy?.split('\n')[0]?.trim() || 'Accommodation';
+  const hotelNote = trip?.dormitoryPolicy?.trim() || 'Details will appear here once confirmed.';
 
   return (
     <div className="min-h-screen bg-sage-50 text-[#1C1C1E] font-sans antialiased pb-20">
@@ -324,56 +391,65 @@ export default function ClientPortal() {
         </div>
       </header>
 
-      <main className="max-w-md mx-auto px-4 pt-5 space-y-5">
-        {tab === 'home' && (
-          <>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm text-[#6B6B6B] font-medium">Hi,</p>
-                <h1 className="text-2xl font-semibold tracking-tight">
-                  {session.customerName} <span aria-hidden>👋</span>
-                </h1>
-              </div>
-              {weather ? <WeatherPill temp={weather.tempC} city={weather.city} condition={weather.condition} /> : null}
+      {tab === 'home' ? (
+        <ActiveTripHomeScreen
+          name={session.customerName}
+          tempC={tempC}
+          tags={tagPills}
+          heroImageUrl={cover}
+          tripTitle={trip?.tourName || session.tourCode}
+          tripSubtitle={trip?.countryTag || 'Private Photo Journey'}
+          durationLabel={durationLabel}
+          distanceLabel={distanceLabel}
+          capacityLabel={capacityLabel}
+          onStartTrip={() => setTab('pass')}
+        />
+      ) : tab === 'itinerary' ? (
+        <TripDetailGroupScreen
+          bannerUrl={cover}
+          countryTag={countryTag}
+          title={trip?.tourName || session.tourCode}
+          metaLeft={durationLabel}
+          metaRight={capacityLabel}
+          hotelName={hotelName}
+          hotelNote={hotelNote}
+        />
+      ) : tab === 'profile' ? (
+        <TripExplorerStackScreen
+          heading="All Trips"
+          datePills={[
+            { id: 'all', label: 'All dates' },
+            ...(trip?.departureStart && trip?.departureEnd
+              ? [{ id: 'next', label: `${trip.departureStart} - ${trip.departureEnd}` }]
+              : []),
+          ]}
+          heroCards={[
+            {
+              id: trip?.tourCode || session.tourCode,
+              imageUrl: cover,
+              badge: countryTag,
+              title: trip?.tourName || session.tourCode,
+              meta: `${durationLabel} • ${capacityLabel}`,
+            },
+          ]}
+        />
+      ) : (
+        <div className="min-h-screen bg-sage-50 text-[#1C1C1E] font-sans antialiased pb-20">
+          <header className="sticky top-0 z-40 bg-sage-50/95 backdrop-blur border-b border-sage-100">
+            <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
+              <Link to="/" className="font-serif text-lg font-semibold">
+                Trip2Talk
+              </Link>
+              <button type="button" onClick={logout} className="text-xs font-semibold text-[#9A9A9A]">
+                Logout
+              </button>
             </div>
-
-            <div className="flex flex-wrap gap-2">
-              {highlights.map((t) => (
-                <Badge key={t}>{t}</Badge>
-              ))}
-            </div>
-
-            <SoftCard>
-              <div className="relative aspect-[4/5]">
-                <img src={cover} alt={trip?.tourName || session.tourCode} className="absolute inset-0 w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-5 text-white">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-white/80 font-semibold">Upcoming trip</p>
-                  <h2 className="font-serif text-2xl font-semibold mt-1 leading-tight">
-                    {trip?.tourName || session.tourCode}
-                  </h2>
-                  <div className="mt-3 flex items-center justify-between text-sm text-white/85">
-                    <span className="inline-flex items-center gap-2">
-                      <span aria-hidden>📅</span>
-                      {trip ? `${trip.durationDays} Days` : '—'}
-                    </span>
-                    <span className="inline-flex items-center gap-2">
-                      <span aria-hidden>👥</span>
-                      {trip?.slotsMax ? `${trip.slotsBooked ?? 1}/${trip.slotsMax} People` : '—'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </SoftCard>
-
-            <PrimaryButton onClick={() => setTab('pass')}>Start Trip / ดูตั๋วดิจิทัล</PrimaryButton>
-          </>
-        )}
+          </header>
+          <main className="max-w-md mx-auto px-4 pt-5 space-y-5">
+            <h2 className="font-serif text-xl font-semibold">Pass &amp; Consent</h2>
 
         {tab === 'pass' && (
           <>
-            <h2 className="font-serif text-xl font-semibold">Pass &amp; Consent</h2>
-
             <SoftCard>
               <div className="p-5">
                 <div className="grid grid-cols-3 gap-3 text-center">
@@ -416,56 +492,6 @@ export default function ClientPortal() {
           </>
         )}
 
-        {tab === 'itinerary' && (
-          <>
-            <h2 className="font-serif text-xl font-semibold">Itinerary &amp; Spots</h2>
-
-            {trip?.itinerary?.length ? (
-              <SoftCard>
-                <div className="p-5">
-                  <ItineraryTimeline days={trip.itinerary} />
-                </div>
-              </SoftCard>
-            ) : (
-              <div className="rounded-[28px] border border-sage-100 bg-white p-5 text-sm text-[#6B6B6B]">
-                Itinerary will appear here once confirmed.
-              </div>
-            )}
-
-            <div className="space-y-3">
-              {(trip?.spots ?? []).slice(0, 6).map((s) => (
-                <SpotCard key={s.spotName + s.mapsUrl} spot={{ spotName: s.spotName, mapsUrl: s.mapsUrl, photoUrl: s.photoUrl }} />
-              ))}
-              {!trip?.spots?.length ? (
-                <div className="rounded-[28px] border border-sage-100 bg-white p-5 text-sm text-[#6B6B6B]">
-                  Spots will appear here once published.
-                </div>
-              ) : null}
-            </div>
-          </>
-        )}
-
-        {tab === 'profile' && (
-          <>
-            <h2 className="font-serif text-xl font-semibold">Profile</h2>
-            <SoftCard>
-              <div className="p-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-[#6B6B6B]">Booking</p>
-                  <p className="text-sm font-semibold">{session.bookingId}</p>
-                </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-[#6B6B6B]">Trip code</p>
-                  <p className="text-sm font-semibold">{session.tourCode}</p>
-                </div>
-                <button type="button" onClick={logout} className="w-full rounded-full border border-sage-100 bg-white py-3 font-semibold">
-                  Log out
-                </button>
-              </div>
-            </SoftCard>
-          </>
-        )}
-
         {loading && (
           <div className="rounded-[28px] border border-sage-100 bg-white p-5 animate-pulse">
             <div className="h-4 w-28 bg-sage-100 rounded" />
@@ -476,9 +502,10 @@ export default function ClientPortal() {
         {error && (
           <div className="rounded-[28px] border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</div>
         )}
-      </main>
-
-      <PortalNav tab={tab} onChange={setTab} />
+          </main>
+          <PortalNav tab={tab} onChange={setTab} />
+        </div>
+      )}
     </div>
   );
 }

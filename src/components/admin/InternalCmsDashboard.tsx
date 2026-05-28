@@ -741,7 +741,15 @@ export default function InternalCmsDashboard() {
       categoryCode: 'OBE-1DAY',
       categoryName: 'One Day Trip',
       dormitoryPolicy: '',
-      itinerary: Array.from({ length: 4 }).map(() => ({ morning: '', afternoon: '', evening: '', night: '' })),
+      itinerary: [
+        {
+          morning: '07:00 · นัดพบ Sydney Thai Town → ออกเดินทางไป Oberon (ประมาณ 180km)',
+          afternoon: 'สาย–บ่าย · ถึงพื้นที่ยุทธศาสตร์ Oberon · เริ่มลุยล่าหิมะแรก + ถ่าย portrait / content',
+          evening: 'เย็น · เก็บกล้อง/เคลียร์ไฟล์ → เดินทางกลับซิดนีย์ ส่งทุกท่านโดยสวัสดิภาพ',
+          night: '',
+        },
+        ...Array.from({ length: 3 }).map(() => ({ morning: '', afternoon: '', evening: '', night: '' })),
+      ],
       spots: [
         {
           name: 'Hunt the Snow (Oberon)',
@@ -770,6 +778,72 @@ export default function InternalCmsDashboard() {
           photoUrl: '',
           portraitGuide: 'ถ่าย candid ในรถ/ริมทาง · mood relaxed แต่ดูแพง',
           landscapeGuide: 'เก็บ establishing shot ของ road trip · รถ + วิว + ท้องฟ้า',
+        },
+      ],
+    }));
+  };
+
+  const prefillAut1day = () => {
+    setTrip((p) => ({
+      ...p,
+      tourCode: 'AUT-1DAY',
+      tourName: 'ทริปวันเดียวตามล่าใบไม้เปลี่ยนสี ซิดนีย์ (Sydney Autumn Leaves Hunt One Day Trip)',
+      countryTag: 'AU · Sydney (Autumn Leaves)',
+      city: 'Sydney',
+      weather: '',
+      messengerUrl: 'https://m.me/trip2talk.chapter99',
+      coverUrl:
+        'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=1400&q=85&auto=format&fit=crop',
+      durationDays: 1,
+      departureStart: '',
+      departureEnd: '',
+      slotsBooked: '1',
+      slotsMax: '4',
+      basePriceAud: '250',
+      depositAud: '',
+      categoryCode: 'AUT-1DAY',
+      categoryName: 'One Day Trip',
+      dormitoryPolicy:
+        'เวลาเดินทาง: 08:00–ช่วงเย็น (เช้าไปเย็นกลับ)\nจุดนัดพบ: Sydney Thai Town (รถรับ-ส่ง)\nขนาดกลุ่ม: จำกัด 4 ที่นั่ง/ทริป (อัปเดตที่ว่างผ่าน CMS)\nหมายเหตุ: โปรแกรม/เส้นทาง/จุดจอดรถอาจปรับหน้างานตามสภาพอากาศ ทัศนวิสัย และความหนาแน่นสีใบไม้ เพื่อผลลัพธ์ภาพที่ดีที่สุด',
+      itinerary: [
+        {
+          morning: '08:00 · ออกเดินทางจาก Sydney Thai Town → มุ่งหน้าสู่เส้นทางสายธรรมชาติ',
+          afternoon:
+            'สาย–บ่าย · Mt Wilson / Meadow Flat + จุดลับตามแนวเทือกเขา · เดินเล่น/ถ่าย portrait + content แบบชิล ๆ',
+          evening:
+            'เย็น · เดินทางกลับซิดนีย์ → ส่งทุกท่านที่ Sydney Thai Town พร้อมความฟินและรูปสวยเต็มเมมโมรี่',
+          night: '',
+        },
+        ...Array.from({ length: 3 }).map(() => ({ morning: '', afternoon: '', evening: '', night: '' })),
+      ],
+      spots: [
+        {
+          name: 'Autumn Leaves Magic (Mt Wilson & Meadow Flat)',
+          proTip:
+            'ช่วงพีคใบไม้เปลี่ยนสีจะได้โทนส้ม/แดง/เหลืองทองจัดจ้าน ส่วนปลายฤดูได้ไวบ์โรแมนติกเดินเตะใบไม้บนพรมหนานุ่ม · แนะนำชุดโทนครีม/เบจ/ดำ/ไวน์แดงให้ตัดกับสีใบไม้',
+          mapsUrl: '',
+          photoUrl: '',
+          portraitGuide:
+            'pose เดินเตะใบไม้/จับหมวก/ถือแก้วกาแฟ · ให้ movement เล็ก ๆ · เน้น eye line นุ่ม ๆ และไหล่ผ่อนคลาย',
+          landscapeGuide:
+            'ใช้ต้นไม้เป็น frame · เก็บเส้นทางเดิน/ซุ้มใบไม้เป็น leading lines · ถ่าย backlight ให้ใบไม้ glow',
+        },
+        {
+          name: 'Tesla Luxury Travel (Model Y)',
+          proTip: 'เดินทางสไตล์ตัวแม่ นุ่มเงียบ เย็นสบาย ไร้มลพิษ · เหมาะกับถ่ายภาพแนว luxury travel',
+          mapsUrl: '',
+          photoUrl: '',
+          portraitGuide: 'คุมโทน minimal + luxury · ถ่าย candid ขึ้น/ลงรถ · แสงนุ่ม ๆ ช่วงเช้า/เย็น',
+          landscapeGuide: 'เก็บ establishing shot: รถ + วิว + สีใบไม้ · ถ่ายมุมต่ำให้รถดู premium',
+        },
+        {
+          name: 'Pro Photographer & Model Vibe',
+          proTip:
+            'พี่แสนจัดท่า/ไกด์มุมกล้องให้ทุกคนแบบเต็ม ๆ ได้ไฟล์ภาพพรีเมียมทั้งแนว portrait และ landscape · ทริปนี้ vibe นางแบบ สนุก ไม่เขินกล้อง',
+          mapsUrl: '',
+          photoUrl: '',
+          portraitGuide: 'สลับกันเป็นแบบ + ชวนกันคิดท่า · ได้ภาพหลากหลายแบบ editorial',
+          landscapeGuide: 'เก็บ wide scene + subject เล็ก ๆ ให้ดู cinematic · เน้นสีและชั้นมิติของใบไม้',
         },
       ],
     }));
@@ -805,15 +879,16 @@ export default function InternalCmsDashboard() {
           dormitoryPolicy: trip.dormitoryPolicy.trim(),
           dormUpgradeNote: trip.dormUpgradeNote.trim(),
           itinerary:
-            durationDays > 1
-              ? trip.itinerary.slice(0, durationDays).map((d, idx) => ({
-                  dayNumber: idx + 1,
-                  morning: d.morning.trim(),
-                  afternoon: d.afternoon.trim(),
-                  evening: d.evening.trim(),
-                  night: d.night.trim(),
-                }))
-              : [],
+            trip.itinerary
+              .slice(0, durationDays)
+              .map((d, idx) => ({
+                dayNumber: idx + 1,
+                morning: d.morning.trim(),
+                afternoon: d.afternoon.trim(),
+                evening: d.evening.trim(),
+                night: d.night.trim(),
+              }))
+              .filter((d) => d.morning || d.afternoon || d.evening || d.night),
           spots: trip.spots
             .slice(0, MAX_SPOTS)
             .map((s) => ({
@@ -889,6 +964,9 @@ export default function InternalCmsDashboard() {
             </button>
             <button type="button" onClick={prefillObe1day} className="cyber-btn-ghost">
               PREFILL OBE-1DAY
+            </button>
+            <button type="button" onClick={prefillAut1day} className="cyber-btn-ghost">
+              PREFILL AUT-1DAY
             </button>
           <button type="button" onClick={() => void loadTourCodes()} className="cyber-btn-ghost">
             REFRESH TRIPS
