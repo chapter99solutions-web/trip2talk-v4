@@ -382,3 +382,122 @@ export function TripDetailGroupScreen({
   );
 }
 
+function CheckRow({
+  label,
+  checked,
+}: {
+  label: string;
+  checked: boolean;
+}) {
+  return (
+    <label className="flex items-start gap-3 cursor-pointer select-none">
+      <input type="checkbox" checked={checked} readOnly className="mt-1 accent-black" />
+      <span className="text-sm text-[#1C1C1E] leading-relaxed">
+        {label}{' '}
+        {checked ? <span className="text-[#6B6B6B] font-semibold">(signed)</span> : null}
+      </span>
+    </label>
+  );
+}
+
+export function PassConsentScreen({
+  bookingId = 'BK-PREVIEW',
+  tripName = 'The Sounds of Nature',
+  dateLabel = 'Fri 8 May 2026 · 08:00–Evening',
+  paxLabel = '4 guests',
+  emergencyName = 'Ploy (Trip Staff)',
+  emergencyPhone = '+61 4XX XXX XXX',
+}: {
+  bookingId?: string;
+  tripName?: string;
+  dateLabel?: string;
+  paxLabel?: string;
+  emergencyName?: string;
+  emergencyPhone?: string;
+}) {
+  return (
+    <div className="min-h-screen bg-sage-50 text-[#1C1C1E] font-sans pb-24">
+      <div className="max-w-md mx-auto px-4 pt-6 space-y-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-[#6B6B6B] font-medium">Digital Pass</p>
+            <h1 className="text-2xl font-semibold tracking-tight">Pass &amp; Consent</h1>
+          </div>
+          <div className="rounded-full border border-sage-100 bg-white/80 backdrop-blur px-3 py-2 shadow-sm">
+            <span className="text-xs font-semibold text-[#1C1C1E]">🎟️ Active</span>
+          </div>
+        </div>
+
+        {/* Digital pass card */}
+        <div className="rounded-[32px] border border-sage-100 bg-white shadow-xl overflow-hidden">
+          <div className="p-6">
+            <p className="text-[11px] font-semibold tracking-[0.25em] text-[#9A9A9A] uppercase">Trip2Talk</p>
+            <p className="mt-2 font-serif text-2xl font-semibold leading-tight">{tripName}</p>
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-sage-100 bg-sage-50 p-3">
+                <p className="text-[11px] text-[#6B6B6B] font-semibold">Booking ID</p>
+                <p className="mt-1 font-mono text-sm font-semibold">{bookingId}</p>
+              </div>
+              <div className="rounded-2xl border border-sage-100 bg-sage-50 p-3">
+                <p className="text-[11px] text-[#6B6B6B] font-semibold">Guests</p>
+                <p className="mt-1 text-sm font-semibold">{paxLabel}</p>
+              </div>
+            </div>
+
+            <div className="mt-3 rounded-2xl border border-sage-100 bg-sage-50 p-3">
+              <p className="text-[11px] text-[#6B6B6B] font-semibold">Date</p>
+              <p className="mt-1 text-sm font-semibold">{dateLabel}</p>
+            </div>
+          </div>
+
+          <div className="border-t border-sage-100 p-6">
+            <p className="text-[11px] font-semibold tracking-[0.25em] text-[#9A9A9A] uppercase">Consent &amp; waiver</p>
+            <div className="mt-3 space-y-3">
+              <CheckRow label="I accept the travel photo package terms." checked />
+              <CheckRow label="I agree to follow staff safety instructions." checked />
+              <CheckRow label="I consent to photo/video capture during the trip." checked />
+            </div>
+          </div>
+
+          <div className="border-t border-sage-100 p-6">
+            <p className="text-[11px] font-semibold tracking-[0.25em] text-[#9A9A9A] uppercase">Emergency contact</p>
+            <div className="mt-3 rounded-2xl border border-sage-100 bg-white p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-[#1C1C1E]">{emergencyName}</p>
+                <a className="text-sm font-semibold text-sage-700 hover:underline" href={`tel:${emergencyPhone}`}>
+                  {emergencyPhone}
+                </a>
+              </div>
+              <p className="mt-1 text-xs text-[#6B6B6B] leading-relaxed">
+                If you feel unwell or separated from the group, call immediately.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom action */}
+        <div className="pt-1">
+          <button
+            type="button"
+            className="w-full rounded-full bg-black text-white py-3.5 font-semibold tracking-wide shadow-lg shadow-black/20 hover:-translate-y-0.5 transition-all"
+            onClick={() => {
+              const text = `Trip2Talk Pass\\n${tripName}\\nBooking: ${bookingId}\\n${dateLabel}\\nGuests: ${paxLabel}`;
+              if (navigator.share) {
+                void navigator.share({ title: 'Trip2Talk Pass', text });
+              } else {
+                void navigator.clipboard?.writeText(text);
+              }
+            }}
+          >
+            Download / Share pass
+          </button>
+          <p className="mt-2 text-[11px] text-[#9A9A9A] text-center">
+            Tip: if Share isn’t available, the pass text will be copied to clipboard.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+

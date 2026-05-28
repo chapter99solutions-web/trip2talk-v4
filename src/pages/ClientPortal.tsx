@@ -4,6 +4,7 @@ import WeatherPill from '../components/shared/WeatherPill';
 import ItineraryTimeline from '../components/client/ItineraryTimeline';
 import {
   ActiveTripHomeScreen,
+  PassConsentScreen,
   TripDetailGroupScreen,
   TripExplorerStackScreen,
 } from '../components/dashboard/SoftDashboardScreens';
@@ -355,24 +356,14 @@ export default function ClientPortal() {
             ]}
           />
         ) : (
-          <div className="min-h-screen bg-sage-50 text-[#1C1C1E] font-sans antialiased pb-20">
-            <header className="sticky top-0 z-40 bg-sage-50/95 backdrop-blur border-b border-sage-100">
-              <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
-                <Link to="/" className="font-serif text-lg font-semibold">
-                  Trip2Talk
-                </Link>
-                <button type="button" onClick={() => setTab('home')} className="text-xs font-semibold text-[#9A9A9A]">
-                  Back
-                </button>
-              </div>
-            </header>
-            <main className="max-w-md mx-auto px-4 pt-5 space-y-5">
-              <h2 className="font-serif text-xl font-semibold">Pass &amp; Consent</h2>
-              <div className="rounded-[28px] border border-sage-100 bg-white p-5 text-sm text-[#6B6B6B]">
-                Preview: pass screen (existing production module remains).
-              </div>
-            </main>
-          </div>
+          <PassConsentScreen
+            bookingId={previewSession.bookingId}
+            tripName={previewTrip.tourName}
+            dateLabel="Fri 8 May 2026 · 08:00–Evening"
+            paxLabel="4 guests"
+            emergencyName="Ploy (Trip Staff)"
+            emergencyPhone="+61 4XX XXX XXX"
+          />
         )}
 
         <PortalNav tab={tab} onChange={setTab} />
