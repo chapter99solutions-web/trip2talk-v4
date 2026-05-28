@@ -7,6 +7,8 @@ body {
   margin: 0;
 }
 
+/* Soft-minimalist surfaces (Client pages override with `bg-sage-50 text-[#1C1C1E]`). */
+
 @keyframes slide-up {
   from {
     transform: translateY(100%);

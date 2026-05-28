@@ -17,6 +17,7 @@ import WaiverModule from '../waiver/WaiverModule';
 import { fetchSignedClientIds } from '../../lib/waiverApi';
 import { getLocalWaiversByClientIds } from '../../lib/waiverDb';
 import { WaiverData } from '../../types/compliance';
+import { pickupEmoji, pickupShortLabel } from '../../lib/pickup-options';
 
 interface CriticalAlert {
   id: string;
@@ -121,6 +122,39 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
       (b) => b.tours && ACTIVE_TOUR_STATUSES.includes(b.tours.status) && b.crm_clients
     );
   }, [synced, data]);
+
+  const pickupByTour = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        tour: Tour;
+        rows: Array<{
+          id: string;
+          client_name: string;
+          pickup_location: string | null;
+        }>;
+      }
+    >();
+    activeBookings.forEach((b) => {
+      const tour = b.tours!;
+      const client = b.crm_clients!;
+      const pickup =
+        (b as { pickup_location?: string | null; preferred_pickup?: string | null }).pickup_location ??
+        (b as { preferred_pickup?: string | null }).preferred_pickup ??
+        null;
+      const entry = map.get(tour.id) ?? {
+        tour,
+        rows: [],
+      };
+      entry.rows.push({
+        id: b.id,
+        client_name: clientLabel(client),
+        pickup_location: pickup,
+      });
+      map.set(tour.id, entry);
+    });
+    return Array.from(map.values());
+  }, [activeBookings]);
 
   const { criticalAlerts, warningAlerts } = useMemo(() => {
     const critical: CriticalAlert[] = [];
@@ -272,6 +306,33 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
           )}
         </section>
 
+        <section className="space-y-3">
+          <h2 className="cyber-section-header text-amber-400 tracking-wide">TRIP PICKUP QUEUE</h2>
+          {pickupByTour.length === 0 ? (
+            <div className="cyber-card p-4 cyber-table-td text-neutral-500 text-sm">NO ACTIVE PICKUPS</div>
+          ) : (
+            pickupByTour.map(({ tour, rows }) => (
+              <div key={tour.id} className="cyber-card p-4">
+                <p className="font-mono text-sm text-amber-400/90">{tour.trip_code}</p>
+                <p className="cyber-table-td text-sm text-neutral-400 mb-2">{tour.destination}</p>
+                <div className="mt-2 text-xs space-y-1">
+                  {rows.map((b) => (
+                    <div
+                      key={b.id}
+                      className="flex flex-wrap items-center gap-2 text-[rgba(255,255,255,0.6)]"
+                    >
+                      <span>{pickupEmoji(b.pickup_location)}</span>
+                      <span>{b.client_name}</span>
+                      <span className="opacity-50">—</span>
+                      <span>{pickupShortLabel(b.pickup_location)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </section>
+
         <div className="cyber-card overflow-hidden">
           <div className="p-4 border-b border-white/5">
             <h2 className="cyber-section-header text-amber-400 tracking-wide">TOUR MANIFEST</h2>
@@ -338,8 +399,8 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
                         <td className="p-3">
                           <TierBadge tier={c.client_tier} />
                         </td>
-                        <td className="p-3 cyber-table-td text-sm text-neutral-300">
-                          {pickupLocation === 'custom_accommodation' ? '🏨' : '📍'}
+                        <td className="p-3 cyber-table-td text-sm text-neutral-300" title={pickupShortLabel(pickupLocation)}>
+                          {pickupEmoji(pickupLocation)}
                         </td>
                         <td className="p-3">
                           {signedClientIds.has(c.id) ? (

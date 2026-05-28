@@ -226,7 +226,7 @@ export default function TravelPackageTerms() {
           <p className="mt-4 text-sm text-slate-600 bg-slate-50 rounded-xl px-4 py-3 border border-slate-200 leading-relaxed">
             <strong>2.1 หมายเหตุราคา:</strong> ราคาทริปถูกกำหนดตามจำนวนผู้ร่วมเดินทางที่ยืนยัน:
             <br />
-            1–3 ท่าน (Private Rate) หรือ 4–6 ท่าน (Standard Rate) — เดินคนเดียว (1 คน) ใช้ราคา Private
+            ทริปออกเดินทางได้ตั้งแต่ 1 ท่านขึ้นไป (Private Rate) หรือ 4 ท่านขึ้นไป (Standard Rate)
           </p>
 
           <div className="mt-8 overflow-hidden rounded-2xl border border-slate-200">

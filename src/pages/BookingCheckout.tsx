@@ -7,12 +7,11 @@ import TripSizeTierBadge from '../components/cyber/TripSizeTierBadge';
 import BookingPolicyPanel from '../components/policy/BookingPolicyPanel';
 import { runPhase2Book } from '../lib/customerJourney';
 import { PORTFOLIO_TOURS } from '../lib/portfolioTours';
-import { sydneyPickupPoints } from '../lib/pickup-options';
+import { PickupId, sydneyPickupPoints } from '../lib/pickup-options';
 
 type Step = 1 | 2 | 3 | 4;
 type VisaType = 'student' | 'other';
 type PackageId = 'STANDARD' | 'SESSION' | 'VIP';
-type PickupLocationId = (typeof sydneyPickupPoints)[number]['id'];
 
 const PAYID = 'trip2talk...';
 
@@ -55,11 +54,11 @@ export default function BookingCheckout() {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   // PICKUP RULE:
-  // 'thaitown_main'        → Standard + Private packages
+  // 'central_station' | 'town_hall' | 'thaitown_main' → Standard + Private
   // 'custom_accommodation' → Private/Upgrade packages ONLY
   // If Standard package + custom_accommodation selected → show warning
   // (ช่างภาพวนรับ CBD มีค่าใช้จ่ายเพิ่มเติมสำหรับ Standard tier)
-  const [pickupLocation, setPickupLocation] = useState<PickupLocationId>('thaitown_main');
+  const [pickupLocation, setPickupLocation] = useState<PickupId>('thaitown_main');
   const [hotelName, setHotelName] = useState('');
   const [visaType, setVisaType] = useState<VisaType>('student');
   const [oshc, setOshc] = useState('');
@@ -99,7 +98,6 @@ export default function BookingCheckout() {
 
   const canProceedStep1 = Boolean(selectedDate) && quote?.valid;
   const pickupRequiresHotel = pickupLocation === 'custom_accommodation';
-  const pickupWarningStandardCBD = pkg === 'STANDARD' && pickupLocation === 'custom_accommodation';
 
   const canProceedStep3 =
     fullName.trim() &&
@@ -378,7 +376,7 @@ export default function BookingCheckout() {
               <label className="text-xs text-slate-500 block mb-1">Pickup location</label>
               <select
                 value={pickupLocation}
-                onChange={(e) => setPickupLocation(e.target.value as PickupLocationId)}
+                onChange={(e) => setPickupLocation(e.target.value as PickupId)}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-teal/30"
               >
                 {sydneyPickupPoints.map((p) => (
@@ -402,9 +400,10 @@ export default function BookingCheckout() {
                   />
                 </div>
               )}
-              {pickupWarningStandardCBD && (
-                <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  ⚠️ Standard package + รับที่พักในเขต CBD: มีค่าใช้จ่ายเพิ่มเติม (แนะนำเลือก Private/Upgrade)
+              {pickupLocation === 'custom_accommodation' && pkg === 'STANDARD' && (
+                <div className="text-xs bg-[#FAEEDA] border border-[#EF9F27] rounded-lg p-3 mt-2 text-[#633806]">
+                  ⚠️ การรับที่พักส่วนตัวใน CBD มีค่าใช้จ่ายเพิ่มเติม — แนะนำอัปเกรดเป็นแพ็กเกจ Private
+                  เพื่อรวมบริการนี้
                 </div>
               )}
             </div>

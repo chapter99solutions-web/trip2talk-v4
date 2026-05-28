@@ -4,6 +4,7 @@ import { findTripById } from '../lib/publicTours';
 import { formatAUD } from '../lib/payidCalc';
 import { PORTFOLIO_TOURS } from '../lib/portfolioTours';
 import { supabase } from '../lib/supabase';
+import { fetchTripByCodeFromSheet, TripSheetRow } from '../lib/tripsSheetApi';
 
 type TourTab = 'details' | 'included' | 'reviews';
 
@@ -24,8 +25,28 @@ export default function TourDetail() {
   const [activeTab, setActiveTab] = useState<TourTab>('details');
   const [saved, setSaved] = useState(false);
   const [photos, setPhotos] = useState<string[]>([]);
+  const [sheetTrip, setSheetTrip] = useState<TripSheetRow | null>(null);
+  const [sheetError, setSheetError] = useState<string | null>(null);
 
-  if (!trip) {
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!tourId) return;
+      setSheetError(null);
+      try {
+        const row = await fetchTripByCodeFromSheet(tourId);
+        if (!cancelled) setSheetTrip(row);
+      } catch (e) {
+        if (!cancelled) setSheetError(e instanceof Error ? e.message : 'Could not load trip');
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [tourId]);
+
+  if (!trip && !sheetTrip) {
     return (
       <div className="max-w-lg mx-auto px-4 py-16 text-center">
         <p className="text-red-600 font-sans">Trip not found.</p>
@@ -36,17 +57,16 @@ export default function TourDetail() {
     );
   }
 
-  const tripId = trip.id;
+  const tripId = trip?.id ?? sheetTrip?.tourCode ?? tourId ?? 'trip';
 
-  const portfolio = PORTFOLIO_TOURS.find((t) => t.id === trip.id || t.id === tourId);
-  const heroImage = portfolio?.image ?? FALLBACK_HERO;
-  const title = portfolio?.title ?? trip.destination;
-  const location = portfolio?.location ?? `${trip.destination}`;
+  const portfolio = trip ? PORTFOLIO_TOURS.find((t) => t.id === trip.id || t.id === tourId) : undefined;
+  const heroImage = sheetTrip?.coverUrl || portfolio?.image || FALLBACK_HERO;
+  const title = sheetTrip?.tourName || portfolio?.title || trip?.destination || 'Trip';
+  const location = sheetTrip?.countryTag || portfolio?.location || `${trip?.destination ?? ''}`;
   const rating = portfolio?.rating ?? 4.8;
-  const duration = portfolio?.duration ?? (() => {
-    const days = dayCount(trip.start_date, trip.end_date);
-    return days ? `${days} days` : '—';
-  })();
+  const duration =
+    portfolio?.duration ??
+    (sheetTrip?.spots?.length ? `${Math.min(7, Math.max(1, sheetTrip.spots.length))} stops` : '—');
 
   const saveKey = useMemo(() => `t2t:savedTours:v1`, []);
 
@@ -134,6 +154,9 @@ export default function TourDetail() {
           </p>
 
           <h1 className="mt-3 text-[24px] leading-snug font-semibold text-slate-900">{title}</h1>
+          {sheetError && (
+            <p className="text-xs text-amber-700 mt-2">Live sheet unavailable — showing fallback details.</p>
+          )}
 
           {/* Stats row */}
           <div className="mt-4 grid grid-cols-3 gap-3">
@@ -147,7 +170,7 @@ export default function TourDetail() {
               <p className="text-xs text-slate-500 flex items-center gap-1">
                 <span aria-hidden>👥</span> Max Pax
               </p>
-              <p className="text-sm font-semibold text-slate-900 mt-1">{trip.max_pax}</p>
+              <p className="text-sm font-semibold text-slate-900 mt-1">{trip?.max_pax ?? 6}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
               <p className="text-xs text-slate-500 flex items-center gap-1">
@@ -188,8 +211,32 @@ export default function TourDetail() {
                   delivery.
                 </p>
                 <p className="text-xs text-slate-500 font-mono">
-                  {trip.start_date} → {trip.end_date} · {trip.trip_code}
+                  {trip?.start_date && trip?.end_date ? `${trip.start_date} → ${trip.end_date} · ${trip.trip_code}` : sheetTrip?.tourCode}
                 </p>
+
+                {sheetTrip?.spots?.length ? (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Spots</p>
+                    {sheetTrip.spots.slice(0, 4).map((s, idx) => (
+                      <div key={`${s.spotName}-${idx}`} className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                        <p className="text-sm font-semibold text-slate-900">{s.spotName || `Spot ${idx + 1}`}</p>
+                        {s.proTip && <p className="text-sm text-slate-600 mt-1">Pro tip: {s.proTip}</p>}
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {s.mapsUrl && (
+                            <a
+                              href={s.mapsUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs font-semibold text-emerald-700 hover:underline"
+                            >
+                              Open maps →
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             )}
 
@@ -245,10 +292,10 @@ export default function TourDetail() {
         <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
           <div>
             <p className="text-xs text-slate-500">From</p>
-            <p className="text-lg font-semibold text-slate-900">{formatAUD(trip.price_aud)}/person</p>
+            <p className="text-lg font-semibold text-slate-900">{formatAUD(trip?.price_aud ?? 0)}/person</p>
           </div>
           <Link
-            to={`/book/${trip.id}`}
+            to={`/book/${encodeURIComponent(sheetTrip?.tourCode ?? trip?.id ?? tourId ?? '')}`}
             className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-teal text-navy font-semibold text-sm hover:opacity-90 transition-opacity"
           >
             Book this trip <span aria-hidden>→</span>

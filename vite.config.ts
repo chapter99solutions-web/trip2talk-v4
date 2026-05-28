@@ -33,12 +33,28 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/niuibpznjvytprbrzvnn\.supabase\.co\/.*/i,
+            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'supabase-cache',
+              cacheName: 'supabase-api',
               expiration: { maxEntries: 50, maxAgeSeconds: 86400 },
-              networkTimeoutSeconds: 10,
+              networkTimeoutSeconds: 5,
+            },
+          },
+          {
+            urlPattern: /\/(trip|album)\/.*/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'trip-pages',
+              expiration: { maxEntries: 20, maxAgeSeconds: 604800 },
+            },
+          },
+          {
+            urlPattern: /\.(?:png|jpg|jpeg|webp|svg)$/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'images',
+              expiration: { maxEntries: 100, maxAgeSeconds: 604800 },
             },
           },
           {

@@ -15,6 +15,8 @@ import LiveClock from '../cyber/LiveClock';
 import KpiCard from '../cyber/KpiCard';
 import TourStatusBadge from '../cyber/TourStatusBadge';
 import AwaitingSync from '../cyber/AwaitingSync';
+import AlbumDeliveryPanel from '../shared/AlbumDeliveryPanel';
+import InternalCmsDashboard from '../admin/InternalCmsDashboard';
 
 const ATO_OPTIONS: ATOCategory[] = [
   'Transport',
@@ -496,6 +498,9 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
             </div>
           </div>
         </div>
+
+        <AlbumDeliveryPanel theme="cyber" />
+        <InternalCmsDashboard />
         </>
         )}
       </div>

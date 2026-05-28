@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { formatAUD } from '../lib/payidCalc';
-import { PORTFOLIO_TOURS, TOUR_FILTERS, TourFilter } from '../lib/portfolioTours';
 import PublicBottomNav from '../components/public/PublicBottomNav';
+import { fetchTripsFromSheet, TripSheetRow } from '../lib/tripsSheetApi';
+import MeetTheCrew from '../components/public/MeetTheCrew';
 
 const HERO_IMAGE =
   'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1920&q=85';
@@ -36,28 +36,11 @@ const FEATURES = [
   },
 ];
 
-const GUIDES = [
-  { name: 'แสน', nameEn: 'Saen', role: 'Founder · Lead Photographer', trips: 186, rating: 4.9, gradient: 'from-emerald-400 to-teal-600' },
-  { name: 'พลอย', nameEn: 'Ploy', role: 'Co-Host · Client Experience', trips: 94, rating: 4.8, gradient: 'from-rose-300 to-amber-400' },
-  { name: 'James', nameEn: 'James', role: 'Wildlife Specialist', trips: 72, rating: 4.9, gradient: 'from-sky-400 to-indigo-500' },
-  { name: 'Lena', nameEn: 'Lena', role: 'City & Editorial', trips: 58, rating: 4.7, gradient: 'from-violet-400 to-fuchsia-500' },
-];
-
 const TESTIMONIALS = [
   { quote: 'The album felt like a magazine spread — every frame intentional.', name: 'M.K.', stars: 5 },
   { quote: 'Small group, no rush. Saen found light we would never have seen.', name: 'P.S.', stars: 5 },
   { quote: 'OSHC and waiver handled smoothly. Parents were reassured.', name: 'A.L.', stars: 5 },
 ];
-
-function StarRow({ rating }: { rating: number }) {
-  return (
-    <span className="text-amber-400 text-sm tracking-tight" aria-label={`${rating} stars`}>
-      {'★'.repeat(Math.floor(rating))}
-      {rating % 1 >= 0.5 ? '½' : ''}
-      <span className="text-slate-400 ml-1 text-xs font-sans font-medium">{rating}</span>
-    </span>
-  );
-}
 
 function TourCard({
   tour,
@@ -65,7 +48,7 @@ function TourCard({
   onToggleSave,
   large,
 }: {
-  tour: (typeof PORTFOLIO_TOURS)[0];
+  tour: TripSheetRow;
   saved: boolean;
   onToggleSave: () => void;
   large?: boolean;
@@ -78,8 +61,8 @@ function TourCard({
     >
       <div className={`relative overflow-hidden ${large ? 'aspect-[21/9]' : 'aspect-video'}`}>
         <img
-          src={tour.image}
-          alt={tour.title}
+          src={tour.coverUrl || 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&q=80'}
+          alt={tour.tourName}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           loading="lazy"
         />
@@ -94,31 +77,32 @@ function TourCard({
         >
           {saved ? '❤️' : '🤍'}
         </button>
-        {tour.featured && (
-          <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-white/90 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-            Featured
-          </span>
-        )}
+        {/* Reserved for future: featured flag from CMS */}
       </div>
       <div className="p-4 md:p-5">
         <div className="flex justify-between items-start gap-2">
           <div>
-            <StarRow rating={tour.rating} />
+            <p className="text-[11px] uppercase tracking-wide font-semibold text-emerald-700">
+              {tour.countryTag || 'Trip2Talk'}
+            </p>
             <h3 className={`font-serif font-semibold text-slate-900 mt-1 ${large ? 'text-2xl' : 'text-lg'}`}>
-              {tour.title}
+              {tour.tourName || tour.tourCode}
             </h3>
           </div>
-          <p className="font-semibold text-teal whitespace-nowrap">{formatAUD(tour.priceAud)}</p>
+          {tour.weather ? (
+            <p className="text-xs font-semibold text-slate-600 whitespace-nowrap">{tour.weather}</p>
+          ) : (
+            <p className="text-xs font-semibold text-slate-400 whitespace-nowrap">{tour.tourCode}</p>
+          )}
         </div>
-        <p className="text-sm text-slate-500 mt-2 flex items-center gap-1">
-          <span aria-hidden>📍</span> {tour.location} · {tour.duration}
+        <p className="text-sm text-slate-500 mt-2 leading-relaxed">
+          Private Photo Journey · small groups · finished .JPG album delivery
         </p>
-        <p className="text-xs text-slate-400 mt-1">{tour.reviewCount} reviews</p>
         <Link
-          to={`/tours/${tour.id}`}
+          to={`/tours/${encodeURIComponent(tour.tourCode)}`}
           className="mt-4 inline-flex w-full justify-center items-center gap-2 py-2.5 rounded-full bg-navy text-white text-sm font-semibold hover:bg-navy-dark transition-colors"
         >
-          Book this trip <span aria-hidden>→</span>
+          View trip details <span aria-hidden>→</span>
         </Link>
       </div>
     </article>
@@ -126,13 +110,30 @@ function TourCard({
 }
 
 export default function PublicPortfolio() {
-  const [filter, setFilter] = useState<TourFilter>('all');
   const [saved, setSaved] = useState<Set<string>>(() => new Set());
+  const [trips, setTrips] = useState<TripSheetRow[]>([]);
+  const [loadingTrips, setLoadingTrips] = useState(true);
+  const [tripError, setTripError] = useState<string | null>(null);
 
-  const filtered = useMemo(() => {
-    if (filter === 'all') return PORTFOLIO_TOURS;
-    return PORTFOLIO_TOURS.filter((t) => t.category === filter);
-  }, [filter]);
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      setLoadingTrips(true);
+      setTripError(null);
+      try {
+        const rows = await fetchTripsFromSheet();
+        if (!cancelled) setTrips(rows);
+      } catch (e) {
+        if (!cancelled) setTripError(e instanceof Error ? e.message : 'Could not load trips');
+      } finally {
+        if (!cancelled) setLoadingTrips(false);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const toggleSave = (id: string) => {
     setSaved((prev) => {
@@ -142,6 +143,17 @@ export default function PublicPortfolio() {
       return next;
     });
   };
+
+  const exploreHref = useMemo(() => {
+    const first = trips[0];
+    return first ? `/tours/${encodeURIComponent(first.tourCode)}` : '/';
+  }, [trips]);
+
+  const grouped = useMemo(() => {
+    const allYear = trips.filter((t) => t.seasonGroup !== 'seasonal');
+    const seasonal = trips.filter((t) => t.seasonGroup === 'seasonal');
+    return { allYear, seasonal };
+  }, [trips]);
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans antialiased pb-20">
@@ -158,15 +170,18 @@ export default function PublicPortfolio() {
             <a href="#gallery" className="hover:text-emerald-600 transition-colors">
               Gallery
             </a>
-            <a href="#guides" className="hover:text-emerald-600 transition-colors">
-              Guides
-            </a>
+            <Link to="/about" className="hover:text-emerald-600 transition-colors">
+              About
+            </Link>
+            <Link to="/contact" className="hover:text-emerald-600 transition-colors">
+              Contact
+            </Link>
             <a href="#pricing" className="hover:text-emerald-600 transition-colors">
               Pricing
             </a>
           </nav>
           <Link
-            to="/tours/nz-aut-2026"
+            to={exploreHref}
             className="shrink-0 px-4 py-2 rounded-full bg-navy text-white text-sm font-semibold hover:bg-navy-dark transition-colors shadow-sm"
           >
             Explore Now <span aria-hidden>→</span>
@@ -213,41 +228,65 @@ export default function PublicPortfolio() {
         </div>
       </section>
 
-      {/* Tours */}
+      {/* Trips */}
       <section id="tours" className="max-w-6xl mx-auto px-4 py-20">
         <div className="text-center mb-10">
           <h2 className="font-serif text-3xl md:text-4xl font-semibold text-slate-900">Curated journeys</h2>
-          <p className="text-slate-500 mt-2 text-sm">Tier 1 Standard (4–6) · Tier 2 Private (1–3) Guaranteed Departure</p>
+          <p className="text-slate-500 mt-2 text-sm">Tier 1 Standard (4–6 guests) · Tier 2 Private (1–3 guests) Guaranteed</p>
+          {tripError && <p className="text-xs text-red-700 mt-2">Live trips unavailable: {tripError}</p>}
         </div>
-        <div className="flex flex-wrap justify-center gap-2 mb-10">
-          {TOUR_FILTERS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => setFilter(f.id)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                filter === f.id
-                  ? 'bg-navy text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {f.label === 'One Day' ? 'One Day Trip' : f.label}
-            </button>
-          ))}
-        </div>
-        <div id="gallery" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map((tour) => (
-            <TourCard
-              key={tour.id}
-              tour={tour}
-              saved={saved.has(tour.id)}
-              onToggleSave={() => toggleSave(tour.id)}
-              large={tour.featured && filter === 'all'}
-            />
-          ))}
-        </div>
-        {filtered.length === 0 && (
-          <p className="text-center text-slate-500 py-12">No trips in this category yet.</p>
+        {loadingTrips ? (
+          <div id="gallery" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-2xl border border-slate-100 bg-slate-50 h-[360px] animate-pulse" />
+            ))}
+          </div>
+        ) : trips.length === 0 ? (
+          <div className="max-w-xl mx-auto text-center py-12">
+            <p className="text-slate-700 font-semibold">No trips available right now.</p>
+            <p className="text-sm text-slate-500 mt-2">Please check again soon.</p>
+          </div>
+        ) : (
+          <div className="space-y-14">
+            <section>
+              <div className="flex items-end justify-between gap-4 mb-6">
+                <div>
+                  <p className="text-[11px] font-semibold tracking-[0.25em] text-slate-400 uppercase">Category</p>
+                  <h3 className="font-serif text-2xl font-semibold text-slate-900">All Year Round Trips</h3>
+                </div>
+              </div>
+              <div id="gallery" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {grouped.allYear.map((tour, idx) => (
+                  <TourCard
+                    key={tour.tourCode}
+                    tour={tour}
+                    saved={saved.has(tour.tourCode)}
+                    onToggleSave={() => toggleSave(tour.tourCode)}
+                    large={idx === 0}
+                  />
+                ))}
+              </div>
+            </section>
+
+            <section>
+              <div className="flex items-end justify-between gap-4 mb-6">
+                <div>
+                  <p className="text-[11px] font-semibold tracking-[0.25em] text-slate-400 uppercase">Category</p>
+                  <h3 className="font-serif text-2xl font-semibold text-slate-900">Seasonal Trips</h3>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {grouped.seasonal.map((tour) => (
+                  <TourCard
+                    key={tour.tourCode}
+                    tour={tour}
+                    saved={saved.has(tour.tourCode)}
+                    onToggleSave={() => toggleSave(tour.tourCode)}
+                  />
+                ))}
+              </div>
+            </section>
+          </div>
         )}
       </section>
 
@@ -264,30 +303,17 @@ export default function PublicPortfolio() {
         </div>
       </section>
 
-      {/* Guides */}
-      <section id="guides" className="max-w-6xl mx-auto px-4 py-20">
-        <h2 className="font-serif text-3xl font-semibold text-center text-slate-900 mb-12">Meet your guides</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {GUIDES.map((g) => (
-            <div
-              key={g.nameEn}
-              className="rounded-2xl border border-slate-100 p-6 text-center shadow-sm hover:shadow-md transition-shadow bg-white"
-            >
-              <div
-                className={`w-20 h-20 mx-auto rounded-full bg-gradient-to-br ${g.gradient} flex items-center justify-center text-white font-serif text-2xl font-semibold shadow-inner`}
-              >
-                {g.nameEn.charAt(0)}
-              </div>
-              <h3 className="font-serif text-lg font-semibold mt-4">
-                {g.name} <span className="text-slate-400 text-sm font-sans">({g.nameEn})</span>
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">{g.role}</p>
-              <p className="text-sm text-slate-700 mt-3 font-medium">
-                {g.trips} trips · ★ {g.rating}
-              </p>
-            </div>
-          ))}
-        </div>
+      {/* Meet the Crew — teaser */}
+      <section className="max-w-6xl mx-auto px-4 py-20 md:py-28 border-t border-slate-100">
+        <MeetTheCrew />
+        <p className="text-center mt-12">
+          <Link
+            to="/about"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-emerald-700 transition-colors tracking-wide"
+          >
+            Full story on About <span aria-hidden>→</span>
+          </Link>
+        </p>
       </section>
 
       {/* Testimonials */}
