@@ -1,5 +1,5 @@
-import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
-import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import PINGate from './PINGate';
 import { AppRole } from '../types/platform';
 
@@ -48,10 +48,11 @@ function CmsGate({ role, onLogout }: { role: AppRole; onLogout: () => void }) {
   );
 }
 
-/** Staff / owner consoles behind PIN (/ops). */
+/** Staff / owner consoles behind PIN (/ops, /cms). /dashboard is the public client portal (no PIN). */
 export default function OpsApp() {
   const [currentRole, setCurrentRole] = useState<AppRole | null>(null);
   const location = useLocation();
+  const isCmsPath = useMemo(() => location.pathname.startsWith('/cms'), [location.pathname]);
 
   const logout = useCallback(() => {
     setCurrentRole(null);
@@ -99,13 +100,11 @@ export default function OpsApp() {
           </div>
         }
       >
-        <Routes>
-          <Route path="/ops" element={<RoleRouter role={currentRole} onLogout={logout} />} />
-          <Route path="/ops/*" element={<RoleRouter role={currentRole} onLogout={logout} />} />
-          <Route path="/cms" element={<CmsGate role={currentRole} onLogout={logout} />} />
-          <Route path="/cms/*" element={<CmsGate role={currentRole} onLogout={logout} />} />
-          <Route path="*" element={<Navigate to={location.pathname.startsWith('/cms') ? '/cms' : '/ops'} replace />} />
-        </Routes>
+        {isCmsPath ? (
+          <CmsGate role={currentRole} onLogout={logout} />
+        ) : (
+          <RoleRouter role={currentRole} onLogout={logout} />
+        )}
       </Suspense>
     </div>
   );

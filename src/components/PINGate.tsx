@@ -6,6 +6,9 @@ import LanguageToggle from './i18n/LanguageToggle';
 import { useI18n } from '../lib/i18n';
 import { AppRole, PIN_ROLE_MAP } from '../types/platform';
 
+/** Valid ops PINs (also in `src/types/platform.ts`). */
+export { PIN_ROLE_MAP };
+
 const MAX_ATTEMPTS = 3;
 const LOCKOUT_MS = 30_000;
 
@@ -82,12 +85,15 @@ export default function PINGate({ onAuthenticated }: PINGateProps) {
 
   const appendDigit = useCallback(
     (digit: string) => {
-      if (locked || scanning || pinBuffer.length >= 4) return;
-      const next = pinBuffer + digit;
-      setPinBuffer(next);
-      if (next.length === 4) submitPin(next);
+      if (locked || scanning) return;
+      setPinBuffer((prev) => {
+        if (prev.length >= 4) return prev;
+        const next = prev + digit;
+        if (next.length === 4) submitPin(next);
+        return next;
+      });
     },
-    [locked, scanning, pinBuffer, submitPin]
+    [locked, scanning, submitPin]
   );
 
   const handleClear = useCallback(() => {
