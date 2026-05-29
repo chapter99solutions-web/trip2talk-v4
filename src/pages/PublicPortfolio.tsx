@@ -445,7 +445,7 @@ export default function PublicPortfolio() {
             <Link to="/package-terms" className="hover:text-teal">
               Package &amp; cancellation terms
             </Link>
-            <Link to="/dashboard" className="text-slate-400 hover:text-slate-600">
+            <Link to="/portal" className="text-slate-400 hover:text-slate-600">
               Staff
             </Link>
           </nav>

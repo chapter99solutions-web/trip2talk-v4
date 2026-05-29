@@ -54,12 +54,12 @@ export const PHASE_OPERATIONS: Record<
   on_trip: {
     summary: 'Payments & ATO expenses on active trip',
     operations: ['UPDATE tour_bookings (payments)', 'INSERT expenses', 'UPDATE safety_briefings'],
-    routes: ['/dashboard'],
+    routes: ['/portal'],
   },
   post_trip: {
     summary: 'Settlement & Google Sheets',
     operations: ['Storage upload (tour-photos)', 'INSERT net_settlements', 'INSERT sheets_sync_log'],
-    routes: ['/dashboard'],
+    routes: ['/portal'],
   },
   receive: {
     summary: 'Album delivery',

@@ -295,7 +295,7 @@ export default function ClientPortal() {
       <div className="min-h-screen bg-sage-50 text-[#1C1C1E] font-sans antialiased">
         <div className="max-w-md mx-auto px-4 pt-4 pb-2 flex items-center justify-between">
           <p className="text-xs font-semibold text-[#9A9A9A]">UI Preview Mode</p>
-          <Link to="/dashboard" className="text-xs font-semibold text-sage-700 hover:underline">
+          <Link to="/portal" className="text-xs font-semibold text-sage-700 hover:underline">
             Exit
           </Link>
         </div>

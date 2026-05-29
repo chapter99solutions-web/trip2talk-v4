@@ -8,6 +8,16 @@ export default {
         serif: ['Playfair Display', 'Georgia', 'serif'],
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', '"Liberation Mono"', '"Courier New"', 'monospace'],
       },
+      keyframes: {
+        shake: {
+          '0%, 100%': { transform: 'translateX(0)' },
+          '25%': { transform: 'translateX(-8px)' },
+          '75%': { transform: 'translateX(8px)' },
+        },
+      },
+      animation: {
+        shake: 'shake 0.4s ease-in-out',
+      },
       colors: {
         navy: { DEFAULT: '#0d1b2a', light: '#1a3a5a', dark: '#080f17' },
         teal: { DEFAULT: '#4dd8a0', dark: '#0F6E56', light: '#E1F5EE' },
