@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
+import { isUuidV4 } from '../lib/bookingRules';
 import { findTripById } from '../lib/publicTours';
 import { fetchAlbumBookingForTrip } from '../lib/albumDelivery';
+import { supabase } from '../lib/supabase';
 import AlbumCountdown from '../components/shared/AlbumCountdown';
 import {
   AlbumMode,
@@ -102,6 +104,29 @@ export default function AlbumPrep() {
   const { tourId } = useParams<{ tourId: string }>();
   const [search, setSearch] = useSearchParams();
   const trip = tourId ? findTripById(tourId) : undefined;
+  const accessToken = search.get('token')?.trim() ?? '';
+  const [tokenGate, setTokenGate] = useState<'loading' | 'ok' | 'deny'>('loading');
+
+  useEffect(() => {
+    if (!accessToken || !isUuidV4(accessToken)) {
+      setTokenGate('deny');
+      return;
+    }
+    let cancelled = false;
+    void supabase
+      .from('tour_bookings')
+      .select('id')
+      .eq('access_token', accessToken)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error || !data) setTokenGate('deny');
+        else setTokenGate('ok');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
 
   const mode: AlbumMode = search.get('type') === 'landscape' ? 'landscape' : 'model';
   const [albumExpiresAt, setAlbumExpiresAt] = useState<string | null>(null);
@@ -125,6 +150,18 @@ export default function AlbumPrep() {
       cancelled = true;
     };
   }, [tourId]);
+
+  if (tokenGate === 'deny') {
+    return <Navigate to="/" replace />;
+  }
+
+  if (tokenGate === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white" style={{ background: NAVY }}>
+        <p className="text-sm text-neutral-400">Validating secure token…</p>
+      </div>
+    );
+  }
 
   const setMode = (m: AlbumMode) => {
     setSearch({ type: m, ready: search.get('ready') ?? '1' }, { replace: true });

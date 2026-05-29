@@ -49,6 +49,7 @@ npx supabase db query --linked -f supabase/00-schema-auth.sql
 npx supabase db query --linked -f supabase/01-schema-tours-staff.sql
 npx supabase db query --linked -f supabase/02-schema-crm-safety.sql
 npx supabase db query --linked -f supabase/03-schema-saas-mrr.sql
+npx supabase db query --linked -f supabase/10-schema-sync-pipeline.sql
 ```
 
 **Fallback:** Dashboard → **SQL Editor** → paste each file in the same order.
@@ -72,7 +73,30 @@ npx supabase functions deploy send-trip-receipt       --project-ref $REF
 npx supabase functions deploy record-waiver           --project-ref $REF
 npx supabase functions deploy deliver-album           --project-ref $REF
 npx supabase functions deploy send-retarget-sms       --project-ref $REF
+npx supabase functions deploy sync-pipeline           --project-ref $REF
 ```
+
+### Sync pipeline (GAS bridge)
+
+`sync-pipeline` is the **only** server path for Google Apps Script **writes**. Payload contract:
+
+```json
+{ "action": "sync_booking|sync_waiver|sync_receipt", "bookingId": "…", "data": { } }
+```
+
+| Action | DB write-back |
+|--------|----------------|
+| `sync_booking` | `tour_bookings.sheets_row_id` |
+| `sync_waiver` | `waiver_signatures.pdf_url`, `sheets_row_id` |
+| `sync_receipt` | `receipts.drive_url`, `sheets_row_id` |
+
+Run schema `10-schema-sync-pipeline.sql` before deploy. Set secret:
+
+```powershell
+npx supabase secrets set GAS_WEBAPP_URL='https://script.google.com/macros/s/…/exec' --project-ref $REF
+```
+
+Client: `src/lib/syncPipeline.ts` — do **not** `fetch()` GAS from the browser for POST/sync.
 
 ## Customer lifecycle (TASK 15)
 

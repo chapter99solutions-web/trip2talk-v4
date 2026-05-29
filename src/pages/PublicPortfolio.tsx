@@ -115,10 +115,8 @@ function TourCard({
 
 const TRIP_FILTERS: { id: TripFilterId; labelKey: keyof ReturnType<typeof usePublicStrings> }[] = [
   { id: 'all', labelKey: 'filter_all' },
-  { id: 'portrait', labelKey: 'filter_portrait' },
-  { id: 'landscape', labelKey: 'filter_landscape' },
+  { id: 'one_day', labelKey: 'filter_one_day' },
   { id: 'overnight', labelKey: 'filter_overnight' },
-  { id: 'wedding', labelKey: 'filter_wedding' },
 ];
 
 export default function PublicPortfolio() {

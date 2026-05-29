@@ -1,3 +1,5 @@
+import { forwardSheetPayload } from './syncPipeline';
+
 export type TripSpotRow = {
   spotName: string;
   proTip: string;
@@ -324,19 +326,23 @@ export async function fetchCustomerBookingByBookingIdOrPhone(query: string): Pro
   return match ?? null;
 }
 
-async function postToAppsScript(payload: unknown): Promise<void> {
-  const url = import.meta.env.VITE_GAS_WEBAPP_URL as string | undefined;
-  if (!url) throw new Error('Missing VITE_GAS_WEBAPP_URL');
+async function postToAppsScript(payload: Record<string, unknown>): Promise<void> {
+  const bookingId =
+    typeof payload.bookingId === 'string'
+      ? payload.bookingId
+      : typeof payload.consent === 'object' &&
+          payload.consent !== null &&
+          typeof (payload.consent as { bookingId?: string }).bookingId === 'string'
+        ? (payload.consent as { bookingId: string }).bookingId
+        : 'sheet-sync';
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
+  const result = await forwardSheetPayload('sync_booking', bookingId, {
+    passthrough: true,
+    ...payload,
   });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Apps Script error: HTTP ${res.status}${text ? ` — ${text}` : ''}`);
+  if (!result.success) {
+    throw new Error(result.error);
   }
 }
 

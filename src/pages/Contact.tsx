@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PublicBottomNav from '../components/public/PublicBottomNav';
+import { forwardSheetPayload } from '../lib/syncPipeline';
 
 type FormState = {
   firstName: string;
@@ -16,19 +17,13 @@ function cn(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(' ');
 }
 
-async function postContact(payload: unknown): Promise<void> {
-  const url = import.meta.env.VITE_GAS_WEBAPP_URL as string | undefined;
-  if (!url) throw new Error('Missing VITE_GAS_WEBAPP_URL');
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
+async function postContact(payload: Record<string, unknown>): Promise<void> {
+  const result = await forwardSheetPayload('sync_booking', 'CONTACT', {
+    passthrough: true,
+    ...payload,
   });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Apps Script error: HTTP ${res.status}${text ? ` — ${text}` : ''}`);
+  if (!result.success) {
+    throw new Error(result.error);
   }
 }
 

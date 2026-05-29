@@ -5,6 +5,7 @@
 import { supabase } from './supabase';
 import { dispatchRetargetingNotification, dispatchTransactionNotification } from './notifications';
 import { buildSettlementForTour, syncSettlementToGoogleSheets, SettlementSyncPayload } from './googleSync';
+import { syncBookingToSheets } from './gasSync';
 import type { Expense, Tour } from '../types/tour';
 import type { TourBooking } from './supabaseData';
 
@@ -199,6 +200,21 @@ export async function runPhase2Book(input: {
     .maybeSingle();
 
   if (bookingErr) warnings.push(bookingErr.message);
+
+  if (bookingRow?.id) {
+    const sync = await syncBookingToSheets({
+      booking_id: bookingRow.id,
+      client_name: input.fullName,
+      email: input.email,
+      phone: input.phone,
+      pax_count: input.partyPax,
+      pickup_type: input.pickup,
+      trip_date: new Date().toISOString().slice(0, 10),
+      payment_status: 'PENDING',
+      created_at: new Date().toISOString(),
+    });
+    if (!sync.success) warnings.push(sync.error ?? 'Sheets sync failed');
+  }
 
   if (input.sendSms !== false) {
     void dispatchTransactionNotification({

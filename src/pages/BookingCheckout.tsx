@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { formatAUD } from '../lib/payidCalc';
 import { findTripById } from '../lib/publicTours';
@@ -8,7 +8,13 @@ import BookingPolicyPanel from '../components/policy/BookingPolicyPanel';
 import { generateBookingRef } from '../lib/bookingRef';
 import { runPhase2Book } from '../lib/customerJourney';
 import { PORTFOLIO_TOURS } from '../lib/portfolioTours';
-import { PickupId, sydneyPickupPoints } from '../lib/pickup-options';
+import {
+  handlePickupValidation,
+  shouldBlockSharedLowPaxNearDate,
+  type TripType,
+  PRICING,
+} from '../lib/bookingRules';
+import { PickupId, pickupOptionsForTripType } from '../lib/pickup-options';
 
 type Step = 1 | 2 | 3 | 4;
 type VisaType = 'student' | 'other';
@@ -86,6 +92,18 @@ export default function BookingCheckout() {
   }
 
   const portfolio = PORTFOLIO_TOURS.find((t) => t.id === trip.id);
+  const tripType: TripType =
+    portfolio?.category === 'overnight' ? 'overnight' : 'one_day';
+  const pickupOptions = pickupOptionsForTripType(tripType);
+  const isSharedGroup = pkg === 'STANDARD';
+  const blockedByBuffer = shouldBlockSharedLowPaxNearDate(isSharedGroup, partyPax, selectedDate);
+
+  useEffect(() => {
+    if (tripType === 'overnight') {
+      setPickupLocation('airport_terminal');
+    }
+  }, [tripType]);
+
   const tourPhoto =
     portfolio?.image ??
     'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&q=80';
@@ -98,13 +116,14 @@ export default function BookingCheckout() {
   const payOnDayAud = Math.max(0, Math.round((totalAud - depositAud) * 100) / 100);
 
   const canProceedStep1 = Boolean(selectedDate) && quote?.valid;
-  const pickupRequiresHotel = pickupLocation === 'custom_accommodation';
+  const pickupRequiresSuburb =
+    pickupLocation === 'route_waypoint' || pickupLocation === 'custom_accommodation';
 
   const canProceedStep3 =
     fullName.trim() &&
     phone.trim() &&
     email.trim() &&
-    (!pickupRequiresHotel || hotelName.trim()) &&
+    (!pickupRequiresSuburb || hotelName.trim()) &&
     (visaType !== 'student' || oshc.trim());
 
   const handleConfirm = async () => {
@@ -112,6 +131,14 @@ export default function BookingCheckout() {
     if (!termsAccepted) return;
     if (!quote?.valid) return;
     if (!canProceedStep3) return;
+    if (blockedByBuffer) return;
+
+    try {
+      handlePickupValidation(tripType, pickupLocation);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Invalid pickup');
+      return;
+    }
 
     setSubmitting(true);
     setSubmitError(null);
@@ -375,39 +402,54 @@ export default function BookingCheckout() {
             </div>
             <div>
               <label className="text-xs text-slate-500 block mb-1">Pickup location</label>
-              <select
-                value={pickupLocation}
-                onChange={(e) => setPickupLocation(e.target.value as PickupId)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-teal/30"
-              >
-                {sydneyPickupPoints.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1 text-xs text-slate-500 leading-relaxed">
-                {sydneyPickupPoints.find((p) => p.id === pickupLocation)?.description}
-              </p>
-              {pickupRequiresHotel && (
-                <div className="mt-2">
-                  <label className="text-xs text-slate-500 block mb-1">Hotel name (CBD)</label>
+              {tripType === 'overnight' ? (
+                <p className="rounded-xl border border-teal/40 bg-teal/10 px-3 py-2 text-sm text-slate-800">
+                  {pickupOptions[0]?.labelEn}
+                </p>
+              ) : (
+                <select
+                  value={pickupLocation}
+                  onChange={(e) => setPickupLocation(e.target.value as PickupId)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-teal/30"
+                >
+                  {pickupOptions.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.labelEn}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {tripType === 'one_day' && pickupLocation === 'route_waypoint' && (
+                <>
+                  <p className="mt-2 text-xs bg-orange-100 border border-orange-400 text-orange-900 rounded-lg p-2">
+                    ต้องเป็นย่านที่เป็นทางผ่านหลักเท่านั้น — รอทีมงานคอนเฟิร์มหลังไมค์
+                  </p>
                   <input
                     value={hotelName}
                     onChange={(e) => setHotelName(e.target.value)}
-                    placeholder="e.g. Four Seasons Sydney"
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-teal/30"
-                    required={pickupRequiresHotel}
+                    placeholder="Suburb on main route"
+                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900"
+                    required
                   />
-                </div>
-              )}
-              {pickupLocation === 'custom_accommodation' && pkg === 'STANDARD' && (
-                <div className="text-xs bg-[#FAEEDA] border border-[#EF9F27] rounded-lg p-3 mt-2 text-[#633806]">
-                  ⚠️ การรับที่พักส่วนตัวใน CBD มีค่าใช้จ่ายเพิ่มเติม — แนะนำอัปเกรดเป็นแพ็กเกจ Private
-                  เพื่อรวมบริการนี้
-                </div>
+                </>
               )}
             </div>
+
+            {blockedByBuffer && (
+              <div className="rounded-xl border border-orange-400 bg-orange-50 p-4 text-sm text-orange-950 space-y-2">
+                <p>
+                  ทริปนี้ยังไม่ถึงจำนวนขั้นต่ำ และใกล้วันเดินทางเกินไป — แนะนำอัปเกรดเป็น Private Luxury
+                  Trip
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setPkg('VIP')}
+                  className="px-4 py-2 rounded-full bg-gold text-navy font-semibold text-sm"
+                >
+                  Upgrade to Private ${PRICING.privatePerPerson}/person
+                </button>
+              </div>
+            )}
 
             <div className="grid sm:grid-cols-2 gap-3">
               <div>

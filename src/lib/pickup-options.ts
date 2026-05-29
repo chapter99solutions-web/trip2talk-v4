@@ -1,44 +1,63 @@
-export const sydneyPickupPoints = [
-  {
-    id: 'central_station',
-    label: '🚉 Central Station (Wake Up Hostel / Pitt St entrance)',
-    description: 'จุดนัดรับหลัก — ใกล้ทางออก Pitt St เวลามาตรฐาน',
-  },
-  {
-    id: 'town_hall',
-    label: '🏛 Town Hall (Rydges World Square / George St)',
-    description: 'จอดรถหน้า Rydges World Square ฝั่ง George St',
-  },
+import type { PickupOptionId, TripType } from './bookingRules';
+
+export const ONE_DAY_PICKUP_OPTIONS: Array<{
+  id: PickupOptionId;
+  labelTh: string;
+  labelEn: string;
+  descriptionTh: string;
+}> = [
   {
     id: 'thaitown_main',
-    label: '📍 Thai Town, Sydney (Dixon St / Sussex St)',
-    description: 'จุดนัดรับหลักสำหรับลูกทริปชาวไทย — เผื่อเวลา 15 นาที',
+    labelTh: 'ไทยทาวน์ ซิดนีย์ (Dixon St)',
+    labelEn: 'Thai Town, Sydney (Dixon St)',
+    descriptionTh: 'จุดนัดรับมาตรฐานสำหรับทริปวันเดียว',
   },
   {
-    id: 'custom_accommodation',
-    label: '🏨 ระบุที่พักของท่านในเขต CBD (เฉพาะแพ็กเกจ Private/Upgrade)',
-    description: 'ช่างภาพวนรถไปรับถึงหน้าโรงแรม — ต้องระบุชื่อและที่อยู่',
+    id: 'route_waypoint',
+    labelTh: 'จุดแวะตามเส้นทาง (ย่านชานเมือง)',
+    labelEn: 'Route waypoint (suburb on main route)',
+    descriptionTh: 'ต้องเป็นย่านที่เป็นทางผ่านหลักเท่านั้น — รอทีมงานคอนเฟิร์มหลังไมค์',
   },
-] as const;
+];
 
-export type PickupPoint = (typeof sydneyPickupPoints)[number];
-export type PickupId = PickupPoint['id'];
+export const OVERNIGHT_PICKUP_LOCKED = {
+  id: 'airport_terminal' as const,
+  labelTh: 'สนามบินซิดนีย์ (เทอร์มินัล) — ล็อกสำหรับทริปค้างคืน',
+  labelEn: 'Sydney Airport Terminal — locked for overnight trips',
+};
+
+export function pickupOptionsForTripType(tripType: TripType) {
+  if (tripType === 'overnight') {
+    return [OVERNIGHT_PICKUP_LOCKED];
+  }
+  return ONE_DAY_PICKUP_OPTIONS;
+}
+
+/** @deprecated use pickupOptionsForTripType */
+export const sydneyPickupPoints = ONE_DAY_PICKUP_OPTIONS.map((p) => ({
+  id: p.id,
+  label: p.labelEn,
+  description: p.descriptionTh,
+}));
+
+export type PickupId = PickupOptionId;
 
 export function pickupEmoji(pickupId: string | null | undefined): string {
   switch (pickupId) {
-    case 'custom_accommodation':
-      return '🏨';
-    case 'central_station':
-      return '🚉';
-    case 'town_hall':
-      return '🏛';
+    case 'airport_terminal':
+      return '✈️';
+    case 'route_waypoint':
+      return '🛣️';
     default:
       return '📍';
   }
 }
 
-export function pickupShortLabel(pickupId: string | null | undefined): string {
-  const point = sydneyPickupPoints.find((p) => p.id === pickupId);
+export function pickupShortLabel(pickupId: string | null | undefined, lang: 'TH' | 'EN' = 'EN'): string {
+  if (pickupId === 'airport_terminal') {
+    return lang === 'TH' ? OVERNIGHT_PICKUP_LOCKED.labelTh : OVERNIGHT_PICKUP_LOCKED.labelEn;
+  }
+  const point = ONE_DAY_PICKUP_OPTIONS.find((p) => p.id === pickupId);
   if (!point) return pickupId ?? '—';
-  return point.label.split('(')[0].trim();
+  return lang === 'TH' ? point.labelTh : point.labelEn;
 }

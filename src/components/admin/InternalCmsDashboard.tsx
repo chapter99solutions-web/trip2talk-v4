@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { forwardSheetPayload, invokeSyncPipeline } from '../../lib/syncPipeline';
 
 type SpotDraft = {
   name: string;
@@ -149,19 +150,34 @@ function UploadCard({
   );
 }
 
-async function postToAppsScript(payload: unknown): Promise<void> {
-  const url = import.meta.env.VITE_GAS_WEBAPP_URL as string | undefined;
-  if (!url) throw new Error('Missing VITE_GAS_WEBAPP_URL');
+async function postToAppsScript(payload: Record<string, unknown>): Promise<void> {
+  const bookingId =
+    typeof payload.booking === 'object' &&
+    payload.booking !== null &&
+    typeof (payload.booking as { bookingId?: string }).bookingId === 'string'
+      ? (payload.booking as { bookingId: string }).bookingId
+      : typeof payload.trip === 'object' &&
+          payload.trip !== null &&
+          typeof (payload.trip as { tourCode?: string }).tourCode === 'string'
+        ? (payload.trip as { tourCode: string }).tourCode
+        : 'cms-sync';
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  const isBookingRow =
+    payload.sheet === 'Customer_Bookings' && typeof payload.booking === 'object';
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Apps Script error: HTTP ${res.status}${text ? ` — ${text}` : ''}`);
+  const result = isBookingRow
+    ? await invokeSyncPipeline({
+        action: 'sync_booking',
+        bookingId,
+        data: payload as Record<string, unknown>,
+      })
+    : await forwardSheetPayload('sync_booking', bookingId, {
+        passthrough: true,
+        ...payload,
+      });
+
+  if (!result.success) {
+    throw new Error(result.error);
   }
 }
 

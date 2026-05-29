@@ -2,20 +2,27 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import CyberViewport from '../layout/CyberViewport';
 import LiveClock from '../cyber/LiveClock';
+import FBInboxTrigger from './FBInboxTrigger';
+import { MARGIN_TABLE } from '../../lib/bookingRules';
+import { syncBookingToSheets } from '../../lib/gasSync';
 import { fetchOwnerDashboardData, tourRevenue, type OwnerDashboardData } from '../../lib/supabaseData';
 
 type OwnerTab = 'overview' | 'financial' | 'crm';
+type Lang = 'TH' | 'EN';
 
 function formatAud(n: number) {
   return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 }).format(n);
 }
 
 export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
+  const [lang, setLang] = useState<Lang>(() =>
+    localStorage.getItem('trip2talk_language') === 'EN' ? 'EN' : 'TH'
+  );
   const [tab, setTab] = useState<OwnerTab>('overview');
   const [data, setData] = useState<OwnerDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -37,47 +44,69 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
     if (!data) return null;
     const revenue = data.bookings.reduce((s, b) => s + b.amount_paid_aud, 0);
     const expenses = data.expenses.reduce((s, e) => s + e.amount_aud, 0);
-    const gstClaimed = data.expenses.reduce((s, e) => s + (e.gst_amount_aud ?? 0), 0);
     const net = revenue - expenses;
-    return { revenue, expenses, gstClaimed, net };
+    return { revenue, expenses, net };
   }, [data]);
 
-  const tripProfit = useMemo(() => {
+  const upcoming = useMemo(() => {
     if (!data) return [];
-    return data.tours
-      .map((t) => {
-        const rev = tourRevenue(t.id, data.bookings);
-        const exp = data.expenses.filter((e) => e.tour_id === t.id).reduce((s, e) => s + e.amount_aud, 0);
-        return { id: t.id, label: t.destination || t.trip_code, rev, exp, net: rev - exp };
-      })
-      .filter((r) => r.rev > 0 || r.exp > 0)
-      .slice(0, 8);
+    return data.tours.slice(0, 8).map((t) => {
+      const pax = t.current_pax ?? 0;
+      return {
+        id: t.id,
+        title: `Secret Journey · ${t.trip_code}`,
+        date: t.start_date,
+        pax,
+        greenlit: pax >= 6,
+        showUpgrade: pax === 4,
+      };
+    });
   }, [data]);
 
-  const handleSync = async (type: string) => {
-    setSyncing(type);
+  const handleSheetsSync = async () => {
+    if (!data?.bookings.length) return;
+    setSyncing(true);
     try {
-      alert(`Use CMS → SAVE & SYNC for ${type}, or Owner Google sync in a future edge-function pass.`);
+      const b = data.bookings[0];
+      const res = await syncBookingToSheets({
+        booking_id: b.id,
+        client_name: 'Owner sync',
+        email: '',
+        phone: '',
+        pax_count: (b as { party_pax?: number }).party_pax ?? 1,
+        trip_date: new Date().toISOString().slice(0, 10),
+        payment_status: b.status,
+      });
+      if (!res.success) throw new Error(res.error);
+      alert(lang === 'TH' ? 'ซิงก์ Sheets สำเร็จ' : 'Sheets sync OK');
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Sync failed');
     } finally {
-      setSyncing(null);
+      setSyncing(false);
     }
   };
 
   return (
-    <CyberViewport className="p-4 sm:p-6">
+    <CyberViewport className="p-4 sm:p-6 bg-navy min-h-screen">
       <div className="max-w-7xl mx-auto space-y-6">
         <header className="flex flex-wrap justify-between items-start gap-4">
           <div>
-            <h1 className="text-amber-400 font-semibold text-[22px] tracking-wide font-sans">OWNER DASHBOARD</h1>
-            <p className="text-neutral-500 text-sm mt-1 tracking-wide font-sans">Trip2Talk · Owner HQ</p>
+            <h1 className="text-gold font-serif text-2xl font-semibold tracking-wide">
+              {lang === 'TH' ? 'แดชบอร์ดเจ้าของ' : 'OWNER DASHBOARD'}
+            </h1>
+            <p className="text-neutral-400 text-sm mt-1">Trip2Talk · Owner HQ</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setLang(lang === 'TH' ? 'EN' : 'TH')}
+              className="text-xs px-3 py-1 rounded-full border border-white/20 text-neutral-300"
+            >
+              {lang === 'TH' ? 'EN' : 'ไทย'}
+            </button>
             <LiveClock />
             <Link to="/cms" className="cyber-btn-gold text-xs">
               CMS
-            </Link>
-            <Link to="/" className="cyber-btn-ghost text-xs">
-              PUBLIC SITE
             </Link>
             <button type="button" onClick={onLogout} className="cyber-btn-exit">
               [ EXIT ]
@@ -92,7 +121,7 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
               type="button"
               onClick={() => setTab(id)}
               className={`px-4 py-2 rounded-full text-xs font-semibold uppercase tracking-wide ${
-                tab === id ? 'bg-amber-400 text-black' : 'bg-white/5 text-neutral-400 border border-white/10'
+                tab === id ? 'bg-gold text-navy' : 'bg-white/5 text-neutral-400 border border-white/10'
               }`}
             >
               {id}
@@ -100,109 +129,122 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
           ))}
         </div>
 
-        {loading && <p className="text-neutral-500 text-sm">Loading…</p>}
+        {loading && <p className="text-neutral-500 text-sm">{lang === 'TH' ? 'กำลังโหลด…' : 'Loading…'}</p>}
         {error && <p className="text-red-400 text-sm">{error}</p>}
 
-        {tab === 'overview' && (
-          <div className="cyber-card p-5">
-            <p className="text-neutral-300 font-semibold">Owner console</p>
-            <p className="mt-2 text-sm text-neutral-500">
-              Use <span className="text-neutral-300 font-semibold">CMS</span> to create trips and register bookings (syncs to
-              Google Sheets).
-            </p>
-          </div>
-        )}
-
-        {tab === 'financial' && financial && (
+        {tab === 'overview' && financial && (
           <div className="space-y-4">
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="cyber-card p-4">
-                <p className="text-xs text-neutral-500 uppercase">Gross revenue</p>
-                <p className="text-xl font-semibold text-emerald-400 mt-1">{formatAud(financial.revenue)}</p>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="cyber-card p-4 border border-teal/30">
+                <p className="text-xs text-neutral-500 uppercase">
+                  {lang === 'TH' ? 'รายได้เดือนนี้' : 'Revenue this month'}
+                </p>
+                <p className="text-2xl font-semibold text-teal mt-1">{formatAud(financial.revenue)}</p>
               </div>
-              <div className="cyber-card p-4">
-                <p className="text-xs text-neutral-500 uppercase">Expenses</p>
-                <p className="text-xl font-semibold text-rose-300 mt-1">{formatAud(financial.expenses)}</p>
-              </div>
-              <div className="cyber-card p-4">
-                <p className="text-xs text-neutral-500 uppercase">GST claimable</p>
-                <p className="text-xl font-semibold text-amber-300 mt-1">{formatAud(financial.gstClaimed)}</p>
-              </div>
-              <div className="cyber-card p-4">
-                <p className="text-xs text-neutral-500 uppercase">Net profit</p>
-                <p className="text-xl font-semibold text-white mt-1">{formatAud(financial.net)}</p>
+              <div className="cyber-card p-4 border border-gold/30">
+                <p className="text-xs text-neutral-500 uppercase">
+                  {lang === 'TH' ? 'กำไรสุทธิ' : 'Net margin'}
+                </p>
+                <p className="text-2xl font-semibold text-gold mt-1">{formatAud(financial.net)}</p>
               </div>
             </div>
 
             <div className="cyber-card p-5">
-              <p className="text-sm font-semibold text-neutral-300 mb-4">Profit per trip</p>
-              <div className="space-y-3">
-                {tripProfit.length === 0 ? (
-                  <p className="text-sm text-neutral-500">No trip P&amp;L data yet.</p>
-                ) : (
-                  tripProfit.map((row) => {
-                    const max = Math.max(...tripProfit.map((r) => Math.abs(r.net)), 1);
-                    const w = Math.round((Math.abs(row.net) / max) * 100);
-                    return (
-                      <div key={row.id}>
-                        <div className="flex justify-between text-xs text-neutral-400 mb-1">
-                          <span>{row.label}</span>
-                          <span className={row.net >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
-                            {formatAud(row.net)}
-                          </span>
-                        </div>
-                        <div className="h-2 rounded-full bg-white/5 overflow-hidden">
-                          <div
-                            className={`h-full ${row.net >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`}
-                            style={{ width: `${w}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+              <p className="text-sm font-semibold text-neutral-200 mb-3">
+                {lang === 'TH' ? 'ทริปที่กำลังจะมาถึง' : 'Upcoming trips'}
+              </p>
+              <ul className="space-y-2">
+                {upcoming.map((t) => (
+                  <li
+                    key={t.id}
+                    className="flex flex-wrap justify-between gap-2 text-sm border-b border-white/5 pb-2"
+                  >
+                    <span className="text-neutral-300">{t.title}</span>
+                    <span className="text-neutral-500">{t.date}</span>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full ${
+                        t.greenlit ? 'bg-teal/20 text-teal' : 'bg-red-500/20 text-red-300'
+                      }`}
+                    >
+                      {t.pax} pax {t.greenlit ? '✓' : '< 6'}
+                    </span>
+                    {t.showUpgrade && (
+                      <button type="button" className="cyber-btn-gold text-xs">
+                        {lang === 'TH'
+                          ? 'ส่งใบแจ้งอัปเกรด +$130/คน'
+                          : 'Send Upgrade Invoice +$130/head'}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              {(['expenses', 'revenue', 'full'] as const).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  disabled={Boolean(syncing)}
-                  onClick={() => void handleSync(type)}
-                  className="cyber-btn-gold text-xs"
-                >
-                  {syncing === type ? 'Syncing…' : `Sync ${type}`}
-                </button>
-              ))}
+            <FBInboxTrigger
+              customerName="Khun Demo"
+              albumUrl="https://trip2talk.com.au/album/demo"
+              expiryDate="2026-08-01"
+              lang={lang}
+            />
+          </div>
+        )}
+
+        {tab === 'financial' && (
+          <div className="space-y-4">
+            <div className="cyber-card p-5 overflow-x-auto">
+              <p className="text-sm font-semibold text-gold mb-3">
+                {lang === 'TH' ? 'ตารางมาร์จิ้น (สเปก)' : 'Margin table (spec)'}
+              </p>
+              <table className="w-full text-xs text-left">
+                <thead className="text-neutral-500">
+                  <tr>
+                    <th className="py-2">{lang === 'TH' ? 'ประเภท' : 'Type'}</th>
+                    <th>Rev</th>
+                    <th>Cohost</th>
+                    <th>Van</th>
+                    <th>Photo</th>
+                    <th>Snacks</th>
+                    <th>NET</th>
+                  </tr>
+                </thead>
+                <tbody className="text-neutral-300">
+                  {[MARGIN_TABLE.shared8, MARGIN_TABLE.private4].map((row) => (
+                    <tr key={row.label.en} className="border-t border-white/10">
+                      <td className="py-2">{lang === 'TH' ? row.label.th : row.label.en}</td>
+                      <td>{formatAud(row.revenue)}</td>
+                      <td>-{formatAud(row.cohost)}</td>
+                      <td>-{formatAud(row.van)}</td>
+                      <td>-{formatAud(row.photographer)}</td>
+                      <td>-{formatAud(row.snacks)}</td>
+                      <td className="text-teal font-semibold">+{formatAud(row.net)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
+            <button
+              type="button"
+              disabled={syncing}
+              onClick={() => void handleSheetsSync()}
+              className="cyber-btn-gold text-xs"
+            >
+              {syncing
+                ? lang === 'TH'
+                  ? 'กำลังซิงก์…'
+                  : 'Syncing…'
+                : lang === 'TH'
+                  ? 'ซิงก์ Google Sheets'
+                  : 'Sync Google Sheets'}
+            </button>
           </div>
         )}
 
         {tab === 'crm' && (
-          <div className="cyber-card p-5 space-y-4">
+          <div className="cyber-card p-5">
             <p className="text-sm text-neutral-400">
-              CRM segments (Model / Photographer) sync from Supabase <code className="text-neutral-300">crm_clients</code> when
-              connected. Use Google Sheets sync for broadcast lists.
+              {lang === 'TH' ? 'ลูกค้า CRM + compliance hash' : 'CRM + compliance hash audit'}
             </p>
-            <p className="text-sm text-neutral-500">{data?.bookings.length ?? 0} bookings on record.</p>
-            <button
-              type="button"
-              disabled={Boolean(syncing)}
-              onClick={() => void handleSync('clients')}
-              className="cyber-btn-gold text-xs"
-            >
-              {syncing === 'clients' ? 'Syncing…' : 'Sync clients to Sheets'}
-            </button>
-            <a
-              href="https://m.me/trip2talk.chapter99"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex cyber-btn-ghost text-xs"
-            >
-              Open Messenger broadcast
-            </a>
+            <p className="text-neutral-500 text-sm mt-2">{data?.bookings.length ?? 0} bookings</p>
           </div>
         )}
       </div>
