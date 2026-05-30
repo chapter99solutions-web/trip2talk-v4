@@ -167,9 +167,14 @@ export default function PublicPortfolio() {
             <br />
             <span className="text-emerald-300 italic font-medium">One Journey</span>
           </h1>
-          <p className="mt-6 text-lg text-white/80 max-w-xl mx-auto">
-            Private Photo Journeys for small groups — curated light, finished .JPG galleries, Chapter 99 Photography.
-          </p>
+          <div className="mt-6 max-w-xl mx-auto text-center">
+            <p className="font-light text-lg text-white">
+              Small group. Real light. Photos you'll actually keep.
+            </p>
+            <p className="font-light text-base text-gray-300 mt-2">
+              ออกทริป · เก็บแสง · กลับมาพร้อมรูประดับ Premium
+            </p>
+          </div>
           <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
             <button
               type="button"
