@@ -1,4 +1,55 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useI18n } from '../../lib/i18n';
+
+// Two cover videos played back-to-back (1 → 2 → 1) behind the reviews intro.
+const REVIEW_VIDEOS = [
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/VDO/cover/videomp_.mp4',
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/VDO/cover/Copy%20of%202026%20t2t%20tripLandscape.mp4',
+];
+
+function ReviewsVideoBackground() {
+  const { lang } = useI18n();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [current, setCurrent] = useState(0);
+
+  // Reload + play whenever we switch to the next clip (mirrors SeasonVideoHero).
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.load();
+    const playback = v.play();
+    if (playback && typeof playback.catch === 'function') {
+      playback.catch(() => {
+        /* autoplay can be blocked until user interaction — ignore */
+      });
+    }
+  }, [current]);
+
+  const caption = lang === 'EN' ? 'Moments Worth Every Mile' : 'ประสบการณ์ที่คุณจะไม่มีวันลืม';
+
+  return (
+    <div className="relative w-full h-[60vh] rounded-2xl overflow-hidden bg-slate-900 mb-12 md:mb-14 shadow-lg shadow-black/10">
+      <video
+        ref={videoRef}
+        src={REVIEW_VIDEOS[current]}
+        autoPlay
+        muted
+        playsInline
+        preload="auto"
+        onEnded={() => setCurrent((c) => (c + 1) % REVIEW_VIDEOS.length)}
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+
+      {/* Dark gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/20 pointer-events-none" />
+
+      {/* Centered caption */}
+      <div className="absolute inset-0 flex items-center justify-center p-6">
+        <p className="text-white text-2xl font-light italic text-center drop-shadow-lg">{caption}</p>
+      </div>
+    </div>
+  );
+}
 
 export type Testimonial = {
   name: string;
@@ -141,6 +192,9 @@ export default function TestimonialsSection() {
             ที่การันตีความฟินและไฟล์ภาพระดับพรีเมียมกลับบ้านเต็มกระเป๋า
           </p>
         </div>
+
+        {/* Full-width alternating video background between the intro and the review cards */}
+        <ReviewsVideoBackground />
 
         {/* Desktop: slider with arrows */}
         <div className="hidden md:block relative">
