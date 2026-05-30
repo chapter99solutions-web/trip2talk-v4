@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import LanguageToggle from '../components/i18n/LanguageToggle';
 import PublicBottomNav from '../components/public/PublicBottomNav';
 import { useI18n } from '../lib/i18n';
-import { forwardSheetPayload } from '../lib/syncPipeline';
+import { supabase } from '../lib/supabase';
 
 const CORPORATE_ADDRESS = 'Chapter 99 Photography, Warrawee NSW 2074, Australia';
 const EMAIL = 'trip2talksyd@gmail.com';
@@ -18,13 +18,21 @@ type FormState = {
   message: string;
 };
 
-async function postContact(payload: Record<string, unknown>): Promise<void> {
-  const result = await forwardSheetPayload('sync_booking', 'CONTACT', {
-    passthrough: true,
-    ...payload,
+async function postContact(payload: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  message: string;
+}): Promise<void> {
+  const { data, error } = await supabase.functions.invoke('send-contact-message', {
+    body: payload,
   });
-  if (!result.success) {
-    throw new Error(result.error);
+  if (error) {
+    throw new Error(error.message);
+  }
+  const row = (data ?? {}) as { success?: boolean; error?: string };
+  if (row.success !== true) {
+    throw new Error(row.error ?? 'Send failed');
   }
 }
 
@@ -60,17 +68,10 @@ export default function Contact() {
     setErr(null);
     try {
       await postContact({
-        sheet: 'Consents',
-        consent: {
-          timestampIso: new Date().toISOString(),
-          bookingId: 'CONTACT',
-          customerName: `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
-          tourCode: 'CONTACT',
-          consentStatus: 'CONTACT_FORM',
-          email: form.email.trim(),
-          message: form.message.trim(),
-          source: 'web',
-        },
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.trim(),
+        message: form.message.trim(),
       });
       setOk(true);
       setForm({ firstName: '', lastName: '', email: '', message: '' });

@@ -34,7 +34,10 @@ const DICT: Dictionary = {
   contact_line: { TH: 'LINE Official', EN: 'LINE Official' },
   contact_email: { TH: 'อีเมล', EN: 'Email' },
   contact_send: { TH: 'ส่งข้อความ', EN: 'Send message' },
-  contact_sent_ok: { TH: 'ส่งแล้ว — เราจะติดต่อกลับโดยเร็ว', EN: 'Sent — we will reply soon.' },
+  contact_sent_ok: {
+    TH: '✅ ส่งข้อความแล้ว เราจะติดต่อกลับเร็วๆ นี้ค่ะ',
+    EN: '✅ ส่งข้อความแล้ว เราจะติดต่อกลับเร็วๆ นี้ค่ะ',
+  },
   contact_privacy_note: {
     TH: 'ไม่มีแผนที่ออนไลน์ — นัดหมายล่วงหน้าเพื่อความเป็นส่วนตัวของการดำเนินงาน',
     EN: 'No embedded map — appointments by arrangement for operational privacy.',
