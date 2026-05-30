@@ -1,8 +1,21 @@
 import { useEffect, useState } from 'react';
-import { useCoverSlideshow } from '../../hooks/useCoverSlideshow';
 
-const SLIDE_MS = 4000;
-const FADE_MS = 1500;
+const SLIDE_MS = 5000;
+const FADE_MS = 1000;
+
+// Hardcoded hero media — no Supabase storage.list() / async fetching.
+const HERO_MEDIA = [
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Mixed%20Cover/01.jpg',
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Mixed%20Cover/02.jpg',
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Mixed%20Cover/03.jpg',
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Mixed%20Cover/04.jpg',
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Mixed%20Cover/05.png',
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Mixed%20Cover/06.jpg',
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Mixed%20Cover/07.jpg',
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Cover/AD/Copy%20of%202026%20t2t%20tripLandscape.mp4',
+];
+
+const isVideo = (url: string) => /\.(mp4|webm|mov)(\?|$)/i.test(url);
 
 type Props = {
   maxPhotos?: number;
@@ -13,48 +26,29 @@ export default function HeroSlideshowBackground({
   maxPhotos = 20,
   pauseOnHover = true,
 }: Props) {
-  const { urls: allUrls, loading } = useCoverSlideshow(undefined, maxPhotos);
-  const urls = maxPhotos ? allUrls.slice(0, maxPhotos) : allUrls;
-  const [index, setIndex] = useState(0);
+  const media = maxPhotos ? HERO_MEDIA.slice(0, maxPhotos) : HERO_MEDIA;
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [paused, setPaused] = useState(false);
 
-  const useSlideshow = !loading && urls.length > 0;
   const isPaused = pauseOnHover && paused;
 
   useEffect(() => {
-    if (useSlideshow) {
-      console.log('[HeroSlideshow] active slideshow, slides:', urls.length);
-    } else if (!loading) {
-      console.warn('[HeroSlideshow] no Cover / Mixed Cover images — solid background only');
-    }
-  }, [useSlideshow, loading, urls.length]);
-
-  useEffect(() => {
-    if (!useSlideshow || urls.length < 2 || isPaused) return;
+    if (media.length < 2 || isPaused) return;
     const id = window.setInterval(() => {
-      setIndex((i) => (i + 1) % urls.length);
+      setCurrentIndex((i) => (i + 1) % media.length);
     }, SLIDE_MS);
     return () => window.clearInterval(id);
-  }, [isPaused, urls.length, useSlideshow]);
+  }, [isPaused, media.length]);
 
+  // Preload the next image so the crossfade is smooth.
   useEffect(() => {
-    if (!useSlideshow || urls.length < 2) return;
-    const next = urls[(index + 1) % urls.length];
-    const img = new Image();
-    img.src = next;
-  }, [index, urls, useSlideshow]);
-
-  useEffect(() => {
-    if (urls.length > 0 && index >= urls.length) {
-      setIndex(0);
+    if (media.length < 2) return;
+    const next = media[(currentIndex + 1) % media.length];
+    if (next && !isVideo(next)) {
+      const img = new Image();
+      img.src = next;
     }
-  }, [index, urls.length]);
-
-  useEffect(() => {
-    if (!useSlideshow || !urls[0]) return;
-    const img = new Image();
-    img.src = urls[0];
-  }, [useSlideshow, urls]);
+  }, [currentIndex, media]);
 
   return (
     <div
@@ -62,38 +56,43 @@ export default function HeroSlideshowBackground({
       onMouseEnter={pauseOnHover ? () => setPaused(true) : undefined}
       onMouseLeave={pauseOnHover ? () => setPaused(false) : undefined}
     >
-      {useSlideshow
-        ? urls.map((url, i) => {
-            const active = i === index;
-            return (
-              <div
-                key={`${url}-${i}`}
-                className="absolute inset-0 overflow-hidden"
-                style={{
-                  opacity: active ? 1 : 0,
-                  transition: `opacity ${FADE_MS}ms ease-in-out`,
-                  willChange: 'opacity',
-                  zIndex: active ? 2 : 1,
-                }}
-                aria-hidden={!active}
-              >
-                <img
-                  src={url}
-                  alt=""
-                  className="absolute inset-0 w-full h-full object-cover"
-                  loading={i < 3 ? 'eager' : 'lazy'}
-                  decoding={i === 0 ? 'sync' : 'async'}
-                  fetchPriority={i === 0 ? 'high' : 'low'}
-                  style={{
-                    willChange: 'transform',
-                    animation: active ? `heroKenBurns ${SLIDE_MS}ms linear forwards` : 'none',
-                    transform: active ? undefined : 'scale(1)',
-                  }}
-                />
-              </div>
-            );
-          })
-        : null}
+      {media.map((url, i) => {
+        const active = i === currentIndex;
+        return (
+          <div
+            key={`${url}-${i}`}
+            className="absolute inset-0 overflow-hidden"
+            style={{
+              opacity: active ? 1 : 0,
+              transition: `opacity ${FADE_MS}ms ease-in-out`,
+              willChange: 'opacity',
+              zIndex: active ? 2 : 1,
+            }}
+            aria-hidden={!active}
+          >
+            {isVideo(url) ? (
+              <video
+                src={url}
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="auto"
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            ) : (
+              <img
+                src={url}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover"
+                loading={i < 3 ? 'eager' : 'lazy'}
+                decoding={i === 0 ? 'sync' : 'async'}
+                fetchPriority={i === 0 ? 'high' : 'low'}
+              />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
