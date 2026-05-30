@@ -274,7 +274,7 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
     ],
     excluded: ['ตั๋วเครื่องบินไป-กลับ', 'ค่าอาหารทุกมื้อ', 'ประกันการเดินทาง'],
     galleryPhotos: [
-      `${PORTFOLIO_BASE}/New%20Zealand/Cover/01.jpg`,
+      `${PORTFOLIO_BASE}/New%20Zealand/Spring/T2T-10.JPG`,
       `${PORTFOLIO_BASE}/New%20Zealand/Cover/02.jpg`,
       `${PORTFOLIO_BASE}/New%20Zealand/Cover/03.jpg`,
       `${PORTFOLIO_BASE}/New%20Zealand/Cover/04.jpg`,

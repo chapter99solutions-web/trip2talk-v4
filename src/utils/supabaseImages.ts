@@ -5,7 +5,7 @@ const PORTFOLIO_BUCKET = 'portfolio';
 export const TOUR_COVER_MAP: Record<string, { folder: string; file?: string }> = {
   'MEL-4D3N': { folder: 'Melbourne', file: '01.jpg' },
   'ULU-4D3N': { folder: 'Ulruru', file: '1.jpg' },
-  'NZ-6D5N': { folder: 'New Zealand/Autumn' },
+  'NZ-6D5N': { folder: 'New Zealand/Spring', file: 'T2T-10.JPG' },
   'TAS-3D2N': { folder: 'Tasmania' },
   'TAS-LH-4D3N': { folder: 'Tasmania' },
   'KIA-1DAY': { folder: 'One day trip SYD' },
