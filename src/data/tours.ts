@@ -289,15 +289,52 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
   {
     tourCode: 'TAS-3D2N',
     anonymizedTitle: 'The Aurora Edge',
+    tourName: 'The Aurora Edge (3D2N)',
+    nameTh:
+      'ทริปพร้อมช่างภาพ สัมผัสประวัติศาสตร์ ศิลปะ และตามล่าแสงใต้เมือง Hobart (Tasmania Mini Aurora Hunt)',
+    location: 'AU · AUSTRALIA · TASMANIA',
     tripType: 'overnight',
     standardPrice: 1350,
-    privatePrice: 1650,
+    privatePrice: 1600,
     durationLabel: '3 Days 2 Nights',
     season: 'winter',
     maxPax: 6,
+    rating: 4.8,
+    nextDate: '2026-03-16',
+    endDate: '2026-03-18',
+    category: 'ทริปค้างคืน',
     highlights: ['Mt Wellington Aurora Hunt', 'Bruny Island', 'MONA'],
+    highlightIcons: ['🌌', '🏝️', '🎨'],
     pickupType: 'airport_terminal',
-    description: "Tasmania in winter — hunt the Southern Lights from the island's highest peak.",
+    description:
+      'ร่วมเดินทางไปกับทริปส่วนตัวสุด Exclusive ที่ออกแบบมาเพื่อกลุ่มเพื่อนและครอบครัว สัมผัสเสน่ห์ของเกาะแทสเมเนียในแบบพรีเมียม ตั้งแต่สถาปัตยกรรมหินทรายอันเป็นตำนาน ไปจนถึงความมหัศจรรย์ของแสงออโรร่าบนยอดเขาที่สูงที่สุดในฮอบาร์ต พักดีไซน์โฮมสุดชิค เดินทางสบายไม่เร่งรีบ',
+    itinerary: [
+      {
+        day: 1,
+        title: 'Port Arthur → Mt. Wellington Aurora Hunt',
+        desc: 'นั่งรถ Private SUV มุ่งสู่ Port Arthur Historic Site → บ่ายเดิน Hobart Market → เย็นขึ้นยอดเขา Mt. Wellington ชมพระอาทิตย์ตกและล่าแสงออโรร่า พัก Design Home Airbnb',
+      },
+      {
+        day: 2,
+        title: 'Bruny Island Full Day',
+        desc: 'นั่งเฟอร์รี่ลุยเกาะ Bruny Island เต็มวัน → The Neck + Bruny Lighthouse → แวะฟาร์มหอยนางรม (Optional) → ค่ำลุ้นล่าแสงใต้รอบสอง พัก Design Home Airbnb',
+      },
+      {
+        day: 3,
+        title: 'MONA → Waterfront → SYD',
+        desc: 'เช้าเข้า MONA → มื้อเที่ยงเดินเล่น Waterfront → บ่ายเดินทางสู่สนามบิน บินกลับซิดนีย์',
+      },
+    ],
+    included: [
+      'รถ Private SUV + คนขับ',
+      'ช่างภาพมืออาชีพ',
+      'น้ำดื่ม',
+      'ค่าเข้าสถานที่ตามแพลน',
+      'ประสานงานจองตั๋วเครื่องบิน',
+    ],
+    excluded: ['ตั๋วเครื่องบิน', 'อาหารทุกมื้อ', 'ประกันการเดินทาง'],
+    accommodation:
+      'พักร่วมกันแบบ Dormitory/Design Airbnb อัปเกรดห้องส่วนตัวเพิ่ม $350-$550 AUD/คืน',
     galleryPhotos: [
       `${PORTFOLIO_BASE}/Tasmania/CT99-12.JPG`,
     ],
