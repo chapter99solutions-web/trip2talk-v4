@@ -43,11 +43,11 @@ function CrewCard({ member }: { member: CrewMember }) {
   return (
     <article className="group">
       <div className="overflow-hidden bg-slate-100">
-        <div className="aspect-square overflow-hidden">
+        <div className="h-[500px] overflow-hidden">
           <img
             src={member.imageSrc}
             alt={member.imageAlt}
-            className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-[500px] object-cover object-top group-hover:scale-105 transition-transform duration-300"
             loading="lazy"
             onError={(e) => {
               const img = e.currentTarget;
@@ -92,7 +92,7 @@ export default function MeetTheCrew({ showHeading = true, className = '' }: Meet
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 max-w-5xl mx-auto">
+      <div className="grid grid-cols-2 gap-4 md:gap-12 max-w-5xl mx-auto">
         {CREW.map((member) => (
           <CrewCard key={member.name} member={member} />
         ))}
