@@ -347,7 +347,7 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
     accommodation:
       'พักร่วมกันแบบ Dormitory/Design Airbnb อัปเกรดห้องส่วนตัวเพิ่ม $350-$550 AUD/คืน',
     galleryPhotos: [
-      `${PORTFOLIO_BASE}/Tasmania/CT99-12.JPG`,
+      `${PORTFOLIO_BASE}/Tasmania/596873932_1428638042594626_8987722411601397177_n.jpg`,
     ],
   },
   {

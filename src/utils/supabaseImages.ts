@@ -6,7 +6,7 @@ export const TOUR_COVER_MAP: Record<string, { folder: string; file?: string }> =
   'MEL-4D3N': { folder: 'Melbourne', file: '01.jpg' },
   'ULU-4D3N': { folder: 'Ulruru', file: '1.jpg' },
   'NZ-6D5N': { folder: 'New Zealand/Spring', file: 'T2T-10.JPG' },
-  'TAS-3D2N': { folder: 'Tasmania', file: 'CT99-12.JPG' },
+  'TAS-3D2N': { folder: 'Tasmania', file: '596873932_1428638042594626_8987722411601397177_n.jpg' },
   'TAS-LH-4D3N': { folder: 'Tasmania', file: '596371362_1428639202594510_8709278754225773992_n.jpg' },
   'KIA-1DAY': { folder: 'One day trip SYD', file: '705320467_10242162489108855_3820285517745745334_n.jpg' },
   'CAN-2D1N': { folder: 'Cowra', file: '12 (1).jpg' },
