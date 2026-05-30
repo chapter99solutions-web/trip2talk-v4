@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useI18n } from '../../lib/i18n';
 
 // Two cover videos played back-to-back (1 → 2 → 1) behind the reviews intro.
 const REVIEW_VIDEOS = [
@@ -8,7 +7,6 @@ const REVIEW_VIDEOS = [
 ];
 
 function ReviewsVideoBackground() {
-  const { lang } = useI18n();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [current, setCurrent] = useState(0);
 
@@ -24,8 +22,6 @@ function ReviewsVideoBackground() {
       });
     }
   }, [current]);
-
-  const caption = lang === 'EN' ? 'Moments Worth Every Mile' : 'ประสบการณ์ที่คุณจะไม่มีวันลืม';
 
   return (
     <div className="relative w-full h-[60vh] rounded-2xl overflow-hidden bg-slate-900 mb-12 md:mb-14 shadow-lg shadow-black/10">
@@ -43,9 +39,15 @@ function ReviewsVideoBackground() {
       {/* Dark gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-black/20 pointer-events-none" />
 
-      {/* Centered caption */}
-      <div className="absolute inset-0 flex items-center justify-center p-6">
-        <p className="text-white text-2xl font-light italic text-center drop-shadow-lg">{caption}</p>
+      {/* Bottom-left brand slogan */}
+      <div
+        className="absolute bottom-8 left-8 flex flex-col gap-1 text-left text-white pointer-events-none"
+        style={{ textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}
+      >
+        <span className="uppercase tracking-[0.2em] text-sm font-light">
+          WE SHOOT ·  WE GUIDE ·  WE DRIVE
+        </span>
+        <span className="text-xl font-medium">ประสบการณ์ที่คุณจะไม่มีวันลืม</span>
       </div>
     </div>
   );
