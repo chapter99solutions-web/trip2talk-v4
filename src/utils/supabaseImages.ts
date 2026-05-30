@@ -9,7 +9,7 @@ export const TOUR_COVER_MAP: Record<string, { folder: string; file?: string }> =
   'TAS-3D2N': { folder: 'Tasmania', file: 'CT99-12.JPG' },
   'TAS-LH-4D3N': { folder: 'Tasmania', file: 'CT99-12.JPG' },
   'KIA-1DAY': { folder: 'One day trip SYD', file: '705320467_10242162489108855_3820285517745745334_n.jpg' },
-  'CAN-2D1N': { folder: 'Cowra' },
+  'CAN-2D1N': { folder: 'Cowra', file: '12 (1).jpg' },
   'SYD-1DAY': { folder: 'One day trip SYD' },
 };
 
