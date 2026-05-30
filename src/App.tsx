@@ -108,6 +108,9 @@ export default function App() {
 
             {/* OPS PIN + protected dashboards */}
             <Route path="/ops" element={<PINGate />} />
+            {/* Convenience aliases → all land on the ops PIN gate */}
+            <Route path="/admin" element={<Navigate to="/ops" replace />} />
+            <Route path="/staff" element={<Navigate to="/ops" replace />} />
             <Route path="/dashboard/staff" element={<StaffDashboardRoute />} />
             <Route path="/dashboard/cohost" element={<CohostDashboardRoute />} />
             <Route path="/dashboard/owner" element={<OwnerDashboardRoute />} />
