@@ -299,7 +299,7 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
     pickupType: 'airport_terminal',
     description: "Tasmania in winter — hunt the Southern Lights from the island's highest peak.",
     galleryPhotos: [
-      `${PORTFOLIO_BASE}/Tasmania/595079032_1428637335928030_4881354636701519223_n.jpg`,
+      `${PORTFOLIO_BASE}/Tasmania/CT99-12.JPG`,
     ],
   },
   {
