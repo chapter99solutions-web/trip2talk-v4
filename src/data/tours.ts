@@ -298,6 +298,9 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
     highlights: ['Mt Wellington Aurora Hunt', 'Bruny Island', 'MONA'],
     pickupType: 'airport_terminal',
     description: "Tasmania in winter — hunt the Southern Lights from the island's highest peak.",
+    galleryPhotos: [
+      `${PORTFOLIO_BASE}/Tasmania/595079032_1428637335928030_4881354636701519223_n.jpg`,
+    ],
   },
   {
     tourCode: 'TAS-LH-4D3N',
