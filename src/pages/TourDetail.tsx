@@ -9,10 +9,10 @@ import { fetchShuffledMixedCover } from '../lib/galleryStorage';
 import { fetchTripByCodeFromSheet, TripSheetRow } from '../lib/tripsSheetApi';
 import { getPublicTripDisplay } from '../lib/publicTripDisplay';
 
-type TourTab = 'details' | 'included' | 'reviews';
-
 const FALLBACK_HERO =
   'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1600&q=80';
+
+const DEFAULT_HIGHLIGHT_ICONS = ['📸', '🌸', '🏙️'];
 
 const AVATARS = [
   'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&q=80&fit=crop&crop=faces',
@@ -29,10 +29,17 @@ function stableHash(input: string): number {
   return Math.abs(h);
 }
 
+/** "2026-02-22" → "22 Feb 2026". */
+function formatTripDate(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 export default function TourDetail() {
   const { tourId } = useParams<{ tourId: string }>();
   const trip = tourId ? findTripById(tourId) : undefined;
-  const [activeTab, setActiveTab] = useState<TourTab>('details');
   const [saved, setSaved] = useState(false);
   const [photos, setPhotos] = useState<string[]>([]);
   const [sheetTrip, setSheetTrip] = useState<TripSheetRow | null>(null);
@@ -82,6 +89,7 @@ export default function TourDetail() {
 
   const tripId = trip?.id ?? resolvedSheet?.tourCode ?? tourId ?? 'trip';
   const saveKey = useMemo(() => `t2t:savedTours:v1`, []);
+  const hardcodedPhotos = staticFallback?.galleryPhotos;
 
   useEffect(() => {
     try {
@@ -93,9 +101,16 @@ export default function TourDetail() {
     }
   }, [saveKey, tripId]);
 
-  // Gallery photos: tour-specific bucket first, then portfolio/ folders as fallback.
+  // Gallery photos: hardcoded per-tour list wins, then tour-specific bucket, then portfolio.
   useEffect(() => {
     let cancelled = false;
+
+    if (hardcodedPhotos && hardcodedPhotos.length) {
+      setPhotos(hardcodedPhotos);
+      return () => {
+        cancelled = true;
+      };
+    }
 
     async function loadPhotos() {
       try {
@@ -135,7 +150,7 @@ export default function TourDetail() {
     return () => {
       cancelled = true;
     };
-  }, [tripId]);
+  }, [tripId, hardcodedPhotos]);
 
   // Reset gallery position whenever the photo set changes.
   useEffect(() => {
@@ -194,31 +209,67 @@ export default function TourDetail() {
   const portfolio = trip
     ? PORTFOLIO_TOURS.find((t) => t.id === trip.id || t.id === tourId)
     : undefined;
-  const heroImage = resolvedSheet?.coverUrl || portfolio?.image || FALLBACK_HERO;
   const publicDisplay = resolvedSheet ? getPublicTripDisplay(resolvedSheet) : null;
+
+  const heroImage =
+    hardcodedPhotos?.[0] || resolvedSheet?.coverUrl || portfolio?.image || FALLBACK_HERO;
+
   const title =
-    publicDisplay?.title || portfolio?.title || resolvedSheet?.tourName || trip?.destination || 'Photo Journey';
+    staticFallback?.tourName ||
+    publicDisplay?.title ||
+    portfolio?.title ||
+    resolvedSheet?.tourName ||
+    trip?.destination ||
+    'Photo Journey';
+  const nameTh = staticFallback?.nameTh;
+  const tagline = staticFallback?.tagline;
   const location =
-    publicDisplay?.region || resolvedSheet?.countryTag || portfolio?.location || `${trip?.destination ?? ''}`;
-  const rating = portfolio?.rating ?? 4.8;
+    staticFallback?.location ||
+    publicDisplay?.region ||
+    resolvedSheet?.countryTag ||
+    portfolio?.location ||
+    `${trip?.destination ?? ''}`;
+  const rating = staticFallback?.rating ?? portfolio?.rating ?? 4.8;
   const duration =
+    staticFallback?.durationLabel ||
     publicDisplay?.durationLabel ||
     portfolio?.duration ||
     (resolvedSheet?.durationDays ? `${resolvedSheet.durationDays} days` : '—');
   const priceAud =
-    resolvedSheet?.priceStandardAud ?? trip?.price_aud ?? staticFallback?.standardPrice ?? 0;
+    staticFallback?.standardPrice ?? resolvedSheet?.priceStandardAud ?? trip?.price_aud ?? 0;
+  const pricePrivate = staticFallback?.privatePrice ?? resolvedSheet?.pricePrivateAud ?? null;
+  const hasPrivate = pricePrivate != null && pricePrivate > priceAud;
   const maxPax = resolvedSheet?.maxPax ?? trip?.max_pax ?? staticFallback?.maxPax ?? 6;
   const description = staticFallback?.description;
+  const weather = staticFallback?.weather || resolvedSheet?.weather || '';
+  const category = staticFallback?.category;
+
+  const highlights =
+    staticFallback?.highlights ??
+    (resolvedSheet?.highlights ? resolvedSheet.highlights.split(',').map((h) => h.trim()).filter(Boolean) : []);
+  const highlightIcons =
+    staticFallback?.highlightIcons && staticFallback.highlightIcons.length
+      ? staticFallback.highlightIcons
+      : DEFAULT_HIGHLIGHT_ICONS;
+  const itinerary = staticFallback?.itinerary ?? [];
+  const included = staticFallback?.included ?? [];
+  const excluded = staticFallback?.excluded ?? [];
+  const accommodation = staticFallback?.accommodation;
+  const nextDate = staticFallback?.nextDate;
 
   const bookingCode = resolvedSheet?.tourCode ?? trip?.id ?? tourId ?? '';
   const bookingHref = `/book/${encodeURIComponent(bookingCode)}`;
 
-  // Conversion boosters (deterministic per-trip so they stay stable across renders).
-  const spotsLeft = 1 + (stableHash(tripId) % 3); // 1–3
-  const joinedCount = 8 + (stableHash(`${tripId}joined`) % 25); // 8–32
+  // Conversion boosters — seats-left comes from data when present, else deterministic.
+  const seatsLeft = staticFallback?.seatsLeft ?? 1 + (stableHash(tripId) % 3);
+  const joinedCount = 8 + (stableHash(`${tripId}joined`) % 25);
   const originalPrice = priceAud > 0 ? Math.round((priceAud * 1.25) / 5) * 5 : 0;
+  const departLabel = formatTripDate(nextDate);
+  const urgencyText = departLabel
+    ? `🔥 เหลือ ${seatsLeft} ที่นั่ง · ออกเดินทาง ${departLabel}`
+    : `🔥 ${seatsLeft} ${seatsLeft === 1 ? 'spot' : 'spots'} left`;
 
-  const galleryPhotos = photos.length ? photos : [heroImage];
+  const galleryPhotos = photos.length ? photos : hardcodedPhotos ?? [heroImage];
   const heroParallax = Math.min(scrollY * 0.4, 80);
 
   const toggleSave = () => {
@@ -297,7 +348,7 @@ export default function TourDetail() {
         <div className="absolute bottom-0 inset-x-0 z-10 px-5 pb-10 sm:px-8 sm:pb-14">
           <div className="max-w-3xl mx-auto w-full">
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-500/90 backdrop-blur text-white text-xs font-bold shadow-lg animate-pulse">
-              🔥 {spotsLeft} {spotsLeft === 1 ? 'spot' : 'spots'} left
+              {urgencyText}
             </span>
 
             <p className="mt-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 backdrop-blur border border-white/25 text-white/95 text-sm font-semibold">
@@ -307,6 +358,8 @@ export default function TourDetail() {
             <h1 className="mt-3 font-serif text-3xl sm:text-5xl lg:text-6xl font-semibold text-white leading-tight drop-shadow-lg">
               {title}
             </h1>
+            {nameTh && <p className="mt-2 text-base sm:text-lg text-white/90 font-medium">{nameTh}</p>}
+            {tagline && <p className="mt-2 max-w-2xl text-sm sm:text-base text-white/80">{tagline}</p>}
 
             <div className="mt-4 flex flex-wrap items-center gap-4 text-white/90 text-sm font-medium">
               <span className="inline-flex items-center gap-1.5">
@@ -318,6 +371,11 @@ export default function TourDetail() {
               <span className="inline-flex items-center gap-1.5">
                 <span aria-hidden>👥</span> Max {maxPax}
               </span>
+              {weather && (
+                <span className="inline-flex items-center gap-1.5">
+                  <span aria-hidden>🌤️</span> {weather}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -362,7 +420,10 @@ export default function TourDetail() {
                 )}
                 <span className="text-emerald-600 font-semibold">Limited offer</span>
               </p>
-              <p className="text-xl font-bold text-slate-900 leading-tight">{formatAUD(priceAud)}<span className="text-sm font-medium text-slate-500">/person</span></p>
+              <p className="text-xl font-bold text-slate-900 leading-tight">
+                {formatAUD(priceAud)}
+                <span className="text-sm font-medium text-slate-500">/person</span>
+              </p>
             </div>
           )}
         </div>
@@ -425,110 +486,184 @@ export default function TourDetail() {
         </div>
       </section>
 
-      {/* ============ DETAILS CARD (tabs) ============ */}
-      <section className="max-w-2xl mx-auto px-4 py-8" id="trip-details">
-        <div className="rounded-3xl bg-white border border-slate-100 shadow-sm p-5">
-          {sheetLoading && (
-            <p className="text-xs text-slate-400 mb-2 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" aria-hidden />
-              Updating live details…
-            </p>
-          )}
-          {!sheetLoading && (sheetError || usingFallback) && (
-            <p className="text-xs text-amber-700 mb-2">
-              {sheetError
-                ? 'Live sheet unavailable — showing curated trip details.'
-                : 'Showing curated trip details.'}
-            </p>
-          )}
+      {/* ============ MAIN CONTENT ============ */}
+      <div className="max-w-3xl mx-auto px-5 sm:px-8 py-8 space-y-12" id="trip-details">
+        {(sheetLoading || sheetError || usingFallback) && (
+          <p className="text-xs text-slate-400 flex items-center gap-1.5">
+            {sheetLoading ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" aria-hidden />
+                Updating live details…
+              </>
+            ) : (
+              <span className="text-amber-700">Showing curated trip details.</span>
+            )}
+          </p>
+        )}
 
-          <div className="flex gap-2">
-            {(
-              [
-                ['details', 'Details'],
-                ['included', "What's Included"],
-                ['reviews', 'Reviews'],
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setActiveTab(key)}
-                className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
-                  activeTab === key ? 'bg-navy text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+        {/* About */}
+        {description && (
+          <section>
+            <h2 className="font-serif text-2xl font-semibold text-slate-900 mb-3">About this trip</h2>
+            <p className="text-[15px] leading-relaxed text-slate-700">{description}</p>
+            {category && (
+              <span className="inline-flex items-center gap-1.5 mt-4 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-semibold">
+                {category}
+              </span>
+            )}
+          </section>
+        )}
 
-          <div className="mt-4">
-            {activeTab === 'details' && (
-              <div className="text-sm text-slate-700 leading-relaxed space-y-3">
-                <p>
-                  {description ||
-                    'A Private Photo Journey designed around light and pacing — small group, calm schedule, and a finished .JPG delivery.'}
-                </p>
-                <p className="text-xs text-slate-500 font-mono">
-                  {trip?.start_date && trip?.end_date
-                    ? `${trip.start_date} → ${trip.end_date} · ${trip.trip_code}`
-                    : resolvedSheet?.tourCode}
-                </p>
+        {/* Highlights */}
+        {highlights.length > 0 && (
+          <section>
+            <h2 className="font-serif text-2xl font-semibold text-slate-900 mb-4">Highlights</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {highlights.map((h, i) => (
+                <div
+                  key={i}
+                  className="rounded-2xl border border-slate-100 bg-slate-50 p-5 flex flex-col gap-3 hover:shadow-md transition-shadow"
+                >
+                  <span className="text-3xl" aria-hidden>
+                    {highlightIcons[i % highlightIcons.length]}
+                  </span>
+                  <p className="text-sm leading-relaxed text-slate-700 font-medium">{h}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
-                {resolvedSheet?.spots?.length ? (
-                  <div className="mt-3 space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Spots</p>
-                    {resolvedSheet.spots.slice(0, 4).map((s, idx) => (
-                      <div key={`${s.spotName}-${idx}`} className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                        <p className="text-sm font-semibold text-slate-900">{s.spotName || `Spot ${idx + 1}`}</p>
-                        {s.proTip && <p className="text-sm text-slate-600 mt-1">Pro tip: {s.proTip}</p>}
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {s.mapsUrl && (
-                            <a
-                              href={s.mapsUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs font-semibold text-emerald-700 hover:underline"
-                            >
-                              Open maps →
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+        {/* Itinerary */}
+        {itinerary.length > 0 && (
+          <section>
+            <h2 className="font-serif text-2xl font-semibold text-slate-900 mb-4">Itinerary</h2>
+            <ol className="relative border-l-2 border-slate-200 ml-3 space-y-6">
+              {itinerary.map((d) => (
+                <li key={d.day} className="ml-6">
+                  <span className="absolute -left-[18px] flex items-center justify-center w-9 h-9 rounded-full bg-navy text-white text-sm font-bold shadow-sm">
+                    {d.day}
+                  </span>
+                  <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                      Day {d.day}
+                    </p>
+                    <h3 className="text-base font-semibold text-slate-900 mt-0.5">{d.title}</h3>
+                    <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">{d.desc}</p>
                   </div>
-                ) : null}
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+
+        {/* Included / Excluded */}
+        {(included.length > 0 || excluded.length > 0) && (
+          <section>
+            <h2 className="font-serif text-2xl font-semibold text-slate-900 mb-4">
+              What&apos;s included
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {included.length > 0 && (
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-5">
+                  <p className="text-sm font-semibold text-emerald-800 mb-3">รวมในแพ็กเกจ</p>
+                  <ul className="space-y-2">
+                    {included.map((item, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                        <span aria-hidden>✅</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {excluded.length > 0 && (
+                <div className="rounded-2xl border border-rose-100 bg-rose-50/60 p-5">
+                  <p className="text-sm font-semibold text-rose-800 mb-3">ไม่รวมในแพ็กเกจ</p>
+                  <ul className="space-y-2">
+                    {excluded.map((item, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                        <span aria-hidden>❌</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+            {accommodation && (
+              <p className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                <span className="font-semibold text-slate-800">ที่พัก:</span> {accommodation}
+              </p>
+            )}
+          </section>
+        )}
+
+        {/* Pricing */}
+        {priceAud > 0 && (
+          <section>
+            <h2 className="font-serif text-2xl font-semibold text-slate-900 mb-4">Pricing</h2>
+            <div className={`grid grid-cols-1 ${hasPrivate ? 'sm:grid-cols-2' : ''} gap-4`}>
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Standard</p>
+                <p className="mt-2 text-3xl font-bold text-slate-900">
+                  {formatAUD(priceAud)}
+                  <span className="text-sm font-medium text-slate-500">/person</span>
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  ออกเดินทาง {departLabel || 'ตามรอบที่กำหนด'} · เหลือ {seatsLeft} ที่นั่ง
+                </p>
+                <Link
+                  to={bookingHref}
+                  className="mt-5 inline-flex justify-center items-center gap-2 py-3 rounded-full bg-navy text-white text-sm font-semibold hover:bg-navy-dark transition-colors"
+                >
+                  Book Now <span aria-hidden>→</span>
+                </Link>
               </div>
-            )}
 
-            {activeTab === 'included' && (
-              <ul className="text-sm text-slate-700 space-y-2">
-                <li>✓ Private photo guide</li>
-                <li>✓ Finished .JPG delivery (no RAW)</li>
-                <li>✓ Trip briefing + safety checklist</li>
-              </ul>
-            )}
-
-            {activeTab === 'reviews' && (
-              <div className="space-y-3">
-                <div className="rounded-2xl border border-slate-100 bg-white p-4">
-                  <p className="text-amber-400 text-sm">★★★★★</p>
-                  <p className="text-sm text-slate-700 mt-2">
-                    “Pacing was perfect and the gallery felt editorial. Worth every dollar.”
+              {hasPrivate && pricePrivate != null && (
+                <div className="rounded-2xl border-2 border-teal bg-teal/5 p-6 shadow-sm flex flex-col">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">
+                    Private group
                   </p>
-                  <p className="text-xs text-slate-500 mt-2">— Verified guest</p>
+                  <p className="mt-2 text-3xl font-bold text-slate-900">
+                    {formatAUD(pricePrivate)}
+                    <span className="text-sm font-medium text-slate-500">/group</span>
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">ทริปส่วนตัว เลือกวันเดินทางได้เอง</p>
+                  <Link
+                    to={`${bookingHref}?tier=private`}
+                    className="mt-5 inline-flex justify-center items-center gap-2 py-3 rounded-full bg-teal text-navy text-sm font-bold hover:opacity-90 transition-opacity"
+                  >
+                    Book Now <span aria-hidden>→</span>
+                  </Link>
                 </div>
-                <div className="rounded-2xl border border-slate-100 bg-white p-4">
-                  <p className="text-amber-400 text-sm">★★★★★</p>
-                  <p className="text-sm text-slate-700 mt-2">“Clear prep checklist, smooth day, beautiful light.”</p>
-                  <p className="text-xs text-slate-500 mt-2">— Verified guest</p>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* Reviews */}
+        <section>
+          <h2 className="font-serif text-2xl font-semibold text-slate-900 mb-4">Reviews</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="rounded-2xl border border-slate-100 bg-white p-4">
+              <p className="text-amber-400 text-sm">★★★★★</p>
+              <p className="text-sm text-slate-700 mt-2">
+                “Pacing was perfect and the gallery felt editorial. Worth every dollar.”
+              </p>
+              <p className="text-xs text-slate-500 mt-2">— Verified guest</p>
+            </div>
+            <div className="rounded-2xl border border-slate-100 bg-white p-4">
+              <p className="text-amber-400 text-sm">★★★★★</p>
+              <p className="text-sm text-slate-700 mt-2">
+                “Clear prep checklist, smooth day, beautiful light.”
+              </p>
+              <p className="text-xs text-slate-500 mt-2">— Verified guest</p>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
       {/* ============ STICKY BOOKING BAR — mobile ============ */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur border-t border-slate-100">

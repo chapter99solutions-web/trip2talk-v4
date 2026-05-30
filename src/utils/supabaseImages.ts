@@ -3,8 +3,8 @@ import { supabase } from '../lib/supabase';
 const PORTFOLIO_BUCKET = 'portfolio';
 
 export const TOUR_COVER_MAP: Record<string, { folder: string; file?: string }> = {
-  'MEL-4D3N': { folder: 'Melbourne' },
-  'ULU-4D3N': { folder: 'Uluru', file: '1.jpg' },
+  'MEL-4D3N': { folder: 'Melbourne', file: '01.jpg' },
+  'ULU-4D3N': { folder: 'Ulruru', file: '1.jpg' },
   'NZ-6D5N': { folder: 'New Zealand/Autumn' },
   'TAS-3D2N': { folder: 'Tasmania' },
   'TAS-LH-4D3N': { folder: 'Tasmania' },

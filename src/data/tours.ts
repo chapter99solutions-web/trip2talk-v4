@@ -2,6 +2,12 @@ import { MASTER_TRIP_SEEDS } from '../lib/masterTrips';
 import type { TripSeason, TripType } from '../lib/masterTrips';
 import type { TripSheetRow } from '../lib/tripsSheetApi';
 
+export type ItineraryDay = {
+  day: number;
+  title: string;
+  desc: string;
+};
+
 export type TourFallback = {
   tourCode: string;
   anonymizedTitle: string;
@@ -14,36 +20,183 @@ export type TourFallback = {
   highlights: string[];
   pickupType: string;
   description: string;
+  // ---- Optional rich content (drives the data-driven TourDetail sections) ----
+  /** Display name incl. duration suffix, e.g. "Victoria Photo Trip (4D3N)". */
+  tourName?: string;
+  /** Thai display name. */
+  nameTh?: string;
+  /** Region label, e.g. "AU · AUSTRALIA · SOUTH". */
+  location?: string;
+  rating?: number;
+  /** ISO date of the next departure, e.g. "2026-02-22". */
+  nextDate?: string;
+  endDate?: string;
+  weather?: string;
+  /** Thai marketing tagline. */
+  tagline?: string;
+  /** Thai category label, e.g. "ทริปค้างคืน". */
+  category?: string;
+  itinerary?: ItineraryDay[];
+  included?: string[];
+  excluded?: string[];
+  accommodation?: string;
+  /** Emoji icons for the highlight cards, cycled across highlights. */
+  highlightIcons?: string[];
+  /** Seats remaining, shown in the urgency badge. */
+  seatsLeft?: number;
+  /** Hardcoded gallery photo URLs — consumed by TourDetail before any bucket lookup (first = hero). */
+  galleryPhotos?: string[];
 };
+
+const PORTFOLIO_BASE =
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio';
 
 export const TOUR_FALLBACK_DATA: TourFallback[] = [
   {
     tourCode: 'MEL-4D3N',
     anonymizedTitle: 'Secret Southern Coast',
+    tourName: 'Victoria Photo Trip (4D3N)',
+    nameTh: 'ทริปถ่ายภาพ 4 วัน 3 คืน: จากซิดนีย์สู่เมลเบิร์น',
+    location: 'AU · AUSTRALIA · SOUTH',
     tripType: 'overnight',
     standardPrice: 1550,
     privatePrice: 2300,
     durationLabel: '4 Days 3 Nights',
     season: 'autumn',
     maxPax: 5,
-    highlights: ['Great Ocean Road', 'Pink Lake', 'Melbourne City'],
+    rating: 4.8,
+    nextDate: '2026-02-22',
+    endDate: '2026-02-25',
+    weather: 'Autumn 14–18°C',
+    category: 'ทริปค้างคืน',
+    tagline:
+      'เบื่อไหมกับการเที่ยวที่ต้องรีบเร่ง? มาถ่ายรูปกับเรา สัมผัสความงามของเมลเบิร์น เมืองแห่ง 4 ฤดูใน 1 วัน',
+    highlights: [
+      'Great Ocean Road & The Twelve Apostles — golden hour + Milky Way',
+      'Pink Lake — สาหร่ายสีชมพู + ทางช้างเผือกสะท้อนน้ำ',
+      'Melbourne City — street art, State Library, Flinders Street Station',
+    ],
+    highlightIcons: ['📸', '🌸', '🏙️'],
+    seatsLeft: 2,
     pickupType: 'airport_terminal',
     description:
-      "An immersive photography journey through Victoria's most dramatic coastal landscapes.",
+      "An immersive 4-day photography journey through Victoria's most dramatic landscapes — Twelve Apostles golden hour, Pink Lake Milky Way reflections, and Melbourne city street art.",
+    itinerary: [
+      {
+        day: 1,
+        title: 'SYD → Twelve Apostles',
+        desc: 'รับรถ SUV → Great Ocean Road → ถ่าย Golden Hour → ล่า Milky Way',
+      },
+      {
+        day: 2,
+        title: 'Blue Hour → Pink Lake',
+        desc: 'เก็บแสงเช้า Blue Hour → เดินทางสู่ Pink Lake → ถ่าย Milky Way สะท้อนน้ำ',
+      },
+      {
+        day: 3,
+        title: 'Melbourne City',
+        desc: 'Street Art · State Library Victoria · Princes Bridge · Flinders Street',
+      },
+      {
+        day: 4,
+        title: 'Melbourne → SYD',
+        desc: 'ถ่ายวิถีชีวิตยามเช้า → คืนรถ → บินกลับซิดนีย์',
+      },
+    ],
+    included: [
+      'รถ SUV พร้อมคนขับและน้ำมัน',
+      'ช่างภาพมืออาชีพตลอดทริป',
+      'น้ำดื่มตลอดทาง',
+      'ค่าเข้าอุทยาน',
+      'ช่วยจองตั๋วเครื่องบินฟรี',
+    ],
+    excluded: ['ตั๋วเครื่องบินไป-กลับ', 'ค่าอาหารทุกมื้อ', 'ประกันการเดินทาง'],
+    accommodation: 'Dormitory (ห้องรวม) — อัปเกรดห้องส่วนตัว +$350-$550/คืน',
+    galleryPhotos: [
+      `${PORTFOLIO_BASE}/Melbourne/01.jpg`,
+      `${PORTFOLIO_BASE}/Melbourne/02.jpg`,
+      `${PORTFOLIO_BASE}/Melbourne/03.jpeg`,
+      `${PORTFOLIO_BASE}/Melbourne/04.jpg`,
+      `${PORTFOLIO_BASE}/Melbourne/Mel02.jpg`,
+      `${PORTFOLIO_BASE}/Melbourne/Mel03.jpg`,
+    ],
   },
   {
     tourCode: 'ULU-4D3N',
     anonymizedTitle: 'The Red Desert Odyssey',
+    tourName: 'The Red Desert Odyssey (4D3N)',
+    nameTh: 'ทริปถ่ายภาพ 4 วัน 3 คืน: ดินแดน Outback อุลูรู',
+    location: 'AU · AUSTRALIA · OUTBACK',
     tripType: 'overnight',
     standardPrice: 1690,
     privatePrice: 1690,
     durationLabel: '4 Days 3 Nights',
     season: 'all',
     maxPax: 5,
-    highlights: ['Uluru Sunrise', 'Field of Light', 'Kata Tjuta'],
+    rating: 4.8,
+    nextDate: '2026-03-15',
+    endDate: '2026-03-18',
+    weather: 'Desert 28°C day / 8°C night',
+    category: 'ทริปค้างคืน',
+    tagline:
+      'อยากมีรูปโปรไฟล์ปัง ๆ ไม่ซ้ำใคร? มาล่าทางช้างเผือกกลางทะเลทราย Outback กับเรา',
+    highlights: [
+      'Uluru — หินเปลี่ยนสีส้มแดง + Milky Way กลางทะเลทราย',
+      'Field of Light — หลอดไฟ 50,000 ดวงของ Bruce Munro ตอนรุ่งเช้า',
+      'Kata Tjuta (The Olgas) — โดมหิน 36 ก้อน แลนด์สเคปย้อนแสง',
+    ],
+    highlightIcons: ['🏜️', '💡', '🪨'],
+    seatsLeft: 3,
     pickupType: 'airport_terminal',
     description:
-      'Chase the ancient red rock at sunrise and hunt the Milky Way in total desert darkness.',
+      '4-day photography journey to Uluru-Kata Tjuta — sunrise over the red rock, Field of Light at dawn, Milky Way in pitch-black desert skies.',
+    itinerary: [
+      {
+        day: 1,
+        title: 'SYD → Ayers Rock → Uluru Sunset',
+        desc: 'รับรถตู้ → เช็กอิน Outback Lodge → ชมหินเปลี่ยนสี Sunset → ล่า Milky Way',
+      },
+      {
+        day: 2,
+        title: 'Field of Light → Kata Tjuta',
+        desc: '05:15 น. รถบัสพิเศษ → Field of Light ตอนพระอาทิตย์ขึ้น → เดินป่า Kata Tjuta → Sunset Kata Tjuta',
+      },
+      {
+        day: 3,
+        title: 'Uluru Sunrise → Base Walk',
+        desc: 'ชม Uluru Sunrise → เดินสำรวจรอบฐานหิน → ค่ำล่า Milky Way ทะเลทราย',
+      },
+      {
+        day: 4,
+        title: 'Kata Tjuta Dune → SYD',
+        desc: 'Sunrise ครั้งสุดท้าย → ปางอูฐ Camel Express → บินกลับซิดนีย์',
+      },
+    ],
+    included: [
+      'รถพร้อมคนขับและน้ำมันตลอดทริป',
+      'ที่พัก Outback Lodge 3 คืน',
+      'ค่าเข้าอุทยาน Uluru-Kata Tjuta 3 วัน',
+      'ตั๋วเข้าชม Field of Light',
+      'น้ำดื่มตลอดทาง',
+      'ช่างภาพมืออาชีพตลอดทริป',
+      'ช่วยจองตั๋วเครื่องบินฟรี',
+    ],
+    excluded: ['ตั๋วเครื่องบินไป-กลับ', 'ค่าอาหารทุกมื้อ', 'ประกันการเดินทาง'],
+    accommodation: 'Outback Lodge Dormitory — อัปเกรดห้องส่วนตัว +$350-$550/คืน',
+    galleryPhotos: [
+      `${PORTFOLIO_BASE}/Ulruru/1.jpg`,
+      `${PORTFOLIO_BASE}/Ulruru/2.jpg`,
+      `${PORTFOLIO_BASE}/Ulruru/3.jpg`,
+      `${PORTFOLIO_BASE}/Ulruru/4.jpg`,
+      `${PORTFOLIO_BASE}/Ulruru/5.jpg`,
+      `${PORTFOLIO_BASE}/Ulruru/6.jpg`,
+      `${PORTFOLIO_BASE}/Ulruru/7.jpg`,
+      `${PORTFOLIO_BASE}/Ulruru/8.jpg`,
+      `${PORTFOLIO_BASE}/Ulruru/9.jpg`,
+      `${PORTFOLIO_BASE}/Ulruru/10.jpg`,
+      `${PORTFOLIO_BASE}/Ulruru/11.jpg`,
+      `${PORTFOLIO_BASE}/Ulruru/12.jpg`,
+    ],
   },
   {
     tourCode: 'NZ-6D5N',
