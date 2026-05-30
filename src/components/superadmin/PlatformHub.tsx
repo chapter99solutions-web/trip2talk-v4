@@ -4,14 +4,39 @@ import AwaitingSync from '../cyber/AwaitingSync';
 import OpsDashboardHeader from '../ops/OpsDashboardHeader';
 
 const MASTER_SHEET_ID = '1U1APoAcFz5zwwcqql1uVHm4CCOtll7bhCLbCELUBuP4';
+const SHEET_ID_STORAGE_KEY = 'GAS_SPREADSHEET_ID';
 import { fetchOwnerDashboardData, OwnerDashboardData } from '../../lib/supabaseData';
 import { supabase } from '../../lib/supabase';
+
+function readSavedSheetId(): string {
+  try {
+    const saved = window.localStorage.getItem(SHEET_ID_STORAGE_KEY);
+    return saved && saved.trim() ? saved.trim() : MASTER_SHEET_ID;
+  } catch {
+    return MASTER_SHEET_ID;
+  }
+}
 
 export default function PlatformHub({ onLogout }: { onLogout: () => void }) {
   const [data, setData] = useState<OwnerDashboardData | null>(null);
   const [synced, setSynced] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [projectRef, setProjectRef] = useState<string>('—');
+  const [sheetId, setSheetId] = useState<string>(() => readSavedSheetId());
+  const [sheetSaved, setSheetSaved] = useState(false);
+
+  const trimmedSheetId = sheetId.trim();
+  const sheetUrl = `https://docs.google.com/spreadsheets/d/${trimmedSheetId}/edit`;
+
+  const saveSheetId = useCallback(() => {
+    try {
+      window.localStorage.setItem(SHEET_ID_STORAGE_KEY, trimmedSheetId);
+    } catch {
+      /* localStorage unavailable — keep in-memory value */
+    }
+    setSheetSaved(true);
+    window.setTimeout(() => setSheetSaved(false), 3000);
+  }, [trimmedSheetId]);
 
   const load = useCallback(async () => {
     setError(null);
@@ -83,17 +108,60 @@ export default function PlatformHub({ onLogout }: { onLogout: () => void }) {
           </div>
         )}
 
-        <div className="cyber-card p-5 space-y-2 text-sm text-neutral-400 font-sans">
+        <div className="cyber-card p-5 space-y-3 text-sm text-neutral-400 font-sans">
           <p className="text-neutral-200 font-semibold">Google Sheets (Trips_Data)</p>
-          <p className="font-mono text-xs text-teal break-all">{MASTER_SHEET_ID}</p>
+
+          <div className="space-y-2">
+            <label
+              htmlFor="gas-sheet-id"
+              className="block text-xs text-neutral-500 uppercase tracking-wide"
+            >
+              Google Sheets ID
+            </label>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                id="gas-sheet-id"
+                type="text"
+                value={sheetId}
+                onChange={(e) => setSheetId(e.target.value)}
+                spellCheck={false}
+                autoComplete="off"
+                className="w-full bg-black/40 border border-white/10 rounded-md px-3 py-2 font-mono text-xs text-teal focus:outline-none focus:border-[color:var(--teal)] break-all"
+                placeholder="Spreadsheet ID"
+              />
+              <button
+                type="button"
+                onClick={saveSheetId}
+                className="shrink-0 inline-flex items-center justify-center gap-1 rounded-md px-4 py-2 text-xs font-semibold text-black bg-emerald-400 hover:bg-emerald-300 transition-colors"
+              >
+                💾 Save
+              </button>
+            </div>
+
+            {sheetSaved && (
+              <p className="text-xs text-emerald-400" role="status">
+                ✅ Spreadsheet ID saved
+              </p>
+            )}
+
+            <p className="text-[11px] text-neutral-500 break-all">
+              {sheetUrl}
+            </p>
+
+            <p className="text-[11px] text-neutral-500">
+              ใช้ ID จาก URL ของ Google Sheets: .../spreadsheets/d/{'{ID}'}/edit
+            </p>
+          </div>
+
           <a
-            href={`https://docs.google.com/spreadsheets/d/${MASTER_SHEET_ID}/edit`}
+            href={sheetUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-block text-xs text-gold hover:underline"
           >
             Open master sheet →
           </a>
+
           <p className="text-[11px] text-neutral-500 pt-1">
             After updating <span className="text-neutral-300">gas/Code.gs</span>, redeploy the Apps Script web app
             (owner login). Frontend reads via <span className="text-neutral-300">VITE_GAS_WEBAPP_URL</span>.
