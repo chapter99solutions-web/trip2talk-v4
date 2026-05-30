@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { forwardSheetPayload, invokeSyncPipeline } from '../../lib/syncPipeline';
+import BookingCMSForm from './BookingCMSForm';
+import TripCoverPhotoUpload from './TripCoverPhotoUpload';
 
 type SpotDraft = {
   name: string;
@@ -34,12 +36,6 @@ type TripDraft = {
   dormUpgradeNote: string;
   itinerary: Array<{ morning: string; afternoon: string; evening: string; night: string }>;
   spots: SpotDraft[];
-};
-
-type BookingDraft = {
-  bookingId: string;
-  customerName: string;
-  tourCode: string;
 };
 
 const MAX_SPOTS = 4;
@@ -150,6 +146,27 @@ function UploadCard({
   );
 }
 
+async function directPostToGas(payload: Record<string, unknown>): Promise<void> {
+  const url = (import.meta.env.VITE_GAS_WEBAPP_URL as string | undefined)?.trim();
+  if (!url) throw new Error('Missing VITE_GAS_WEBAPP_URL');
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const text = await res.text();
+  let parsed: Record<string, unknown> = {};
+  try {
+    parsed = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+  } catch {
+    throw new Error(`GAS returned non-JSON (HTTP ${res.status})`);
+  }
+  if (!res.ok || parsed.status === 'error') {
+    throw new Error(String(parsed.message || parsed.error || `GAS HTTP ${res.status}`));
+  }
+}
+
 async function postToAppsScript(payload: Record<string, unknown>): Promise<void> {
   const bookingId =
     typeof payload.booking === 'object' &&
@@ -165,19 +182,30 @@ async function postToAppsScript(payload: Record<string, unknown>): Promise<void>
   const isBookingRow =
     payload.sheet === 'Customer_Bookings' && typeof payload.booking === 'object';
 
-  const result = isBookingRow
-    ? await invokeSyncPipeline({
-        action: 'sync_booking',
-        bookingId,
-        data: payload as Record<string, unknown>,
-      })
-    : await forwardSheetPayload('sync_booking', bookingId, {
-        passthrough: true,
-        ...payload,
-      });
+  try {
+    const result = isBookingRow
+      ? await invokeSyncPipeline({
+          action: 'sync_booking',
+          bookingId,
+          data: payload as Record<string, unknown>,
+        })
+      : await forwardSheetPayload('sync_booking', bookingId, {
+          passthrough: true,
+          ...payload,
+        });
 
-  if (!result.success) {
-    throw new Error(result.error);
+    if (!result.success) {
+      throw new Error(result.error);
+    }
+  } catch (edgeErr) {
+    // Local dev / edge outage: write directly to Apps Script web app (POST).
+    try {
+      await directPostToGas(payload);
+    } catch (gasErr) {
+      const edgeMsg = edgeErr instanceof Error ? edgeErr.message : 'Edge sync failed';
+      const gasMsg = gasErr instanceof Error ? gasErr.message : 'GAS POST failed';
+      throw new Error(`${edgeMsg} — ${gasMsg}`);
+    }
   }
 }
 
@@ -214,14 +242,8 @@ export default function InternalCmsDashboard() {
     })),
   }));
 
-  const [booking, setBooking] = useState<BookingDraft>(() => ({
-    bookingId: '',
-    customerName: '',
-    tourCode: '',
-  }));
-
   const [tourCodes, setTourCodes] = useState<string[]>([]);
-  const [syncing, setSyncing] = useState<'none' | 'trip' | 'booking'>('none');
+  const [syncing, setSyncing] = useState<'none' | 'trip'>('none');
   const [syncOk, setSyncOk] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
 
@@ -927,29 +949,6 @@ export default function InternalCmsDashboard() {
     }
   };
 
-  const saveBooking = async () => {
-    setSyncing('booking');
-    setSyncOk(null);
-    setSyncError(null);
-    try {
-      const payload = {
-        sheet: 'Customer_Bookings',
-        booking: {
-          bookingId: booking.bookingId.trim(),
-          customerName: booking.customerName.trim(),
-          tourCode: booking.tourCode.trim(),
-        },
-      };
-      await postToAppsScript(payload);
-      setSyncOk('Customer_Bookings synced.');
-      setBooking({ bookingId: '', customerName: '', tourCode: booking.tourCode });
-    } catch (e) {
-      setSyncError(e instanceof Error ? e.message : 'Sync failed');
-    } finally {
-      setSyncing('none');
-    }
-  };
-
   return (
     <section className="cyber-card p-5 space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1290,12 +1289,10 @@ export default function InternalCmsDashboard() {
             </div>
           )}
 
-          <UploadCard
-            label="Trip Cover Photo"
-            valueUrl={trip.coverUrl}
-            pathPrefix={`${tripPathPrefix}/cover`}
-            onUploaded={(url) => setTrip((p) => ({ ...p, coverUrl: url }))}
-            disabled={!trip.tourCode.trim()}
+          <TripCoverPhotoUpload
+            tourCode={trip.tourCode}
+            coverUrl={trip.coverUrl}
+            onCoverUrlChange={(url) => setTrip((p) => ({ ...p, coverUrl: url }))}
           />
 
           <div className="flex items-center justify-between gap-3">
@@ -1434,69 +1431,7 @@ export default function InternalCmsDashboard() {
           </button>
         </div>
 
-        {/* FORM 2 */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-neutral-200">FORM 2 · REGISTER CUSTOMER BOOKING</p>
-            {syncing === 'booking' && (
-              <span className="inline-flex items-center gap-2 text-xs font-mono text-amber-400">
-                <span className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-                SYNCING…
-              </span>
-            )}
-          </div>
-
-          <div>
-            <label className="text-xs text-neutral-500 font-mono">Tour Code</label>
-            <select
-              className="cyber-input mt-1"
-              value={booking.tourCode}
-              onChange={(e) => setBooking((p) => ({ ...p, tourCode: e.target.value }))}
-            >
-              <option value="">Select tour…</option>
-              {computedTourCodes.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-neutral-500 font-mono">Booking ID</label>
-              <input
-                className="cyber-input mt-1"
-                value={booking.bookingId}
-                onChange={(e) => setBooking((p) => ({ ...p, bookingId: e.target.value }))}
-                placeholder="BK-123456"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-neutral-500 font-mono">Customer Name</label>
-              <input
-                className="cyber-input mt-1"
-                value={booking.customerName}
-                onChange={(e) => setBooking((p) => ({ ...p, customerName: e.target.value }))}
-                placeholder="Jane Doe"
-              />
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className="cyber-btn-gold"
-            disabled={syncing !== 'none'}
-            onClick={() => void saveBooking()}
-          >
-            SAVE & SYNC (Customer_Bookings)
-          </button>
-
-          <p className="text-xs text-neutral-600 font-mono leading-relaxed">
-            Apps Script must accept JSON and append to tabs: <span className="text-neutral-400">Trips_Data</span> /
-            <span className="text-neutral-400"> Customer_Bookings</span>.
-          </p>
-        </div>
+        <BookingCMSForm tourCodes={computedTourCodes} />
       </div>
     </section>
   );

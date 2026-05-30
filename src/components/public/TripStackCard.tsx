@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
 import type { TripSheetRow } from '../../lib/tripsSheetApi';
-import { tripCapacityLabel, tripDurationLabel, tripRegionBadge } from '../../lib/tripDisplay';
-
-const FALLBACK_COVER = 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&q=80';
+import { tripDurationBadge, tripMaxPaxLabel, tripPriceFromLabel, tripSeasonBadge } from '../../lib/tripDisplay';
+import { getPublicTripDisplay } from '../../lib/publicTripDisplay';
+import TourCardCover from './TourCardCover';
 
 type Props = {
   tour: TripSheetRow;
@@ -21,6 +21,7 @@ export default function TripStackCard({
   isActive,
   onActivate,
 }: Props) {
+  const display = getPublicTripDisplay(tour);
   const scale = stackDepth === 0 ? 1 : stackDepth === 1 ? 0.95 : 0.9;
   const translateY = stackDepth === 0 ? 0 : stackDepth === 1 ? -14 : -26;
   const opacity = stackDepth === 0 ? 1 : stackDepth === 1 ? 0.92 : 0.78;
@@ -47,17 +48,19 @@ export default function TripStackCard({
           onClick={() => onActivate()}
           className="block aspect-[4/5] max-h-[min(72vh,520px)] relative"
         >
-          <img
-            src={tour.coverUrl || FALLBACK_COVER}
-            alt={tour.tourName || tour.tourCode}
-            className="absolute inset-0 w-full h-full object-cover"
-            loading="lazy"
-          />
+          <div className="absolute inset-0">
+            <TourCardCover
+              tourCode={tour.tourCode}
+              alt={display.title}
+              aspectClassName="h-full w-full"
+              imgClassName="absolute inset-0 w-full h-full object-cover"
+            />
+          </div>
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
 
           <div className="absolute top-4 left-4 right-4 flex items-start justify-between gap-3 z-10">
             <span className="inline-flex items-center rounded-full bg-black/35 backdrop-blur-md border border-white/15 px-3 py-1.5 text-[10px] font-bold tracking-[0.18em] text-white uppercase">
-              {tripRegionBadge(tour.countryTag, tour.tourName || tour.tourCode)}
+              {display.region}
             </span>
             <button
               type="button"
@@ -75,16 +78,20 @@ export default function TripStackCard({
 
           <div className="absolute bottom-0 left-0 right-0 p-5 md:p-6 z-10">
             <h3 className="font-serif text-2xl font-bold text-white leading-tight tracking-tight">
-              {tour.tourName || tour.tourCode}
+              {display.title}
             </h3>
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/85">
-              <span className="inline-flex items-center gap-1.5">
-                <span aria-hidden>📅</span>
-                {tripDurationLabel(tour.durationDays)}
+            {display.priceLabel ? (
+              <p className="mt-2 text-sm font-semibold text-emerald-300">{display.priceLabel}</p>
+            ) : null}
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/90">
+              <span className="inline-flex items-center rounded-full bg-white/15 backdrop-blur px-2.5 py-1 font-semibold">
+                {tripDurationBadge(tour.durationDays, tour.tripType)}
               </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span aria-hidden>👥</span>
-                {tripCapacityLabel(tour)}
+              <span className="inline-flex items-center rounded-full bg-white/15 backdrop-blur px-2.5 py-1 font-semibold">
+                {tripSeasonBadge(tour.season)}
+              </span>
+              <span className="inline-flex items-center rounded-full bg-white/15 backdrop-blur px-2.5 py-1 font-semibold">
+                {tripMaxPaxLabel(tour)}
               </span>
             </div>
           </div>

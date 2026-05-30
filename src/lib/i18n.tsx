@@ -19,6 +19,30 @@ const DICT: Dictionary = {
   installHint: { TH: 'เพิ่มไปที่หน้าจอหลักเพื่อใช้งานแบบออฟไลน์', EN: 'Add to home screen for offline access' },
   installIOSHint: { TH: 'กดปุ่มแชร์ แล้วเลือก “เพิ่มไปที่หน้าจอโฮม”', EN: 'Tap the share icon then "Add to Home Screen"' },
   installButton: { TH: 'ติดตั้ง', EN: 'INSTALL' },
+
+  contact_kicker: { TH: 'ติดต่อเรา', EN: 'Contact' },
+  contact_title: { TH: 'เริ่มทริปถ่ายภาพของคุณ', EN: 'Start your photo journey' },
+  contact_lead: {
+    TH: 'ทริปถ่ายภาพระดับพรีเมียมจาก Chapter 99 Photography — ส่งข้อความหรือทักแชทได้ทุกช่องทาง',
+    EN: 'Premium photo journeys by Chapter 99 Photography — message us on any channel below.',
+  },
+  contact_form_title: { TH: 'ส่งข้อความ', EN: 'Send a message' },
+  contact_studio_title: { TH: 'สตูดิโอ & ที่ตั้ง', EN: 'Studio & location' },
+  contact_address_label: { TH: 'ที่ตั้ง', EN: 'Address' },
+  contact_channels: { TH: 'ช่องทางติดต่อ', EN: 'Contact channels' },
+  contact_messenger: { TH: 'Facebook Messenger', EN: 'Facebook Messenger' },
+  contact_line: { TH: 'LINE Official', EN: 'LINE Official' },
+  contact_email: { TH: 'อีเมล', EN: 'Email' },
+  contact_send: { TH: 'ส่งข้อความ', EN: 'Send message' },
+  contact_sent_ok: { TH: 'ส่งแล้ว — เราจะติดต่อกลับโดยเร็ว', EN: 'Sent — we will reply soon.' },
+  contact_privacy_note: {
+    TH: 'ไม่มีแผนที่ออนไลน์ — นัดหมายล่วงหน้าเพื่อความเป็นส่วนตัวของการดำเนินงาน',
+    EN: 'No embedded map — appointments by arrangement for operational privacy.',
+  },
+  nav_trips: { TH: 'ทริป', EN: 'Trips' },
+  nav_about: { TH: 'เกี่ยวกับเรา', EN: 'About' },
+  nav_contact: { TH: 'ติดต่อ', EN: 'Contact' },
+  nav_terms: { TH: 'เงื่อนไข', EN: 'Terms' },
 };
 
 function readStoredLanguage(): AppLanguage {

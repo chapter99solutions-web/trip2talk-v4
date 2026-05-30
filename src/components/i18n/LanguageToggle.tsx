@@ -1,15 +1,28 @@
 import { useI18n } from '../../lib/i18n';
 
-export default function LanguageToggle({ className = '' }: { className?: string }) {
+export default function LanguageToggle({
+  className = '',
+  variant = 'dark',
+}: {
+  className?: string;
+  variant?: 'light' | 'dark';
+}) {
   const { lang, setLang } = useI18n();
 
+  const shell =
+    variant === 'light'
+      ? 'border-slate-200 bg-slate-50'
+      : 'border-white/10 bg-white/5 backdrop-blur';
+  const idle = variant === 'light' ? 'text-slate-500 hover:text-navy' : 'text-white/70 hover:text-white';
+  const active = 'bg-teal text-navy';
+
   return (
-    <div className={`inline-flex rounded-full border border-white/10 bg-white/5 p-1 backdrop-blur ${className}`}>
+    <div className={`inline-flex rounded-full border p-1 ${shell} ${className}`}>
       <button
         type="button"
         onClick={() => setLang('TH')}
         className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${
-          lang === 'TH' ? 'bg-[color:var(--teal)] text-[color:var(--navy)]' : 'text-white/70 hover:text-white'
+          lang === 'TH' ? active : idle
         }`}
         aria-pressed={lang === 'TH'}
       >
@@ -19,7 +32,7 @@ export default function LanguageToggle({ className = '' }: { className?: string 
         type="button"
         onClick={() => setLang('EN')}
         className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${
-          lang === 'EN' ? 'bg-[color:var(--teal)] text-[color:var(--navy)]' : 'text-white/70 hover:text-white'
+          lang === 'EN' ? active : idle
         }`}
         aria-pressed={lang === 'EN'}
       >

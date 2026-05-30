@@ -27,3 +27,6 @@ verify_jwt = false
 
 [functions.sync-delivery-status]
 verify_jwt = false
+
+[functions.generate-portal-link]
+verify_jwt = false

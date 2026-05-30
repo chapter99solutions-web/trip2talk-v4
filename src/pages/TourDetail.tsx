@@ -1,23 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { findTourFallbackByCode, tourFallbackToSheetRow } from '../data/tours';
 import { findTripById } from '../lib/publicTours';
 import { formatAUD } from '../lib/payidCalc';
 import { PORTFOLIO_TOURS } from '../lib/portfolioTours';
 import { supabase } from '../lib/supabase';
 import { fetchTripByCodeFromSheet, TripSheetRow } from '../lib/tripsSheetApi';
+import { getPublicTripDisplay } from '../lib/publicTripDisplay';
 
 type TourTab = 'details' | 'included' | 'reviews';
 
 const FALLBACK_HERO =
   'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1600&q=80';
-
-function dayCount(start: string, end: string) {
-  const a = new Date(start);
-  const b = new Date(end);
-  const ms = b.getTime() - a.getTime();
-  if (!Number.isFinite(ms) || ms <= 0) return null;
-  return Math.max(1, Math.round(ms / (1000 * 60 * 60 * 24)));
-}
 
 export default function TourDetail() {
   const { tourId } = useParams<{ tourId: string }>();
@@ -27,17 +21,28 @@ export default function TourDetail() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [sheetTrip, setSheetTrip] = useState<TripSheetRow | null>(null);
   const [sheetError, setSheetError] = useState<string | null>(null);
+  const [sheetLoading, setSheetLoading] = useState(true);
+
+  const staticFallback = tourId ? findTourFallbackByCode(tourId) : undefined;
 
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
-      if (!tourId) return;
+      if (!tourId) {
+        setSheetLoading(false);
+        return;
+      }
+      setSheetLoading(true);
       setSheetError(null);
       try {
         const row = await fetchTripByCodeFromSheet(tourId);
         if (!cancelled) setSheetTrip(row);
       } catch (e) {
-        if (!cancelled) setSheetError(e instanceof Error ? e.message : 'Could not load trip');
+        if (!cancelled) {
+          setSheetError(e instanceof Error ? e.message : 'Could not load trip');
+        }
+      } finally {
+        if (!cancelled) setSheetLoading(false);
       }
     };
     void run();
@@ -46,7 +51,23 @@ export default function TourDetail() {
     };
   }, [tourId]);
 
-  if (!trip && !sheetTrip) {
+  const resolvedSheet = useMemo(() => {
+    if (sheetTrip) return sheetTrip;
+    if (staticFallback) return tourFallbackToSheetRow(staticFallback);
+    return null;
+  }, [sheetTrip, staticFallback]);
+
+  const usingFallback = Boolean(!sheetTrip && staticFallback && resolvedSheet);
+
+  if (sheetLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="w-10 h-10 border-4 border-teal-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!trip && !resolvedSheet) {
     return (
       <div className="max-w-lg mx-auto px-4 py-16 text-center">
         <p className="text-red-600 font-sans">Trip not found.</p>
@@ -57,16 +78,26 @@ export default function TourDetail() {
     );
   }
 
-  const tripId = trip?.id ?? sheetTrip?.tourCode ?? tourId ?? 'trip';
+  const tripId = trip?.id ?? resolvedSheet?.tourCode ?? tourId ?? 'trip';
 
-  const portfolio = trip ? PORTFOLIO_TOURS.find((t) => t.id === trip.id || t.id === tourId) : undefined;
-  const heroImage = sheetTrip?.coverUrl || portfolio?.image || FALLBACK_HERO;
-  const title = sheetTrip?.tourName || portfolio?.title || trip?.destination || 'Trip';
-  const location = sheetTrip?.countryTag || portfolio?.location || `${trip?.destination ?? ''}`;
+  const portfolio = trip
+    ? PORTFOLIO_TOURS.find((t) => t.id === trip.id || t.id === tourId)
+    : undefined;
+  const heroImage = resolvedSheet?.coverUrl || portfolio?.image || FALLBACK_HERO;
+  const publicDisplay = resolvedSheet ? getPublicTripDisplay(resolvedSheet) : null;
+  const title =
+    publicDisplay?.title || portfolio?.title || resolvedSheet?.tourName || trip?.destination || 'Photo Journey';
+  const location =
+    publicDisplay?.region || resolvedSheet?.countryTag || portfolio?.location || `${trip?.destination ?? ''}`;
   const rating = portfolio?.rating ?? 4.8;
   const duration =
-    portfolio?.duration ??
-    (sheetTrip?.spots?.length ? `${Math.min(7, Math.max(1, sheetTrip.spots.length))} stops` : '—');
+    publicDisplay?.durationLabel ||
+    portfolio?.duration ||
+    (resolvedSheet?.durationDays ? `${resolvedSheet.durationDays} days` : '—');
+  const priceAud =
+    resolvedSheet?.priceStandardAud ?? trip?.price_aud ?? staticFallback?.standardPrice ?? 0;
+  const maxPax = resolvedSheet?.maxPax ?? trip?.max_pax ?? staticFallback?.maxPax ?? 6;
+  const description = staticFallback?.description;
 
   const saveKey = useMemo(() => `t2t:savedTours:v1`, []);
 
@@ -85,7 +116,6 @@ export default function TourDetail() {
 
     async function loadPhotos() {
       try {
-        // Bucket: tour-photos, path: tour-photos/{tourId}/...
         const prefix = `${tripId}/`;
         const { data, error } = await supabase.storage.from('tour-photos').list(prefix, {
           limit: 24,
@@ -124,7 +154,6 @@ export default function TourDetail() {
 
   return (
     <div className="min-h-screen bg-white text-slate-900 pb-24">
-      {/* Hero (55vh) */}
       <section className="relative h-[55vh] min-h-[360px] overflow-hidden">
         <img src={heroImage} alt={title} className="absolute inset-0 w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/60" />
@@ -154,11 +183,14 @@ export default function TourDetail() {
           </p>
 
           <h1 className="mt-3 text-[24px] leading-snug font-semibold text-slate-900">{title}</h1>
-          {sheetError && (
-            <p className="text-xs text-amber-700 mt-2">Live sheet unavailable — showing fallback details.</p>
+          {(sheetError || usingFallback) && (
+            <p className="text-xs text-amber-700 mt-2">
+              {sheetError
+                ? 'Live sheet unavailable — showing curated trip details.'
+                : 'Showing curated trip details.'}
+            </p>
           )}
 
-          {/* Stats row */}
           <div className="mt-4 grid grid-cols-3 gap-3">
             <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
               <p className="text-xs text-slate-500 flex items-center gap-1">
@@ -170,7 +202,7 @@ export default function TourDetail() {
               <p className="text-xs text-slate-500 flex items-center gap-1">
                 <span aria-hidden>👥</span> Max Pax
               </p>
-              <p className="text-sm font-semibold text-slate-900 mt-1">{trip?.max_pax ?? 6}</p>
+              <p className="text-sm font-semibold text-slate-900 mt-1">{maxPax}</p>
             </div>
             <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
               <p className="text-xs text-slate-500 flex items-center gap-1">
@@ -180,7 +212,6 @@ export default function TourDetail() {
             </div>
           </div>
 
-          {/* Tabs */}
           <div className="mt-5 flex gap-2">
             {(
               [
@@ -202,22 +233,23 @@ export default function TourDetail() {
             ))}
           </div>
 
-          {/* Tab content */}
           <div className="mt-4">
             {activeTab === 'details' && (
               <div className="text-sm text-slate-700 leading-relaxed space-y-3">
                 <p>
-                  A Private Photo Journey designed around light and pacing — small group, calm schedule, and a finished .JPG
-                  delivery.
+                  {description ||
+                    'A Private Photo Journey designed around light and pacing — small group, calm schedule, and a finished .JPG delivery.'}
                 </p>
                 <p className="text-xs text-slate-500 font-mono">
-                  {trip?.start_date && trip?.end_date ? `${trip.start_date} → ${trip.end_date} · ${trip.trip_code}` : sheetTrip?.tourCode}
+                  {trip?.start_date && trip?.end_date
+                    ? `${trip.start_date} → ${trip.end_date} · ${trip.trip_code}`
+                    : resolvedSheet?.tourCode}
                 </p>
 
-                {sheetTrip?.spots?.length ? (
+                {resolvedSheet?.spots?.length ? (
                   <div className="mt-3 space-y-2">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Spots</p>
-                    {sheetTrip.spots.slice(0, 4).map((s, idx) => (
+                    {resolvedSheet.spots.slice(0, 4).map((s, idx) => (
                       <div key={`${s.spotName}-${idx}`} className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
                         <p className="text-sm font-semibold text-slate-900">{s.spotName || `Spot ${idx + 1}`}</p>
                         {s.proTip && <p className="text-sm text-slate-600 mt-1">Pro tip: {s.proTip}</p>}
@@ -267,7 +299,6 @@ export default function TourDetail() {
           </div>
         </div>
 
-        {/* Gallery */}
         <div className="mt-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-serif text-lg font-semibold text-slate-900">Gallery</h2>
@@ -287,15 +318,14 @@ export default function TourDetail() {
         </div>
       </section>
 
-      {/* Sticky bottom */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/92 backdrop-blur border-t border-slate-100">
         <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
           <div>
             <p className="text-xs text-slate-500">From</p>
-            <p className="text-lg font-semibold text-slate-900">{formatAUD(trip?.price_aud ?? 0)}/person</p>
+            <p className="text-lg font-semibold text-slate-900">{formatAUD(priceAud)}/person</p>
           </div>
           <Link
-            to={`/book/${encodeURIComponent(sheetTrip?.tourCode ?? trip?.id ?? tourId ?? '')}`}
+            to={`/book/${encodeURIComponent(resolvedSheet?.tourCode ?? trip?.id ?? tourId ?? '')}`}
             className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-teal text-navy font-semibold text-sm hover:opacity-90 transition-opacity"
           >
             Book this trip <span aria-hidden>→</span>

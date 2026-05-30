@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TripSheetRow } from '../../lib/tripsSheetApi';
+import { getPublicTripDisplay } from '../../lib/publicTripDisplay';
 import {
   buildTripDatePills,
   filterTripsByDatePill,
@@ -93,7 +94,7 @@ export default function MobileTripStack({ trips, saved, onToggleSave }: Props) {
               type="button"
               role="tab"
               aria-selected={i === activeIndex}
-              aria-label={`Show ${t.tourName || t.tourCode}`}
+              aria-label={`Show ${getPublicTripDisplay(t).title}`}
               onClick={() => setActiveIndex(i)}
               className={`rounded-full transition-all duration-300 ${
                 i === activeIndex ? 'w-6 h-2 bg-neutral-950' : 'w-2 h-2 bg-neutral-300'

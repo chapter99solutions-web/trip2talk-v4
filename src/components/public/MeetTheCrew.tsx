@@ -2,16 +2,28 @@ export type CrewMember = {
   name: string;
   role: string;
   imageSrc: string;
+  fallbackSrc: string;
   imageAlt: string;
   intro: string;
 };
+
+const SAEN_PHOTO =
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Meet%20the%20Crew/saen%20man.jpg';
+
+const MONSICHA_PHOTO =
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Meet%20the%20Crew/Ploy.jpg';
+
+const FALLBACK_SAEN =
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=85&auto=format&fit=crop';
+const FALLBACK_PLOY =
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800&q=85&auto=format&fit=crop';
 
 const CREW: CrewMember[] = [
   {
     name: 'SAEN',
     role: 'Trip Leader & Photographer',
-    imageSrc:
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=85&auto=format&fit=crop',
+    imageSrc: SAEN_PHOTO,
+    fallbackSrc: FALLBACK_SAEN,
     imageAlt: "P'Saen — Trip Leader & Photographer",
     intro:
       'Founder of Chapter 99 Photography and the creative lead behind every Trip2Talk journey. Saen plans light, pacing, and composition so your group walks away with a finished .JPG gallery that feels intentional — never rushed, never generic.',
@@ -19,8 +31,8 @@ const CREW: CrewMember[] = [
   {
     name: 'MONSICHA CHAYAKORN',
     role: 'Admin & Trip Staff',
-    imageSrc:
-      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800&q=85&auto=format&fit=crop',
+    imageSrc: MONSICHA_PHOTO,
+    fallbackSrc: FALLBACK_PLOY,
     imageAlt: 'K.Ploy — Admin & Trip Staff',
     intro:
       'The calm centre of operations — from booking confirmations to on-trip logistics and Messenger group care. Ploy makes sure every guest feels prepared, informed, and looked after before the shutter ever clicks.',
@@ -35,8 +47,14 @@ function CrewCard({ member }: { member: CrewMember }) {
           <img
             src={member.imageSrc}
             alt={member.imageAlt}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
             loading="lazy"
+            onError={(e) => {
+              const img = e.currentTarget;
+              if (img.src !== member.fallbackSrc) {
+                img.src = member.fallbackSrc;
+              }
+            }}
           />
         </div>
       </div>

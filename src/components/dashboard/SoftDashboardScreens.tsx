@@ -106,6 +106,9 @@ export function ActiveTripHomeScreen({
   durationLabel,
   distanceLabel,
   capacityLabel,
+  guestsLabel,
+  pickupLabel,
+  departLabel,
   onStartTrip,
 }: {
   name: string;
@@ -117,6 +120,9 @@ export function ActiveTripHomeScreen({
   durationLabel: string;
   distanceLabel: string;
   capacityLabel: string;
+  guestsLabel?: string;
+  pickupLabel?: string;
+  departLabel?: string;
   onStartTrip?: () => void;
 }) {
   const heroSrc = heroImageUrl?.trim() || FALLBACK_HERO_AU;
@@ -165,10 +171,14 @@ export function ActiveTripHomeScreen({
                 <p className="text-sm text-white/80 leading-relaxed mt-1">{tripSubtitle}</p>
               </div>
 
-              <div className="flex items-center justify-between gap-3">
-                <MetaChip icon="📅" text={durationLabel} />
-                <MetaChip icon="🗺️" text={distanceLabel} />
-                <MetaChip icon="👥" text={capacityLabel} />
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                {guestsLabel ? (
+                  <MetaChip icon="👥" text={guestsLabel} />
+                ) : (
+                  <MetaChip icon="👥" text={capacityLabel} />
+                )}
+                {pickupLabel ? <MetaChip icon="📍" text={pickupLabel} /> : <MetaChip icon="🗺️" text={distanceLabel} />}
+                {departLabel ? <MetaChip icon="🕐" text={departLabel} /> : <MetaChip icon="📅" text={durationLabel} />}
               </div>
 
               <div className="pt-2 flex justify-center">

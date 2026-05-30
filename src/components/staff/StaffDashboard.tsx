@@ -1,441 +1,492 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { CRMClient, Tour } from '../../types/tour';
-import { validateOSHC } from '../../lib/compliance';
-import {
-  fetchStaffDashboardData,
-  ACTIVE_TOUR_STATUSES,
-  BookingWithRelations,
-  StaffDashboardData,
-} from '../../lib/supabaseData';
-import CyberViewport from '../layout/CyberViewport';
-import AwaitingSync from '../cyber/AwaitingSync';
-import { IconAlertTriangle } from '../icons/IconAlertTriangle';
-import { IconFirstAid } from '../icons/IconFirstAid';
-import VisaBadge from '../cyber/VisaBadge';
-import TierBadge from '../cyber/TierBadge';
-import WaiverModule from '../waiver/WaiverModule';
-import { fetchSignedClientIds } from '../../lib/waiverApi';
-import { getLocalWaiversByClientIds } from '../../lib/waiverDb';
-import { WaiverData } from '../../types/compliance';
-import { pickupEmoji, pickupShortLabel } from '../../lib/pickup-options';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import IntakeFormModal from '../IntakeFormModal';
+import { fetchConfirmedBookings, type PlatformBooking } from '../../lib/platformBookings';
 
-interface CriticalAlert {
-  id: string;
-  clientName: string;
-  detail: string;
+type Lang = 'TH' | 'EN';
+
+type IntakeBooking = {
+  bookingId: string;
+  customerName: string;
+  tourCode: string;
+  tourDate: string;
+  intakeStatus: string;
+  bookingStatus: string;
+  fullNamePassport: string;
+  dob: string;
+  emergencyContact: string;
+  dietaryReq: string;
+  medicalCondition: string;
+  motionSickness: string;
+  photoStyle: string;
+  pickupDisplay: string;
+};
+
+const NAVY = '#0d1b2a';
+const GOLD = '#d4af37';
+const TEAL = '#4dd8a0';
+
+function isSeafoodAllergy(dietary: string) {
+  return /seafood/i.test(dietary) || /\bshrimp\b/i.test(dietary) || /แพ้.*ทะเล/i.test(dietary);
 }
 
-interface WarningAlert {
-  id: string;
-  clientName: string;
-  detail: string;
-  type: 'medical' | 'dietary';
+function parseDietaryFlags(dietary: string): string[] {
+  const d = (dietary || '').toLowerCase();
+  const out: string[] = [];
+  if (d.includes('vegetarian') || d.includes('มังสวิรัติ')) out.push('vegetarian');
+  if (d.includes('vegan') || d.includes('วีแกน')) out.push('vegan');
+  if (d.includes('halal') || d.includes('ฮาลาล')) out.push('halal');
+  if (isSeafoodAllergy(dietary)) out.push('seafood_allergy');
+  return out;
 }
 
-function clientLabel(c: CRMClient): string {
-  return `${c.first_name_en} ${c.last_name_en}`;
+function dietaryBadge(flag: string) {
+  if (flag === 'seafood_allergy') return '🦐';
+  if (flag === 'vegan') return '🌱';
+  if (flag === 'vegetarian') return '🥗';
+  if (flag === 'halal') return '🕌';
+  return '•';
 }
 
-function oshcStatusLabel(client: CRMClient, tour: Tour): { text: string; tone: 'ok' | 'warn' | 'crit' } {
-  const v = validateOSHC(client, tour);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const expiry = new Date(client.oshc_expiry);
-  if (expiry < today) return { text: 'EXPIRED', tone: 'crit' };
-  if (!v.is_valid) return { text: v.warnings[0] ?? 'INVALID', tone: 'warn' };
-  return { text: `${v.days_remaining}D OK`, tone: 'ok' };
+function photoEmoji(style: string) {
+  const s = (style || '').toLowerCase();
+  if (s.includes('candid')) return '🌿';
+  if (s.includes('fashion')) return '👗';
+  if (s.includes('landscape')) return '🏔️';
+  if (s.includes('cafe')) return '☕';
+  return '📷';
+}
+
+function isBirthdayOnTrip(dob: string, tripDateIso: string): boolean {
+  if (!dob || !tripDateIso) return false;
+  const d = new Date(dob);
+  const t = new Date(tripDateIso);
+  if (!Number.isFinite(d.getTime()) || !Number.isFinite(t.getTime())) return false;
+  return d.getUTCMonth() === t.getUTCMonth() && d.getUTCDate() === t.getUTCDate();
+}
+
+function printableHtml(title: string, rows: IntakeBooking[]) {
+  const escape = (s: string) =>
+    (s || '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;');
+
+  return `<!doctype html>
+  <html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${escape(title)}</title>
+    <style>
+      body { font-family: ui-sans-serif, system-ui, -apple-system; padding: 24px; }
+      h1 { margin: 0 0 10px; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { border: 1px solid #e5e7eb; padding: 10px; font-size: 12px; vertical-align: top; }
+      th { background: #f3f4f6; text-align: left; }
+      .muted { color: #6b7280; }
+    </style>
+  </head>
+  <body>
+    <h1>${escape(title)}</h1>
+    <p class="muted">Generated: ${new Date().toLocaleString('en-AU')}</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Pickup</th>
+          <th>Dietary</th>
+          <th>Medical</th>
+          <th>Emergency</th>
+          <th>Photo style</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows
+          .map(
+            (r) =>
+              `<tr>
+                <td><b>${escape(r.fullNamePassport || r.customerName)}</b><br/><span class="muted">${escape(r.bookingId)}</span></td>
+                <td>${escape(r.pickupDisplay)}</td>
+                <td>${escape(r.dietaryReq)}</td>
+                <td>${escape(r.medicalCondition)}</td>
+                <td>${escape(r.emergencyContact)}</td>
+                <td>${escape(r.photoStyle)}</td>
+              </tr>`
+          )
+          .join('')}
+      </tbody>
+    </table>
+  </body>
+  </html>`;
 }
 
 export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
-  const [data, setData] = useState<StaffDashboardData | null>(null);
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const [lang, setLang] = useState<Lang>(() => (localStorage.getItem('trip2talk_language') === 'EN' ? 'EN' : 'TH'));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [synced, setSynced] = useState(false);
-  const [dateStr, setDateStr] = useState('');
-  const [signedClientIds, setSignedClientIds] = useState<Set<string>>(new Set());
-  const [waiverSession, setWaiverSession] = useState<{
-    client: CRMClient;
-    tour: Tour;
-  } | null>(null);
-  const [checkedInIds, setCheckedInIds] = useState<Set<string>>(() => new Set());
+  const [bookings, setBookings] = useState<IntakeBooking[]>([]);
+  const [manifestBookings, setManifestBookings] = useState<PlatformBooking[]>([]);
+  const [manifestError, setManifestError] = useState<string | null>(null);
+  const [intakeTarget, setIntakeTarget] = useState<PlatformBooking | null>(null);
+
+  const assignedTourCode = (params.get('tourCode') || sessionStorage.getItem('t2t_staff_tourCode') || '').trim();
+  const assignedTripDate = (params.get('date') || sessionStorage.getItem('t2t_staff_tripDate') || '').trim();
+
+  const exit = () => {
+    sessionStorage.removeItem('trip2talk_role');
+    onLogout();
+    navigate('/', { replace: true });
+  };
 
   const load = useCallback(async () => {
+    const gasUrl = (import.meta.env.VITE_GAS_WEBAPP_URL as string | undefined)?.trim() || '';
+    if (!gasUrl) {
+      setError('Missing VITE_GAS_WEBAPP_URL');
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchStaffDashboardData();
-      setData(result);
-      setSynced(true);
-      setError(null);
+      const res = await fetch(`${gasUrl}?action=getBookings`, { method: 'GET', cache: 'no-store' });
+      const json = (await res.json()) as any;
+      const arr = json?.bookings ?? json?.data ?? [];
+      const normalized: IntakeBooking[] = (Array.isArray(arr) ? arr : [])
+        .map((r: any) => ({
+          bookingId: String(r.bookingId || '').trim(),
+          customerName: String(r.customerName || '').trim(),
+          tourCode: String(r.tourCode || '').trim(),
+          tourDate: String(r.tourDate || '').trim(),
+          intakeStatus: String(r.intakeStatus || '').trim() || 'Pending',
+          bookingStatus: String(r.bookingStatus || '').trim(),
+          // Requires GAS `readBookings_()` to include these columns for full functionality.
+          fullNamePassport: String(r.fullNamePassport || r['Full Name Passport'] || '').trim(),
+          dob: String(r.dob || r['DOB'] || '').trim(),
+          emergencyContact: String(r.emergencyContact || r['Emergency Contact'] || '').trim(),
+          dietaryReq: String(r.dietaryReq || r['Dietary Req'] || '').trim(),
+          medicalCondition: String(r.medicalCondition || r['Medical Condition'] || '').trim(),
+          motionSickness: String(r.motionSickness || r['Motion Sickness'] || '').trim(),
+          photoStyle: String(r.photoStyle || r['Photo Style'] || '').trim(),
+          pickupDisplay: String(r.pickupDisplay || '').trim(),
+        }))
+        .filter((b) => Boolean(b.bookingId));
 
-      const clientIds = [
-        ...new Set(
-          result.bookings
-            .map((b) => b.crm_clients?.id)
-            .filter((id): id is string => Boolean(id))
-        ),
-      ];
-
-      try {
-        const remoteSigned = await fetchSignedClientIds(clientIds);
-        const localWaivers = await getLocalWaiversByClientIds(clientIds);
-        const merged = new Set(remoteSigned);
-        localWaivers.forEach((w) => merged.add(w.client_id));
-        setSignedClientIds(merged);
-      } catch (waiverErr) {
-        console.warn('[Trip2Talk] Waiver status load failed:', waiverErr);
-        const localWaivers = await getLocalWaiversByClientIds(clientIds);
-        setSignedClientIds(new Set(localWaivers.map((w) => w.client_id)));
-      }
-    } catch (err) {
-      setData(null);
-      setSynced(false);
-      const msg = err instanceof Error ? err.message : 'CONNECTION LOST';
-      setError(msg);
-      console.error('[Trip2Talk] StaffDashboard sync failed:', err);
+      setBookings(normalized);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load');
+      setBookings([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    load();
+    void load();
   }, [load]);
 
-  useEffect(() => {
-    const update = () =>
-      setDateStr(
-        new Date().toLocaleDateString('en-AU', {
-          weekday: 'long',
-          day: '2-digit',
-          month: 'long',
-          year: 'numeric',
-        })
-      );
-    update();
-    const t = setInterval(update, 60_000);
-    return () => clearInterval(t);
+  const loadManifest = useCallback(async () => {
+    setManifestError(null);
+    try {
+      const rows = await fetchConfirmedBookings();
+      setManifestBookings(rows);
+    } catch (e) {
+      setManifestError(e instanceof Error ? e.message : 'Failed to load intake manifest');
+      setManifestBookings([]);
+    }
   }, []);
 
-  const activeBookings = useMemo(() => {
-    if (!synced || !data) return [];
-    return data.bookings.filter(
-      (b) => b.tours && ACTIVE_TOUR_STATUSES.includes(b.tours.status) && b.crm_clients
-    );
-  }, [synced, data]);
+  useEffect(() => {
+    void loadManifest();
+  }, [loadManifest]);
 
-  const pickupByTour = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        tour: Tour;
-        rows: Array<{
-          id: string;
-          client_name: string;
-          pickup_location: string | null;
-        }>;
+  const scoped = useMemo(() => {
+    let rows = bookings;
+    if (assignedTourCode) {
+      rows = rows.filter((b) => b.tourCode.toUpperCase() === assignedTourCode.toUpperCase());
+    }
+    if (assignedTripDate) {
+      rows = rows.filter((b) => (b.tourDate || '').slice(0, 10) === assignedTripDate.slice(0, 10));
+    }
+    return rows;
+  }, [bookings, assignedTourCode, assignedTripDate]);
+
+  const critical = useMemo(() => {
+    return scoped.filter((b) => Boolean(b.medicalCondition.trim()) || isSeafoodAllergy(b.dietaryReq));
+  }, [scoped]);
+
+  const dietaryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const b of scoped) {
+      for (const f of parseDietaryFlags(b.dietaryReq)) {
+        counts.set(f, (counts.get(f) ?? 0) + 1);
       }
-    >();
-    activeBookings.forEach((b) => {
-      const tour = b.tours!;
-      const client = b.crm_clients!;
-      const pickup =
-        (b as { pickup_location?: string | null; preferred_pickup?: string | null }).pickup_location ??
-        (b as { preferred_pickup?: string | null }).preferred_pickup ??
-        null;
-      const entry = map.get(tour.id) ?? {
-        tour,
-        rows: [],
-      };
-      entry.rows.push({
-        id: b.id,
-        client_name: clientLabel(client),
-        pickup_location: pickup,
-      });
-      map.set(tour.id, entry);
-    });
-    return Array.from(map.values());
-  }, [activeBookings]);
+    }
+    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  }, [scoped]);
 
-  const { criticalAlerts, warningAlerts } = useMemo(() => {
-    const critical: CriticalAlert[] = [];
-    const warning: WarningAlert[] = [];
+  const motionCount = useMemo(() => {
+    return scoped.filter((b) => String(b.motionSickness || '').toLowerCase() === 'yes').length;
+  }, [scoped]);
 
-    activeBookings.forEach((b) => {
-      const client = b.crm_clients!;
-      const tour = b.tours!;
-      const name = clientLabel(client);
-      const oshc = validateOSHC(client, tour);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const expiry = new Date(client.oshc_expiry);
-
-      if (expiry < today) {
-        critical.push({
-          id: `exp-${client.id}`,
-          clientName: name,
-          detail: `OSHC expired ${client.oshc_expiry}`,
-        });
-      } else if (!oshc.is_valid) {
-        critical.push({
-          id: `pre-${client.id}`,
-          clientName: name,
-          detail: oshc.warnings.join(' · '),
-        });
-      }
-
-      if (client.medical_conditions.trim()) {
-        warning.push({
-          id: `med-${client.id}`,
-          clientName: name,
-          detail: client.medical_conditions,
-          type: 'medical',
-        });
-      }
-      if (client.dietary_requirements.trim() && client.dietary_requirements.toLowerCase() !== 'none') {
-        warning.push({
-          id: `diet-${client.id}`,
-          clientName: name,
-          detail: client.dietary_requirements,
-          type: 'dietary',
-        });
-      }
-    });
-
-    return { criticalAlerts: critical, warningAlerts: warning };
-  }, [activeBookings]);
+  const downloadManifest = () => {
+    const title = `${assignedTourCode || 'Trip'} Manifest`;
+    const html = printableHtml(title, scoped);
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+  };
 
   if (loading) {
     return (
-      <CyberViewport className="flex items-center justify-center p-6">
-        <p className="text-amber-400 cyber-sync-dots">
-          SYNCING DATABASE
-          <span>.</span>
-          <span>.</span>
-          <span>.</span>
-        </p>
-      </CyberViewport>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: NAVY, color: 'white' }}>
+        <div className="w-10 h-10 border-4 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+      </div>
     );
   }
 
-  const handleWaiverComplete = (_waiver: WaiverData) => {
-    if (waiverSession) {
-      setSignedClientIds((prev) => new Set(prev).add(waiverSession.client.id));
-    }
-    setWaiverSession(null);
-    load();
-  };
-
   return (
-    <CyberViewport className="p-6">
-      {waiverSession && (
-        <WaiverModule
-          client={waiverSession.client}
-          tour={waiverSession.tour}
-          onComplete={handleWaiverComplete}
-          onCancel={() => setWaiverSession(null)}
-        />
-      )}
-      <div className="max-w-6xl mx-auto space-y-6">
-        <header className="flex flex-wrap justify-between items-start gap-4">
-          <div>
-            <h1 className="text-amber-400 font-semibold text-[22px] tracking-wide font-sans">STAFF OPERATIONS</h1>
-            <p className="font-mono text-sm text-neutral-500 mt-1 tracking-wide">{dateStr}</p>
+    <div className="min-h-screen" style={{ background: NAVY, color: 'white' }}>
+      <header className="sticky top-0 z-40 border-b border-white/10" style={{ background: 'rgba(13,27,42,0.92)' }}>
+        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold tracking-[0.28em]" style={{ color: GOLD }}>
+              STAFF DASHBOARD
+            </p>
+            <p className="text-xs font-mono text-white/70 truncate">
+              {assignedTourCode ? `Trip: ${assignedTourCode}` : 'Trip: (not set)'}
+              {assignedTripDate ? ` • Date: ${assignedTripDate}` : ''}
+            </p>
           </div>
-          <button type="button" onClick={onLogout} className="cyber-btn-exit">
-            [ EXIT ]
-          </button>
-        </header>
-
-        {error && (
-          <div className="cyber-card p-4 flex flex-wrap justify-between items-center gap-3 border-red-500/30">
-            <span className="font-sans text-sm font-medium text-red-400 tracking-wide">CONNECTION LOST — {error}</span>
-            <button type="button" onClick={load} className="cyber-btn-ghost">
-              RETRY SYNC
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setLang((p) => (p === 'TH' ? 'EN' : 'TH'))}
+              className="px-3 py-2 rounded-full text-xs font-semibold border border-white/15 bg-white/5 hover:bg-white/10"
+            >
+              {lang === 'TH' ? 'EN' : 'ไทย'}
+            </button>
+            <button
+              type="button"
+              onClick={exit}
+              className="px-3 py-2 rounded-full text-xs font-semibold border border-white/15 bg-white/5 hover:bg-white/10"
+            >
+              EXIT
             </button>
           </div>
-        )}
+        </div>
+      </header>
 
-        {!synced ? (
-          <AwaitingSync />
-        ) : (
-        <>
-        <section className="space-y-3">
-          <h2 className="cyber-section-header text-red-400 tracking-wide uppercase">
-            Critical Safety Briefing
-          </h2>
-          {criticalAlerts.length === 0 ? (
-            <div className="cyber-card p-4 cyber-table-td text-neutral-500 text-sm">NO CRITICAL ALERTS</div>
-          ) : (
-            criticalAlerts.map((a) => (
-              <div
-                key={a.id}
-                className="cyber-card cyber-alert-critical p-4 flex gap-3 items-start"
-              >
-                <IconAlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="cyber-alert-text font-semibold text-red-400">{a.clientName}</p>
-                  <p className="cyber-alert-text text-neutral-400 mt-1">{a.detail}</p>
-                </div>
-              </div>
-            ))
-          )}
-        </section>
+      <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+        {error && <div className="rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-200">{error}</div>}
 
         <section className="space-y-3">
-          <h2 className="cyber-section-header tracking-wide uppercase" style={{ color: 'var(--neon-orange)' }}>
-            Warnings — Medical & Dietary
+          <h2 className="text-sm font-semibold tracking-wide" style={{ color: GOLD }}>
+            {lang === 'TH' ? 'Critical Safety Briefing' : 'Critical Safety Briefing'}
           </h2>
-          {warningAlerts.length === 0 ? (
-            <div className="cyber-card p-4 cyber-table-td text-neutral-500 text-sm">NO WARNINGS</div>
+          {critical.length === 0 ? (
+            <div className="rounded-2xl border border-emerald-400/25 bg-emerald-500/10 p-4 text-sm text-emerald-100">
+              ✅ {lang === 'TH' ? 'ไม่มีเคสเสี่ยงด้านสุขภาพสำหรับทริปนี้' : 'No medical alerts for this trip'}
+            </div>
           ) : (
-            warningAlerts.map((a) => (
-              <div
-                key={a.id}
-                className="cyber-card cyber-alert-warning p-4 flex gap-3 items-start"
-              >
-                <IconFirstAid className="w-5 h-5 text-orange-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="cyber-alert-text font-semibold text-orange-400">{a.clientName}</p>
-                  <p className="font-sans text-sm text-neutral-500 uppercase tracking-wide mt-0.5">
-                    {a.type === 'medical' ? 'Medical' : 'Dietary'}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {critical.map((b) => (
+                <div key={b.bookingId} className="rounded-2xl border border-red-400/25 bg-red-500/10 p-4">
+                  <p className="font-semibold text-red-100">
+                    {b.fullNamePassport || b.customerName}{' '}
+                    <span className="text-xs font-mono text-white/50">({b.bookingId})</span>
                   </p>
-                  <p className="cyber-alert-text text-neutral-400 mt-1">{a.detail}</p>
+                  {b.medicalCondition.trim() && (
+                    <p className="text-sm text-white/80 mt-2">
+                      <span className="font-semibold text-red-200">Medical:</span> {b.medicalCondition}
+                    </p>
+                  )}
+                  {isSeafoodAllergy(b.dietaryReq) && (
+                    <p className="text-sm text-white/80 mt-2">
+                      <span className="font-semibold text-red-200">Dietary:</span> 🦐 Seafood allergy
+                    </p>
+                  )}
+                  {b.emergencyContact.trim() && (
+                    <p className="text-sm text-white/80 mt-2">
+                      <span className="font-semibold text-red-200">Emergency:</span> {b.emergencyContact}
+                    </p>
+                  )}
                 </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </section>
 
         <section className="space-y-3">
-          <h2 className="cyber-section-header text-amber-400 tracking-wide">TRIP PICKUP QUEUE</h2>
-          {pickupByTour.length === 0 ? (
-            <div className="cyber-card p-4 cyber-table-td text-neutral-500 text-sm">NO ACTIVE PICKUPS</div>
-          ) : (
-            pickupByTour.map(({ tour, rows }) => (
-              <div key={tour.id} className="cyber-card p-4">
-                <p className="font-mono text-sm text-amber-400/90">{tour.trip_code}</p>
-                <p className="cyber-table-td text-sm text-neutral-400 mb-2">{tour.destination}</p>
-                <div className="mt-2 text-xs space-y-1">
-                  {rows.map((b) => (
-                    <div
-                      key={b.id}
-                      className="flex flex-wrap items-center gap-2 text-[rgba(255,255,255,0.6)]"
-                    >
-                      <span>{pickupEmoji(b.pickup_location)}</span>
-                      <span>{b.client_name}</span>
-                      <span className="opacity-50">—</span>
-                      <span>{pickupShortLabel(b.pickup_location)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-        </section>
-
-        <div className="cyber-card overflow-hidden">
-          <div className="p-4 border-b border-white/5">
-            <h2 className="cyber-section-header text-amber-400 tracking-wide">TOUR MANIFEST</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold tracking-wide" style={{ color: GOLD }}>
+              {lang === 'TH' ? 'Intake Manifest' : 'Intake Manifest'}
+            </h2>
+            <button
+              type="button"
+              onClick={() => void loadManifest()}
+              className="text-xs font-mono text-white/70 hover:text-white"
+            >
+              {lang === 'TH' ? 'รีเฟรช' : 'Refresh'}
+            </button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-white/5">
-                  <th className="p-3 cyber-table-th text-neutral-500 tracking-wide">NAME</th>
-                  <th className="p-3 cyber-table-th text-neutral-500 tracking-wide">PASSPORT</th>
-                  <th className="p-3 cyber-table-th text-neutral-500 tracking-wide">VISA</th>
-                  <th className="p-3 cyber-table-th text-neutral-500 tracking-wide">OSHC</th>
-                  <th className="p-3 cyber-table-th text-neutral-500 tracking-wide">MEDICAL</th>
-                  <th className="p-3 cyber-table-th text-neutral-500 tracking-wide">TIER</th>
-                  <th className="p-3 cyber-table-th text-neutral-500 tracking-wide">PICKUP</th>
-                  <th className="p-3 cyber-table-th text-neutral-500 tracking-wide">WAIVER</th>
-                  <th className="p-3 cyber-table-th text-neutral-500 tracking-wide">CHECK-IN</th>
+          {manifestError && (
+            <div className="rounded-2xl border border-amber-400/25 bg-amber-500/10 p-4 text-sm text-amber-100">
+              {manifestError}
+            </div>
+          )}
+          <div className="rounded-2xl border border-white/10 bg-white/5 overflow-x-auto">
+            <table className="min-w-[820px] w-full text-left">
+              <thead className="text-[11px] uppercase tracking-wider text-white/60">
+                <tr className="border-b border-white/10">
+                  <th className="p-3">Booking ID</th>
+                  <th className="p-3">Client Name</th>
+                  <th className="p-3">Trip</th>
+                  <th className="p-3">Departure Date</th>
+                  <th className="p-3">Intake Status</th>
                 </tr>
               </thead>
-              <tbody>
-                {activeBookings.length === 0 ? (
+              <tbody className="text-sm">
+                {manifestBookings.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-4 cyber-table-td text-neutral-500 text-sm text-center">
-                      NO MANIFEST ENTRIES
+                    <td className="p-4 text-white/60" colSpan={5}>
+                      {lang === 'TH' ? 'ไม่มีการจองที่ยืนยันแล้ว' : 'No confirmed bookings in Supabase'}
                     </td>
                   </tr>
                 ) : (
-                  activeBookings.map((b: BookingWithRelations) => {
-                    const c = b.crm_clients!;
-                    const t = b.tours!;
-                    const oshc = oshcStatusLabel(c, t);
-                    const pickupLocation = (b as unknown as { pickup_location?: string | null; preferred_pickup?: string | null })
-                      .pickup_location ?? (b as unknown as { preferred_pickup?: string | null }).preferred_pickup;
+                  manifestBookings.map((b) => {
+                    const bookingRef = b.external_id || b.id;
+                    const intakeComplete = b.intake_status === 'complete';
                     return (
-                      <tr key={b.id} className="cyber-table-row border-b border-white/5">
-                        <td className="p-3">
-                          <p className="cyber-table-td font-medium">
-                            {c.first_name_en} {c.last_name_en}
-                          </p>
-                          <p className="font-sans text-sm text-neutral-500">
-                            {c.first_name_th} {c.last_name_th}
-                          </p>
-                          <p className="font-mono text-sm text-amber-500/70 mt-0.5">{t.trip_code}</p>
+                      <tr key={b.id} className="border-b border-white/5">
+                        <td className="p-3 font-mono text-xs" style={{ color: TEAL }}>
+                          {bookingRef}
                         </td>
-                        <td className="p-3 cyber-table-td font-mono">{c.passport_number}</td>
+                        <td className="p-3">{b.client_name}</td>
+                        <td className="p-3">{b.trip_name || b.trip_id || '—'}</td>
+                        <td className="p-3 font-mono text-xs text-white/70">{b.departure_date || '—'}</td>
                         <td className="p-3">
-                          <VisaBadge status={c.visa_status} />
-                        </td>
-                        <td className="p-3">
-                          <span
-                            className={`font-mono text-sm ${
-                              oshc.tone === 'crit'
-                                ? 'text-red-400'
-                                : oshc.tone === 'warn'
-                                  ? 'text-orange-400'
-                                  : 'text-emerald-400'
+                          <button
+                            type="button"
+                            onClick={() => setIntakeTarget(b)}
+                            className={`inline-flex items-center px-2 py-1 rounded-full border text-xs font-semibold ${
+                              intakeComplete
+                                ? 'bg-emerald-500/15 text-emerald-200 border-emerald-400/25'
+                                : 'bg-amber-500/15 text-amber-200 border-amber-400/25'
                             }`}
                           >
-                            {oshc.text}
-                          </span>
+                            {intakeComplete ? 'complete' : 'pending'}
+                          </button>
                         </td>
-                        <td className="p-3 cyber-table-td text-sm text-neutral-400 max-w-[140px]">
-                          {c.medical_conditions || '—'}
-                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold tracking-wide" style={{ color: GOLD }}>
+            {lang === 'TH' ? 'Warnings Summary' : 'Warnings Summary'}
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-xs text-white/60">Dietary counts</p>
+              {dietaryCounts.length === 0 ? (
+                <p className="text-sm mt-2 text-white/70">—</p>
+              ) : (
+                <ul className="mt-2 space-y-1 text-sm">
+                  {dietaryCounts.map(([k, n]) => (
+                    <li key={k} className="text-white/80">
+                      {n} × {k.replaceAll('_', ' ')}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-xs text-white/60">Motion sickness</p>
+              <p className="text-sm mt-2 text-white/80">
+                {motionCount > 0 ? `${motionCount} person — assign front seat` : lang === 'TH' ? 'ไม่มี' : 'None'}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-xs text-white/60">Manifest size</p>
+              <p className="text-sm mt-2 text-white/80">{scoped.length} bookings</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold tracking-wide" style={{ color: GOLD }}>
+              {lang === 'TH' ? 'Tour Manifest' : 'Tour Manifest'}
+            </h2>
+            <button
+              type="button"
+              onClick={downloadManifest}
+              className="px-4 py-2 rounded-full text-xs font-semibold border"
+              style={{ borderColor: TEAL, color: NAVY, background: TEAL }}
+            >
+              📄 DOWNLOAD MANIFEST
+            </button>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 overflow-x-auto">
+            <table className="min-w-[980px] w-full text-left">
+              <thead className="text-[11px] uppercase tracking-wider text-white/60">
+                <tr className="border-b border-white/10">
+                  <th className="p-3">Name</th>
+                  <th className="p-3">Icons</th>
+                  <th className="p-3">Photo Style</th>
+                  <th className="p-3">Motion</th>
+                  <th className="p-3">Birthday</th>
+                  <th className="p-3">Emergency</th>
+                </tr>
+              </thead>
+              <tbody className="text-sm">
+                {scoped.length === 0 ? (
+                  <tr>
+                    <td className="p-4 text-white/60" colSpan={6}>
+                      {lang === 'TH' ? 'ไม่มีข้อมูลสำหรับทริปนี้' : 'No bookings for this trip'}
+                    </td>
+                  </tr>
+                ) : (
+                  scoped.map((b) => {
+                    const dietary = parseDietaryFlags(b.dietaryReq);
+                    const hasMed = Boolean(b.medicalCondition.trim());
+                    const icons = [...dietary.map(dietaryBadge), ...(hasMed ? ['💊'] : [])].join(' ');
+                    const showCake = isBirthdayOnTrip(b.dob, b.tourDate);
+                    return (
+                      <tr key={b.bookingId} className="border-b border-white/5">
                         <td className="p-3">
-                          <TierBadge tier={c.client_tier} />
+                          <p className="font-semibold text-white/90">{b.fullNamePassport || b.customerName}</p>
+                          <p className="text-xs font-mono text-white/50">{b.bookingId}</p>
                         </td>
-                        <td className="p-3 cyber-table-td text-sm text-neutral-300" title={pickupShortLabel(pickupLocation)}>
-                          {pickupEmoji(pickupLocation)}
+                        <td className="p-3 text-white/80">{icons || '—'}</td>
+                        <td className="p-3 text-white/80">
+                          {photoEmoji(b.photoStyle)} <span className="text-xs">{b.photoStyle || '—'}</span>
                         </td>
-                        <td className="p-3">
-                          {signedClientIds.has(c.id) ? (
-                            <span className="font-mono text-xs text-emerald-400 font-semibold tracking-wide">
-                              ✓ SIGNED
-                            </span>
+                        <td className="p-3 text-white/80">
+                          {String(b.motionSickness || '').toLowerCase() === 'yes' ? 'YES' : '—'}
+                        </td>
+                        <td className="p-3 text-white/80">{showCake ? '🎂' : '—'}</td>
+                        <td className="p-3 text-white/80">
+                          {b.emergencyContact ? (
+                            <details>
+                              <summary className="cursor-pointer select-none">📞</summary>
+                              <p className="text-xs mt-1 text-white/80">{b.emergencyContact}</p>
+                            </details>
                           ) : (
-                            <button
-                              type="button"
-                              onClick={() => setWaiverSession({ client: c, tour: t })}
-                              className="px-3 py-1.5 rounded-lg font-mono text-xs font-semibold bg-amber-500 text-neutral-950 hover:bg-amber-400 transition-colors"
-                            >
-                              SIGN WAIVER
-                            </button>
-                          )}
-                        </td>
-                        <td className="p-3">
-                          {checkedInIds.has(b.id) ? (
-                            <span className="font-mono text-xs text-emerald-400">✓ IN</span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setCheckedInIds((prev) => {
-                                  const next = new Set(prev);
-                                  next.add(b.id);
-                                  return next;
-                                })
-                              }
-                              className="px-3 py-1.5 rounded-lg font-mono text-xs font-semibold border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
-                            >
-                              CHECK IN
-                            </button>
+                            '—'
                           )}
                         </td>
                       </tr>
@@ -445,10 +496,29 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
               </tbody>
             </table>
           </div>
-        </div>
-        </>
-        )}
-      </div>
-    </CyberViewport>
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <p className="text-sm text-white/70">
+            {lang === 'TH'
+              ? 'PSO Brief + Trip Status Pipeline จะเปิดใช้หลัง sync Supabase'
+              : 'PSO Brief + Trip Status Pipeline will be enabled after Supabase sync.'}
+          </p>
+        </section>
+      </main>
+
+      {intakeTarget && (
+        <IntakeFormModal
+          bookingId={intakeTarget.external_id || intakeTarget.id}
+          tourCode={intakeTarget.trip_id || ''}
+          language={lang}
+          defaultFullName={intakeTarget.client_name}
+          onComplete={() => {
+            setIntakeTarget(null);
+            void loadManifest();
+          }}
+        />
+      )}
+    </div>
   );
 }

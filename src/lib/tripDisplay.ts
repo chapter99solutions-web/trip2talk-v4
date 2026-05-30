@@ -1,4 +1,5 @@
 import type { TripSheetRow } from './tripsSheetApi';
+import type { TripSeason } from './masterTrips';
 
 export type TripDatePill = {
   id: string;
@@ -45,25 +46,61 @@ export function countryFlagEmoji(countryTag: string): string {
   return '🌏';
 }
 
-export function tripRegionBadge(countryTag: string, tourName: string): string {
-  const tag = (countryTag || '').trim();
-  let region = tag;
-  if (tag.includes('·')) region = tag.split('·').pop()?.trim() || tag;
-  else if (tag.includes('—')) region = tag.split('—')[0]?.trim() || tag;
-  else if (tag.includes('-')) region = tag.split('-')[0]?.trim() || tag;
-  if (!region) region = tourName.split(' ')[0] || 'Trip2Talk';
-  return `${countryFlagEmoji(tag)} ${region.toUpperCase()}`;
+/** Anonymized region — no city or landmark names. */
+export function tripRegionBadge(countryTag: string): string {
+  const tag = (countryTag || '').trim().toUpperCase();
+  if (tag.startsWith('NZ')) return `${countryFlagEmoji(tag)} New Zealand`;
+  if (tag.includes('VIC')) return `${countryFlagEmoji(tag)} Australia · South`;
+  if (tag.includes('NT')) return `${countryFlagEmoji(tag)} Australia · Outback`;
+  if (tag.includes('TAS')) return `${countryFlagEmoji(tag)} Australia · Island`;
+  if (tag.includes('NSW')) return `${countryFlagEmoji(tag)} Australia · East`;
+  if (tag.includes('AU')) return `${countryFlagEmoji(tag)} Australia`;
+  return `${countryFlagEmoji(tag)} Trip2Talk`;
+}
+
+export function tripDurationBadge(days: number, tripType?: string): string {
+  const d = Math.max(1, days || 1);
+  if (tripType === 'one_day' || d === 1) return '1 Day';
+  if (d === 2) return '2D1N';
+  if (d === 3) return '3D2N';
+  if (d === 4) return '4D3N';
+  if (d === 6) return '6D5N';
+  return `${d}D${d - 1}N`;
 }
 
 export function tripDurationLabel(days: number): string {
-  const d = Math.max(1, days || 1);
-  return `${d} day${d === 1 ? '' : 's'}`;
+  return tripDurationBadge(days);
+}
+
+export function tripSeasonBadge(season: TripSeason | '' | undefined): string {
+  switch (season) {
+    case 'autumn':
+      return '🍂 Autumn';
+    case 'winter':
+      return '❄️ Winter';
+    case 'spring':
+      return '🌸 Spring';
+    case 'summer':
+      return '☀️ Summer';
+    case 'all':
+    default:
+      return '🗓️ All Year';
+  }
+}
+
+export function tripMaxPaxLabel(tour: TripSheetRow): string {
+  const max = tour.maxPax ?? tour.slotsMax ?? 5;
+  return `max ${max} pax`;
+}
+
+export function tripPriceFromLabel(tour: TripSheetRow): string {
+  const price = tour.priceStandardAud ?? tour.basePriceAud;
+  if (price == null) return '';
+  return `from $${price.toLocaleString('en-AU')} AUD/person`;
 }
 
 export function tripCapacityLabel(tour: TripSheetRow): string {
-  const max = tour.slotsMax ?? 5;
-  const booked = tour.slotsBooked ?? Math.min(max - 1, 4);
-  return `${booked}/${max} People`;
+  return tripMaxPaxLabel(tour);
 }
 
 export function buildTripDatePills(trips: TripSheetRow[]): TripDatePill[] {

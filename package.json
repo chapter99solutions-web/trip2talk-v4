@@ -8,7 +8,10 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "supabase:bootstrap": "powershell -ExecutionPolicy Bypass -File scripts/supabase-bootstrap.ps1",
-    "vercel:prod": "npx vercel@latest --prod --yes"
+    "vercel:prod": "npx vercel@latest --prod --yes",
+    "seed:trips": "node scripts/seed-trips.mjs",
+    "seed:booking": "node scripts/seed-test-booking.mjs",
+    "seed:supabase-bookings": "node scripts/seed-supabase-bookings.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.1",

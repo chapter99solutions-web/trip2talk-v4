@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import WeatherPill from '../components/shared/WeatherPill';
 import ItineraryTimeline from '../components/client/ItineraryTimeline';
+import IntakeFormModal from '../components/IntakeFormModal';
+import PackingAssistant from '../components/PackingAssistant';
+import { useBookingStatus } from '../hooks/useBookingStatus';
+import { useI18n } from '../lib/i18n';
 import {
   ActiveTripHomeScreen,
   PassConsentScreen,
@@ -10,13 +14,19 @@ import {
 } from '../components/dashboard/SoftDashboardScreens';
 import { fetchCityWeather } from '../lib/weather';
 import {
+  CustomerBookingRow,
   fetchCustomerBookingByBookingIdOrPhone,
+  fetchCustomerBookingsFromSheet,
   fetchTripByCodeFromSheet,
+  fetchBookingStatusFromSheet,
+  isClientIntakeComplete,
   logConsentToSheet,
+  markClientIntakeComplete,
+  updateBookingCheckedIn,
   TripSheetRow,
 } from '../lib/tripsSheetApi';
 
-type TabId = 'home' | 'pass' | 'itinerary' | 'profile';
+type TabId = 'home' | 'pass' | 'itinerary' | 'packing' | 'profile';
 
 type Session = {
   query: string;
@@ -51,32 +61,44 @@ function PrimaryButton({ children, onClick }: { children: React.ReactNode; onCli
   );
 }
 
-function PortalNav({ tab, onChange }: { tab: TabId; onChange: (t: TabId) => void }) {
-  const items: Array<{ id: TabId; label: string; icon: string }> = [
-    { id: 'home', label: 'Home', icon: '🏠' },
-    { id: 'pass', label: 'Pass', icon: '🎟️' },
-    { id: 'itinerary', label: 'Trip', icon: '🗺️' },
-    { id: 'profile', label: 'Profile', icon: '👤' },
+function PortalNav({
+  tab,
+  onChange,
+  language,
+}: {
+  tab: TabId;
+  onChange: (t: TabId) => void;
+  language: 'TH' | 'EN';
+}) {
+  const items: Array<{ id: TabId; labelTh: string; labelEn: string; icon: string }> = [
+    { id: 'home', labelTh: 'หน้าแรก', labelEn: 'Home', icon: '🏠' },
+    { id: 'pass', labelTh: 'พาส', labelEn: 'Pass', icon: '🎟️' },
+    { id: 'itinerary', labelTh: 'ทริป', labelEn: 'Trip', icon: '🗺️' },
+    { id: 'packing', labelTh: 'แพ็กกระเป๋า', labelEn: 'Packing', icon: '🧳' },
+    { id: 'profile', labelTh: 'โปรไฟล์', labelEn: 'Profile', icon: '👤' },
   ];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/92 backdrop-blur border-t border-sage-100">
-      <div className="max-w-md mx-auto px-4 h-16 flex items-center justify-between">
+      <div className="max-w-md mx-auto px-2 h-16 flex items-center justify-between">
         {items.map((it) => {
           const active = it.id === tab;
+          const label = language === 'TH' ? it.labelTh : it.labelEn;
           return (
             <button
               key={it.id}
               type="button"
               onClick={() => onChange(it.id)}
-              className="flex flex-col items-center justify-center gap-1 w-16"
+              className="flex flex-1 flex-col items-center justify-center gap-0.5 min-w-0 px-0.5"
               aria-current={active ? 'page' : undefined}
             >
-              <span className={`text-lg leading-none ${active ? 'text-[#1C1C1E]' : 'text-[#9A9A9A]'}`} aria-hidden>
+              <span className={`text-base leading-none ${active ? 'text-[#1C1C1E]' : 'text-[#9A9A9A]'}`} aria-hidden>
                 {it.icon}
               </span>
-              <span className={`text-[10px] font-semibold ${active ? 'text-[#1C1C1E]' : 'text-[#9A9A9A]'}`}>
-                {it.label}
+              <span
+                className={`text-[9px] font-semibold leading-tight text-center truncate max-w-full ${active ? 'text-[#1C1C1E]' : 'text-[#9A9A9A]'}`}
+              >
+                {label}
               </span>
             </button>
           );
@@ -226,15 +248,46 @@ function SwipeCheckIn({ onChecked, disabled }: { onChecked: () => Promise<void>;
 
 export default function ClientPortal() {
   const location = useLocation();
+  const { lang } = useI18n();
   const [tab, setTab] = useState<TabId>('home');
   const [query, setQuery] = useState('');
   const [session, setSession] = useState<Session | null>(null);
+  const [booking, setBooking] = useState<CustomerBookingRow | null>(null);
   const [trip, setTrip] = useState<TripSheetRow | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [weather, setWeather] = useState<{ tempC: number; condition: 'sunny' | 'cloudy' | 'rainy'; city: string } | null>(null);
+  const [intakeDone, setIntakeDone] = useState(false);
+  const [showIntake, setShowIntake] = useState(false);
 
   const uiPreview = useMemo(() => new URLSearchParams(location.search).get('ui') === '1', [location.search]);
+
+  const urlBookingId = useMemo(() => {
+    if (session) return null;
+    return new URLSearchParams(location.search).get('booking')?.trim() || null;
+  }, [location.search, session]);
+
+  const { status: urlStatus, booking: urlBooking } = useBookingStatus(urlBookingId);
+
+  useEffect(() => {
+    if (!session?.bookingId) return;
+    const localDone = isClientIntakeComplete(session.bookingId);
+    setIntakeDone(localDone);
+    void fetchBookingStatusFromSheet(session.bookingId).then((status) => {
+      if (!status) return;
+      const done = status.intakeStatus === 'Completed' || status.intakeStatus === 'completed';
+      if (done) {
+        markClientIntakeComplete(session.bookingId);
+        setIntakeDone(true);
+      }
+    });
+  }, [session?.bookingId]);
+
+  useEffect(() => {
+    if (tab === 'pass' && session && !intakeDone) {
+      setShowIntake(true);
+    }
+  }, [tab, session, intakeDone]);
 
   const highlights = useMemo(() => buildHighlights(trip), [trip]);
 
@@ -273,6 +326,11 @@ export default function ClientPortal() {
       departureEnd: '2026-05-15',
       slotsBooked: 8,
       slotsMax: 10,
+      tripType: 'overnight',
+      season: 'autumn',
+      highlights: 'Coastal lookouts, forest trails',
+      pickupType: 'airport_terminal',
+      maxPax: 10,
     };
 
     const previewSession: Session = {
@@ -355,7 +413,9 @@ export default function ClientPortal() {
               },
             ]}
           />
-        ) : (
+        ) : tab === 'packing' ? (
+          <PackingAssistant tourCode="NZ-6D5N" language={lang} storageKey="preview" />
+        ) : tab === 'pass' ? (
           <PassConsentScreen
             bookingId={previewSession.bookingId}
             tripName={previewTrip.tourName}
@@ -364,9 +424,9 @@ export default function ClientPortal() {
             emergencyName="Ploy (Trip Staff)"
             emergencyPhone="+61 4XX XXX XXX"
           />
-        )}
+        ) : null}
 
-        <PortalNav tab={tab} onChange={setTab} />
+        <PortalNav tab={tab} onChange={setTab} language={lang} />
       </div>
     );
   }
@@ -381,6 +441,26 @@ export default function ClientPortal() {
       // ignore
     }
   }, []);
+
+  useEffect(() => {
+    if (!session) {
+      setBooking(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const all = await fetchCustomerBookingsFromSheet();
+        const match = all.find((b) => b.bookingId.toLowerCase() === session.bookingId.toLowerCase());
+        if (!cancelled) setBooking(match ?? null);
+      } catch {
+        if (!cancelled) setBooking(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
 
   useEffect(() => {
     if (!session) return;
@@ -406,17 +486,20 @@ export default function ClientPortal() {
     };
   }, [session]);
 
-  const login = async () => {
+  const enterPortal = async (bookingIdOrQuery: string) => {
+    const id = bookingIdOrQuery.trim();
+    if (!id) return;
     setLoading(true);
     setError(null);
     try {
-      const match = await fetchCustomerBookingByBookingIdOrPhone(query);
+      const match = await fetchCustomerBookingByBookingIdOrPhone(id);
       if (!match) {
         setError('Booking not found. Please check your Booking ID / phone number.');
         return;
       }
+      setBooking(match);
       const next: Session = {
-        query,
+        query: id,
         bookingId: match.bookingId,
         customerName: match.customerName || 'friend',
         tourCode: match.tourCode,
@@ -431,8 +514,19 @@ export default function ClientPortal() {
     }
   };
 
+  const login = () => void enterPortal(query);
+
+  useEffect(() => {
+    if (!urlBooking || session) return;
+    setQuery(urlBooking.bookingId);
+    if (urlBooking.intakeStatus === 'Completed') {
+      void enterPortal(urlBooking.bookingId);
+    }
+  }, [urlBooking, session]);
+
   const logout = () => {
     setSession(null);
+    setBooking(null);
     setTrip(null);
     setWeather(null);
     setQuery('');
@@ -442,19 +536,83 @@ export default function ClientPortal() {
 
   const onCheckIn = async () => {
     if (!session) return;
-    await logConsentToSheet({
-      timestampIso: new Date().toISOString(),
-      bookingId: session.bookingId,
-      customerName: session.customerName,
-      tourCode: session.tourCode,
-      consentStatus: 'CHECKED_IN',
-    });
+    await Promise.all([
+      logConsentToSheet({
+        timestampIso: new Date().toISOString(),
+        bookingId: session.bookingId,
+        customerName: session.customerName,
+        tourCode: session.tourCode,
+        consentStatus: 'CHECKED_IN',
+      }),
+      updateBookingCheckedIn(session.bookingId),
+    ]);
   };
+
+  const showUrlIntake =
+    !session &&
+    urlBooking &&
+    urlBooking.intakeStatus === 'Pending' &&
+    !intakeDone &&
+    !isClientIntakeComplete(urlBooking.bookingId);
 
   // Unauthed view
   if (!session) {
+    if (urlBookingId && urlStatus === 'loading') {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-sage-50">
+          <div className="text-center px-4">
+            <div className="w-10 h-10 border-4 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-[#6B6B6B] text-sm">
+              {lang === 'TH' ? 'กำลังโหลดการจองของคุณ…' : 'Loading your booking...'}
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    if (urlBookingId && urlStatus === 'not_found') {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-sage-50 px-4">
+          <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-sm border border-sage-100">
+            <span className="text-5xl mb-4 block" aria-hidden>
+              🔍
+            </span>
+            <h2 className="font-bold text-[#1C1C1E] text-lg mb-2">
+              {lang === 'TH' ? 'ไม่พบการจอง' : 'Booking Not Found'}
+            </h2>
+            <p className="text-sm text-[#6B6B6B] leading-relaxed">
+              {lang === 'TH'
+                ? 'กรุณาตรวจสอบ Booking ID หรือติดต่อพี่แสนผ่าน Messenger'
+                : "Please check your Booking ID or contact P'Saen via Messenger."}
+            </p>
+            <Link
+              to="/"
+              className="mt-4 inline-block text-sm font-semibold text-teal-700 hover:underline"
+            >
+              {lang === 'TH' ? 'กลับหน้าแรก' : 'Back to home'}
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-sage-50 text-[#1C1C1E] font-sans antialiased pb-20">
+        {showUrlIntake && urlBooking && (
+          <IntakeFormModal
+            dismissible={false}
+            bookingId={urlBooking.bookingId}
+            tourCode={urlBooking.tourCode}
+            language={lang}
+            defaultFullName={urlBooking.customerName}
+            onComplete={() => {
+              markClientIntakeComplete(urlBooking.bookingId);
+              setIntakeDone(true);
+              void enterPortal(urlBooking.bookingId);
+            }}
+          />
+        )}
+
         <header className="sticky top-0 z-40 bg-sage-50/95 backdrop-blur border-b border-sage-100">
           <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
             <Link to="/" className="font-serif text-lg font-semibold">
@@ -466,44 +624,75 @@ export default function ClientPortal() {
           </div>
         </header>
 
-        <main className="max-w-md mx-auto px-4 pt-8 space-y-5">
-          <h1 className="font-serif text-3xl font-semibold tracking-tight">Client Portal</h1>
-          <p className="text-sm text-[#6B6B6B] leading-relaxed">
-            Enter your <span className="font-semibold">Booking ID</span> or <span className="font-semibold">Phone Number</span> to access your trip.
-          </p>
-
-          <SoftCard>
-            <div className="p-5 space-y-3">
-              <label className="text-xs font-semibold text-[#6B6B6B]">Booking ID / Phone</label>
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="e.g. BK-12345 or +614XXXXXXXX"
-                className="w-full rounded-2xl border border-sage-100 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-sage-200"
-              />
-              {error && <p className="text-sm text-rose-700">{error}</p>}
-              <button
-                type="button"
-                onClick={() => void login()}
-                disabled={!query.trim() || loading}
-                className="w-full rounded-full bg-[#1C1C1E] text-white font-semibold tracking-wide py-3.5 hover:-translate-y-0.5 transition-all disabled:opacity-40"
-              >
-                {loading ? 'Checking…' : 'Enter Portal'}
-              </button>
-              <p className="text-[11px] text-[#9A9A9A] leading-relaxed">
-                If you can’t find your booking, contact admin via Messenger.
+        {!showUrlIntake && (
+          <main className="max-w-md mx-auto px-4 pt-8 space-y-5">
+            <h1 className="font-serif text-3xl font-semibold tracking-tight">Client Portal</h1>
+            {urlBooking && urlBooking.intakeStatus === 'Completed' && (
+              <p className="text-sm text-emerald-700 font-semibold">
+                {lang === 'TH'
+                  ? `✅ ยินดีต้อนรับ ${urlBooking.customerName} — กำลังเข้าสู่พอร์ทัล…`
+                  : `✅ Welcome, ${urlBooking.customerName}! Entering portal…`}
               </p>
-            </div>
-          </SoftCard>
-        </main>
+            )}
+            <p className="text-sm text-[#6B6B6B] leading-relaxed">
+              {lang === 'TH' ? (
+                <>
+                  กรอก <span className="font-semibold">Booking ID</span> หรือ{' '}
+                  <span className="font-semibold">เบอร์โทร</span> เพื่อเข้าพอร์ทัลทริป
+                </>
+              ) : (
+                <>
+                  Enter your <span className="font-semibold">Booking ID</span> or{' '}
+                  <span className="font-semibold">phone number</span> to access your trip.
+                </>
+              )}
+            </p>
+
+            <SoftCard>
+              <div className="p-5 space-y-3">
+                <label className="text-xs font-semibold text-[#6B6B6B]">Booking ID / Phone</label>
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="e.g. BK-001, BK-002, BK-003"
+                  className="w-full rounded-2xl border border-sage-100 bg-white px-4 py-3 outline-none focus:ring-2 focus:ring-sage-200"
+                />
+                {error && <p className="text-sm text-rose-700">{error}</p>}
+                <button
+                  type="button"
+                  onClick={login}
+                  disabled={!query.trim() || loading}
+                  className="w-full rounded-full bg-[#1C1C1E] text-white font-semibold tracking-wide py-3.5 hover:-translate-y-0.5 transition-all disabled:opacity-40"
+                >
+                  {loading
+                    ? lang === 'TH'
+                      ? 'กำลังตรวจสอบ…'
+                      : 'Checking…'
+                    : lang === 'TH'
+                      ? 'เข้าพอร์ทัล'
+                      : 'Enter Portal'}
+                </button>
+                <p className="text-[11px] text-[#9A9A9A] leading-relaxed">
+                  {lang === 'TH'
+                    ? 'หากไม่พบการจอง ติดต่อทีมงานผ่าน Messenger'
+                    : 'If you can’t find your booking, contact us via Messenger.'}
+                </p>
+              </div>
+            </SoftCard>
+          </main>
+        )}
       </div>
     );
   }
 
-  const messengerUrl = trip?.messengerUrl?.trim() || 'https://m.me/trip2talk.chapter99';
+  const messengerUrl =
+    booking?.fbChatUrl?.trim() || trip?.messengerUrl?.trim() || 'https://m.me/trip2talk.chapter99';
   const cover = trip?.coverUrl?.trim() || 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&q=80';
-  const oneDay = (trip?.durationDays ?? 1) === 1;
   const tempC = weather?.tempC ?? 15;
+  const tripDisplayName = booking?.tourName?.trim() || trip?.tourName?.trim() || session.tourCode;
+  const guestsLabel = booking?.guests != null ? `${booking.guests} guests` : undefined;
+  const pickupLabel = booking?.pickupDisplay?.trim() || booking?.pickupLocation?.trim() || undefined;
+  const departLabel = booking?.departTime?.trim() || undefined;
   const tagPills = highlights.map((t) => {
     const m = t.match(/^(\S+)\s+(.*)$/);
     return { icon: m?.[1] ?? '✦', label: m?.[2] ?? t };
@@ -534,18 +723,21 @@ export default function ClientPortal() {
           tempC={tempC}
           tags={tagPills}
           heroImageUrl={cover}
-          tripTitle={trip?.tourName || session.tourCode}
+          tripTitle={tripDisplayName}
           tripSubtitle={trip?.countryTag || 'Private Photo Journey'}
           durationLabel={durationLabel}
           distanceLabel={distanceLabel}
           capacityLabel={capacityLabel}
+          guestsLabel={guestsLabel}
+          pickupLabel={pickupLabel}
+          departLabel={departLabel}
           onStartTrip={() => setTab('pass')}
         />
       ) : tab === 'itinerary' ? (
         <TripDetailGroupScreen
           bannerUrl={cover}
           countryTag={countryTag}
-          title={trip?.tourName || session.tourCode}
+          title={tripDisplayName}
           metaLeft={durationLabel}
           metaRight={capacityLabel}
           hotelName={hotelName}
@@ -565,84 +757,108 @@ export default function ClientPortal() {
               id: trip?.tourCode || session.tourCode,
               imageUrl: cover,
               badge: countryTag,
-              title: trip?.tourName || session.tourCode,
+              title: tripDisplayName,
               meta: `${durationLabel} • ${capacityLabel}`,
             },
           ]}
         />
-      ) : (
-        <div className="min-h-screen bg-sage-50 text-[#1C1C1E] font-sans antialiased pb-20">
-          <header className="sticky top-0 z-40 bg-sage-50/95 backdrop-blur border-b border-sage-100">
-            <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
-              <Link to="/" className="font-serif text-lg font-semibold">
-                Trip2Talk
-              </Link>
-              <button type="button" onClick={logout} className="text-xs font-semibold text-[#9A9A9A]">
-                Logout
-              </button>
-            </div>
-          </header>
-          <main className="max-w-md mx-auto px-4 pt-5 space-y-5">
-            <h2 className="font-serif text-xl font-semibold">Pass &amp; Consent</h2>
+      ) : tab === 'packing' ? (
+        <PackingAssistant
+          tourCode={booking?.tourCode ?? session.tourCode}
+          language={lang}
+          storageKey={session.bookingId}
+        />
+      ) : tab === 'pass' ? (
+        <main className="max-w-md mx-auto px-4 pt-5 space-y-5 pb-24">
+          {showIntake && session && (
+            <IntakeFormModal
+              dismissible={false}
+              bookingId={session.bookingId}
+              tourCode={booking?.tourCode ?? session.tourCode}
+              language={lang}
+              defaultFullName={booking?.customerName ?? session.customerName}
+              onComplete={() => {
+                markClientIntakeComplete(session.bookingId);
+                setIntakeDone(true);
+                setShowIntake(false);
+              }}
+            />
+          )}
 
-        {tab === 'pass' && (
-          <>
-            <SoftCard>
-              <div className="p-5">
-                <div className="grid grid-cols-3 gap-3 text-center">
-                  <div className="rounded-2xl border border-sage-100 bg-sage-50 p-3">
-                    <p className="text-[11px] text-[#6B6B6B] font-semibold">Guests</p>
-                    <p className="mt-1 font-semibold">{'—'}</p>
-                  </div>
-                  <div className="rounded-2xl border border-sage-100 bg-sage-50 p-3">
-                    <p className="text-[11px] text-[#6B6B6B] font-semibold">Pickup</p>
-                    <p className="mt-1 font-semibold">{'—'}</p>
-                  </div>
-                  <div className="rounded-2xl border border-sage-100 bg-sage-50 p-3">
-                    <p className="text-[11px] text-[#6B6B6B] font-semibold">Depart</p>
-                    <p className="mt-1 font-semibold">{'—'}</p>
-                  </div>
+          <h2 className="font-serif text-xl font-semibold">Pass &amp; Consent</h2>
+          <p className="text-sm text-[#6B6B6B]">{tripDisplayName}</p>
+
+          <SoftCard>
+            <div className="p-5">
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="rounded-2xl border border-sage-100 bg-sage-50 p-3">
+                  <p className="text-[11px] text-[#6B6B6B] font-semibold">Guests</p>
+                  <p className="mt-1 font-semibold text-sm leading-snug">{guestsLabel ?? '—'}</p>
                 </div>
-
-                <div className="mt-4">
-                  <SwipeCheckIn onChecked={onCheckIn} disabled={loading} />
-                  <p className="mt-2 text-xs text-[#6B6B6B] leading-relaxed">
-                    Checking in logs a consent timestamp to Google Sheets (Consents tab).
-                  </p>
+                <div className="rounded-2xl border border-sage-100 bg-sage-50 p-3">
+                  <p className="text-[11px] text-[#6B6B6B] font-semibold">Pickup</p>
+                  <p className="mt-1 font-semibold text-sm leading-snug">{pickupLabel ?? '—'}</p>
+                </div>
+                <div className="rounded-2xl border border-sage-100 bg-sage-50 p-3">
+                  <p className="text-[11px] text-[#6B6B6B] font-semibold">Depart</p>
+                  <p className="mt-1 font-semibold text-sm leading-snug">{departLabel ?? '—'}</p>
                 </div>
               </div>
-            </SoftCard>
 
-            <div className="h-16" />
-            <div className="fixed bottom-16 left-0 right-0 z-40">
-              <div className="max-w-md mx-auto px-4">
-                <a
-                  href={messengerUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full inline-flex items-center justify-center rounded-2xl bg-messenger text-white font-semibold py-3 shadow-lg shadow-blue-500/20"
-                >
-                  Open Messenger group
-                </a>
+              <div className="mt-4">
+                {!intakeDone && (
+                  <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+                    <p className="text-xs text-amber-900 leading-relaxed">
+                      {lang === 'TH'
+                        ? 'กรุณากรอกแบบฟอร์ม 2 นาทีก่อนเช็คอิน เพื่อปรับทริปให้เหมาะกับคุณ'
+                        : 'Complete the 2-minute intake form before check-in to personalize your trip.'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowIntake(true)}
+                      className="mt-2 text-xs font-semibold text-teal-700 underline"
+                    >
+                      {lang === 'TH' ? 'เปิดแบบฟอร์ม →' : 'Open intake form →'}
+                    </button>
+                  </div>
+                )}
+                <SwipeCheckIn onChecked={onCheckIn} disabled={loading || !intakeDone} />
+                <p className="mt-2 text-xs text-[#6B6B6B] leading-relaxed">
+                  {lang === 'TH'
+                    ? 'เช็คอินจะบันทึกเวลายินยอมลง Google Sheets (แท็บ Consents)'
+                    : 'Checking in logs a consent timestamp to Google Sheets (Consents tab).'}
+                </p>
               </div>
             </div>
-          </>
-        )}
+          </SoftCard>
 
-        {loading && (
+          <a
+            href={messengerUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full inline-flex items-center justify-center rounded-2xl bg-messenger text-white font-semibold py-3 shadow-lg shadow-blue-500/20"
+          >
+            Open Messenger group
+          </a>
+        </main>
+      ) : null}
+
+      {loading && (
+        <div className="max-w-md mx-auto px-4">
           <div className="rounded-[28px] border border-sage-100 bg-white p-5 animate-pulse">
             <div className="h-4 w-28 bg-sage-100 rounded" />
             <div className="mt-3 h-3 w-full bg-sage-100 rounded" />
             <div className="mt-2 h-3 w-2/3 bg-sage-100 rounded" />
           </div>
-        )}
-        {error && (
-          <div className="rounded-[28px] border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</div>
-        )}
-          </main>
-          <PortalNav tab={tab} onChange={setTab} />
         </div>
       )}
+      {error && tab !== 'pass' && (
+        <div className="max-w-md mx-auto px-4">
+          <div className="rounded-[28px] border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{error}</div>
+        </div>
+      )}
+
+      <PortalNav tab={tab} onChange={setTab} language={lang} />
     </div>
   );
 }

@@ -13,6 +13,7 @@ const TourDetail = lazy(() => import('./pages/TourDetail'));
 const BookingCheckout = lazy(() => import('./pages/BookingCheckout'));
 const ClientVIPHub = lazy(() => import('./pages/ClientVIPHub'));
 const AlbumPrep = lazy(() => import('./pages/AlbumPrep'));
+const AlbumPrepGate = lazy(() => import('./pages/AlbumPrepGate'));
 const PhotoDeliveryTerms = lazy(() => import('./pages/PhotoDeliveryTerms'));
 const TravelPackageTerms = lazy(() => import('./pages/TravelPackageTerms'));
 const About = lazy(() => import('./pages/About'));
@@ -91,6 +92,7 @@ export default function App() {
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/album/:tourId" element={<AlbumPrep />} />
+            <Route path="/album-prep" element={<AlbumPrepGate />} />
             <Route element={<PublicShell />}>
               <Route path="/tours/:tourId" element={<TourDetail />} />
               <Route path="/trips" element={<PublicPortfolio />} />

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PublicBottomNav from '../components/public/PublicBottomNav';
+import { mergeTripsWithFallback } from '../data/tours';
 import { fetchTripsFromSheet, TripSheetRow } from '../lib/tripsSheetApi';
 import MeetTheCrew from '../components/public/MeetTheCrew';
 import TestimonialsSection from '../components/public/TestimonialsSection';
@@ -9,9 +10,9 @@ import PortfolioGallery from '../components/public/PortfolioGallery';
 import LanguageToggle from '../components/i18n/LanguageToggle';
 import { usePublicStrings } from '../lib/publicI18n';
 import { filterTripsByCategory, TripFilterId } from '../lib/tripFilters';
-
-const HERO_IMAGE =
-  'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1920&q=85';
+import SeasonPrepSection from '../components/public/SeasonPrepSection';
+import HeroSlideshowBackground from '../components/public/HeroSlideshowBackground';
+import TourCard from '../components/public/TourCard';
 
 function scrollToSection(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
@@ -46,77 +47,11 @@ const FEATURES = [
   },
 ];
 
-function TourCard({
-  tour,
-  saved,
-  onToggleSave,
-  large,
-}: {
-  tour: TripSheetRow;
-  saved: boolean;
-  onToggleSave: () => void;
-  large?: boolean;
-}) {
-  return (
-    <article
-      className={`group bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl transition-shadow ${
-        large ? 'lg:col-span-2' : ''
-      }`}
-    >
-      <div className={`relative overflow-hidden ${large ? 'aspect-[21/9]' : 'aspect-video'}`}>
-        <img
-          src={tour.coverUrl || 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&q=80'}
-          alt={tour.tourName}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          loading="lazy"
-        />
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            onToggleSave();
-          }}
-          className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/90 backdrop-blur flex items-center justify-center text-lg shadow-sm hover:scale-110 transition-transform"
-          aria-label={saved ? 'Unsave' : 'Save'}
-        >
-          {saved ? '❤️' : '🤍'}
-        </button>
-        {/* Reserved for future: featured flag from CMS */}
-      </div>
-      <div className="p-4 md:p-5">
-        <div className="flex justify-between items-start gap-2">
-          <div>
-            <p className="text-[11px] uppercase tracking-wide font-semibold text-emerald-700">
-              {tour.countryTag || 'Trip2Talk'}
-            </p>
-            <h3 className={`font-serif font-semibold text-slate-900 mt-1 ${large ? 'text-2xl' : 'text-lg'}`}>
-              {tour.tourName || tour.tourCode}
-            </h3>
-          </div>
-          {tour.weather ? (
-            <p className="text-xs font-semibold text-slate-600 whitespace-nowrap">{tour.weather}</p>
-          ) : (
-            <p className="text-xs font-semibold text-slate-400 whitespace-nowrap">{tour.tourCode}</p>
-          )}
-        </div>
-        <p className="text-sm text-slate-500 mt-2 leading-relaxed">
-          Private Photo Journey · small groups · finished .JPG album delivery
-        </p>
-        <Link
-          to={`/tours/${encodeURIComponent(tour.tourCode)}`}
-          className="mt-4 inline-flex w-full justify-center items-center gap-2 py-2.5 rounded-full bg-navy text-white text-sm font-semibold hover:bg-navy-dark transition-colors"
-        >
-          View trip details <span aria-hidden>→</span>
-        </Link>
-      </div>
-    </article>
-  );
-}
-
 const TRIP_FILTERS: { id: TripFilterId; labelKey: keyof ReturnType<typeof usePublicStrings> }[] = [
   { id: 'all', labelKey: 'filter_all' },
   { id: 'one_day', labelKey: 'filter_one_day' },
   { id: 'overnight', labelKey: 'filter_overnight' },
+  { id: 'by_season', labelKey: 'filter_by_season' },
 ];
 
 export default function PublicPortfolio() {
@@ -134,9 +69,12 @@ export default function PublicPortfolio() {
       setTripError(null);
       try {
         const rows = await fetchTripsFromSheet();
-        if (!cancelled) setTrips(rows);
+        if (!cancelled) setTrips(mergeTripsWithFallback(rows));
       } catch (e) {
-        if (!cancelled) setTripError(e instanceof Error ? e.message : 'Could not load trips');
+        if (!cancelled) {
+          setTripError(e instanceof Error ? e.message : 'Could not load trips');
+          setTrips(mergeTripsWithFallback([]));
+        }
       } finally {
         if (!cancelled) setLoadingTrips(false);
       }
@@ -162,12 +100,7 @@ export default function PublicPortfolio() {
   }, [trips]);
 
   const filteredTrips = useMemo(() => filterTripsByCategory(trips, tripFilter), [trips, tripFilter]);
-
-  const grouped = useMemo(() => {
-    const allYear = filteredTrips.filter((t) => t.seasonGroup !== 'seasonal');
-    const seasonal = filteredTrips.filter((t) => t.seasonGroup === 'seasonal');
-    return { allYear, seasonal };
-  }, [filteredTrips]);
+  const showSeasonPrep = tripFilter === 'by_season';
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans antialiased pb-20">
@@ -210,9 +143,9 @@ export default function PublicPortfolio() {
       </header>
 
       {/* Hero */}
-      <section className="relative min-h-[88vh] flex items-center justify-center overflow-hidden">
-        <img src={HERO_IMAGE} alt="" className="absolute inset-0 w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-black/60" />
+      <section className="relative min-h-[88vh] flex items-center justify-center overflow-hidden bg-[#0d1b2a]">
+        <HeroSlideshowBackground maxPhotos={20} />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-black/60 z-[3]" />
         <div className="relative z-10 max-w-4xl mx-auto px-4 text-center text-white">
           <p className="flex items-center justify-center gap-2 text-sm font-medium mb-6">
             <span className="relative flex h-2.5 w-2.5">
@@ -302,56 +235,26 @@ export default function PublicPortfolio() {
             <p className="text-slate-700 font-semibold">No trips available right now.</p>
             <p className="text-sm text-slate-500 mt-2">Please check again soon.</p>
           </div>
+        ) : showSeasonPrep ? (
+          <SeasonPrepSection />
+        ) : filteredTrips.length === 0 ? (
+          <div className="max-w-xl mx-auto text-center py-12">
+            <p className="text-slate-700 font-semibold">No trips match this filter.</p>
+          </div>
         ) : (
-          <div className="space-y-14">
-            <section>
-              <div className="flex items-end justify-between gap-4 mb-6">
-                <div>
-                  <p className="text-[11px] font-semibold tracking-[0.25em] text-slate-400 uppercase">Category</p>
-                  <h3 className="font-serif text-2xl font-semibold text-slate-900">All Year Round Trips</h3>
-                </div>
-              </div>
-              <MobileTripStack
-                trips={grouped.allYear}
-                saved={saved}
-                onToggleSave={toggleSave}
-              />
-              <div id="gallery" className="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {grouped.allYear.map((tour, idx) => (
-                  <TourCard
-                    key={tour.tourCode}
-                    tour={tour}
-                    saved={saved.has(tour.tourCode)}
-                    onToggleSave={() => toggleSave(tour.tourCode)}
-                    large={idx === 0}
-                  />
-                ))}
-              </div>
-            </section>
-
-            <section>
-              <div className="flex items-end justify-between gap-4 mb-6">
-                <div>
-                  <p className="text-[11px] font-semibold tracking-[0.25em] text-slate-400 uppercase">Category</p>
-                  <h3 className="font-serif text-2xl font-semibold text-slate-900">Seasonal Trips</h3>
-                </div>
-              </div>
-              <MobileTripStack
-                trips={grouped.seasonal}
-                saved={saved}
-                onToggleSave={toggleSave}
-              />
-              <div className="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {grouped.seasonal.map((tour) => (
-                  <TourCard
-                    key={tour.tourCode}
-                    tour={tour}
-                    saved={saved.has(tour.tourCode)}
-                    onToggleSave={() => toggleSave(tour.tourCode)}
-                  />
-                ))}
-              </div>
-            </section>
+          <div className="space-y-8">
+            <MobileTripStack trips={filteredTrips} saved={saved} onToggleSave={toggleSave} />
+            <div id="gallery" className="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredTrips.map((tour, idx) => (
+                <TourCard
+                  key={tour.tourCode}
+                  tour={tour}
+                  saved={saved.has(tour.tourCode)}
+                  onToggleSave={() => toggleSave(tour.tourCode)}
+                  large={idx === 0 && tripFilter === 'all'}
+                />
+              ))}
+            </div>
           </div>
         )}
       </section>
@@ -414,13 +317,13 @@ export default function PublicPortfolio() {
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-4">
           <Link
-            to="/tours/nz-aut-2026"
+            to="/tours/MEL-4D3N"
             className="px-6 py-3 rounded-full bg-white text-navy font-semibold text-sm hover:bg-slate-50 transition-colors"
           >
             Explore trips <span aria-hidden>→</span>
           </Link>
           <Link
-            to="/book/nz-aut-2026"
+            to="/book/MEL-4D3N"
             className="px-6 py-3 rounded-full border border-white/40 text-white font-semibold text-sm hover:bg-white/10 transition-colors"
           >
             Book this trip <span aria-hidden>→</span>

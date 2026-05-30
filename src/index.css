@@ -39,6 +39,15 @@ body {
   animation: slide-down 0.35s ease-out forwards;
 }
 
+@keyframes heroKenBurns {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.08);
+  }
+}
+
 .scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -46,4 +55,18 @@ body {
 
 .scrollbar-none::-webkit-scrollbar {
   display: none;
+}
+
+@keyframes termsPhotoStripScroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.terms-photo-strip-track {
+  animation: termsPhotoStripScroll 30s linear infinite;
+  will-change: transform;
 }

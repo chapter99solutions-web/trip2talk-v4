@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import CyberViewport from '../layout/CyberViewport';
-import LiveClock from '../cyber/LiveClock';
 import AwaitingSync from '../cyber/AwaitingSync';
+import OpsDashboardHeader from '../ops/OpsDashboardHeader';
+
+const MASTER_SHEET_ID = '1U1APoAcFz5zwwcqql1uVHm4CCOtll7bhCLbCELUBuP4';
 import { fetchOwnerDashboardData, OwnerDashboardData } from '../../lib/supabaseData';
 import { supabase } from '../../lib/supabase';
 
@@ -37,22 +39,11 @@ export default function PlatformHub({ onLogout }: { onLogout: () => void }) {
   return (
     <CyberViewport className="p-6">
       <div className="max-w-4xl mx-auto space-y-6">
-        <header className="flex flex-wrap justify-between items-start gap-4">
-          <div>
-            <h1 className="text-[color:var(--gold)] font-serif font-semibold text-[22px] tracking-wide">
-              PLATFORM HUB
-            </h1>
-            <p className="text-neutral-400 text-sm mt-1 font-sans">
-              Trip2Talk V4 · Platform Admin
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-2">
-            <LiveClock />
-            <button type="button" onClick={onLogout} className="cyber-btn-exit">
-              [ EXIT ]
-            </button>
-          </div>
-        </header>
+        <OpsDashboardHeader
+          title="PLATFORM HUB"
+          subtitle="Trip2Talk V4 · Platform Admin (PIN 3501)"
+          onLogout={onLogout}
+        />
 
         {error && (
           <div className="cyber-card p-4 flex flex-wrap justify-between items-center gap-3 border-red-500/30">
@@ -91,6 +82,23 @@ export default function PlatformHub({ onLogout }: { onLogout: () => void }) {
             </div>
           </div>
         )}
+
+        <div className="cyber-card p-5 space-y-2 text-sm text-neutral-400 font-sans">
+          <p className="text-neutral-200 font-semibold">Google Sheets (Trips_Data)</p>
+          <p className="font-mono text-xs text-teal break-all">{MASTER_SHEET_ID}</p>
+          <a
+            href={`https://docs.google.com/spreadsheets/d/${MASTER_SHEET_ID}/edit`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block text-xs text-gold hover:underline"
+          >
+            Open master sheet →
+          </a>
+          <p className="text-[11px] text-neutral-500 pt-1">
+            After updating <span className="text-neutral-300">gas/Code.gs</span>, redeploy the Apps Script web app
+            (owner login). Frontend reads via <span className="text-neutral-300">VITE_GAS_WEBAPP_URL</span>.
+          </p>
+        </div>
 
         <div className="cyber-card p-5 space-y-3 text-sm text-neutral-400 font-sans">
           <p className="text-neutral-200 font-semibold">Edge functions</p>

@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { TRIP_SIZE_TIERS } from '../lib/bookingPolicy';
+import HeroSlideshowBackground from '../components/public/HeroSlideshowBackground';
+import TermsPhotoStrip from '../components/terms/TermsPhotoStrip';
+import TermsPhotoBreak from '../components/terms/TermsPhotoBreak';
+import TermsCtaBanner from '../components/terms/TermsCtaBanner';
 
 type TabId = 'service' | 'pricing' | 'cancel' | 'vehicle';
 
@@ -10,9 +14,6 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'cancel', label: '🚫 3.การยกเลิก' },
   { id: 'vehicle', label: '🛡 4.ยานพาหนะ&ลิขสิทธิ์' },
 ];
-
-const HERO_IMAGE =
-  'https://images.unsplash.com/photo-1469854523086-cc02afe5c88?w=1920&q=80';
 
 const SERVICE_CHECKS = [
   'ช่างภาพมืออาชีพนำทริปและถ่ายภาพตลอดเส้นทาง',
@@ -93,13 +94,14 @@ export default function TravelPackageTerms() {
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
       {/* Hero */}
-      <header className="relative bg-navy text-white overflow-hidden">
+      <header className="relative text-white overflow-hidden bg-[#0d1b2a]">
+        <div className="absolute inset-0">
+          <HeroSlideshowBackground maxPhotos={5} pauseOnHover={false} />
+        </div>
         <div
-          className="absolute inset-0 bg-cover bg-center opacity-10"
-          style={{ backgroundImage: `url(${HERO_IMAGE})` }}
+          className="absolute inset-0 bg-gradient-to-b from-black/70 to-black/40 pointer-events-none"
           aria-hidden
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-navy via-navy to-navy/95" aria-hidden />
         <div className="relative z-10 max-w-6xl mx-auto px-4 py-14 md:py-18">
           <h1 className="font-serif text-2xl md:text-3xl lg:text-4xl font-semibold leading-snug">
             เงื่อนไขและข้อตกลงการใช้บริการถ่ายภาพเดินทางส่วนตัว
@@ -112,6 +114,8 @@ export default function TravelPackageTerms() {
           </p>
         </div>
       </header>
+
+      <TermsPhotoStrip />
 
       {/* Sticky tabs */}
       <div className="sticky top-14 z-30 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
@@ -176,6 +180,12 @@ export default function TravelPackageTerms() {
             ))}
           </div>
         </section>
+
+        <TermsPhotoBreak
+          pickIndex={0}
+          textTh="ทริปที่ออกแบบมาเพื่อภาพถ่ายของคุณโดยเฉพาะ"
+          textEn="Journeys designed around your perfect shot"
+        />
 
         {/* Tab 2 */}
         <section
@@ -265,6 +275,12 @@ export default function TravelPackageTerms() {
           </p>
         </section>
 
+        <TermsPhotoBreak
+          pickIndex={1}
+          textTh="ราคาโปร่งใส ไม่มีค่าใช้จ่ายซ่อนเร้น"
+          textEn="Transparent pricing, no hidden costs"
+        />
+
         {/* Tab 3 */}
         <section
           ref={(el) => {
@@ -319,6 +335,12 @@ export default function TravelPackageTerms() {
             </table>
           </div>
         </section>
+
+        <TermsPhotoBreak
+          pickIndex={2}
+          textTh="จองวันนี้ รักษาสิทธิ์ทริปในฝัน"
+          textEn="Book today, secure your dream journey"
+        />
 
         {/* Tab 4 */}
         <section
@@ -387,6 +409,8 @@ export default function TravelPackageTerms() {
           </Link>
         </p>
       </div>
+
+      <TermsCtaBanner />
 
       <footer className="border-t border-slate-200 bg-[#f8f8f8] py-10 text-center text-xs text-slate-500">
         <p>© 2026 Chapter 99 Photography &amp; Trip2Talk</p>
