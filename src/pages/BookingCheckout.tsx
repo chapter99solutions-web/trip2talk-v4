@@ -9,12 +9,10 @@ import { generateBookingRef } from '../lib/bookingRef';
 import { runPhase2Book } from '../lib/customerJourney';
 import { PORTFOLIO_TOURS } from '../lib/portfolioTours';
 import {
-  handlePickupValidation,
   shouldBlockSharedLowPaxNearDate,
-  type TripType,
   PRICING,
 } from '../lib/bookingRules';
-import { PickupId, pickupOptionsForTripType } from '../lib/pickup-options';
+import { ONE_DAY_PICKUP_OPTIONS } from '../lib/pickup-options';
 
 type Step = 1 | 2 | 3 | 4;
 type VisaType = 'student' | 'other';
@@ -61,11 +59,10 @@ export default function BookingCheckout() {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   // PICKUP RULE:
-  // 'central_station' | 'town_hall' | 'thaitown_main' → Standard + Private
-  // 'custom_accommodation' → Private/Upgrade packages ONLY
-  // If Standard package + custom_accommodation selected → show warning
-  // (ช่างภาพวนรับ CBD มีค่าใช้จ่ายเพิ่มเติมสำหรับ Standard tier)
-  const [pickupLocation, setPickupLocation] = useState<PickupId>('thaitown_main');
+  // The option set + label adapt to the tour type derived from the tour code
+  // (see pickupConfig below): 1DAY → day-trip pickups, NZ → New Zealand airports,
+  // otherwise → domestic multi-day airport terminals.
+  const [pickupLocation, setPickupLocation] = useState<string>('thaitown_main');
   const [hotelName, setHotelName] = useState('');
   const [visaType, setVisaType] = useState<VisaType>('student');
   const [oshc, setOshc] = useState('');
@@ -80,6 +77,44 @@ export default function BookingCheckout() {
     [trip, partyPax]
   );
 
+  // Smart pickup: derive the option set + label from the tour code (route param /
+  // trip_code). Recomputes if the code changes so the dropdown always matches the
+  // tour type.
+  const pickupConfig = useMemo(() => {
+    const code = (tourId ?? trip?.trip_code ?? '').toUpperCase();
+    if (code.includes('1DAY') || code.includes('1-DAY')) {
+      return {
+        kind: 'day' as const,
+        label: 'Pickup location',
+        options: ONE_DAY_PICKUP_OPTIONS.map((p) => ({
+          value: p.id as string,
+          label: p.labelEn,
+        })),
+      };
+    }
+    if (code.includes('NZ')) {
+      return {
+        kind: 'nz' as const,
+        label: 'Meeting point (Airport Terminal)',
+        options: [
+          { value: 'nz_christchurch', label: 'Christchurch International Airport' },
+          { value: 'nz_queenstown', label: 'Queenstown Airport' },
+          { value: 'nz_auckland', label: 'Auckland Airport (transit)' },
+          { value: 'self_arrange', label: "Self-arrange (I'll meet at destination)" },
+        ],
+      };
+    }
+    return {
+      kind: 'domestic' as const,
+      label: 'Meeting point (Airport Terminal)',
+      options: [
+        { value: 'syd_t2t3', label: 'Sydney Domestic Airport T2/T3 (Qantas/Virgin)' },
+        { value: 'syd_t1', label: 'Sydney Domestic Airport T1 (Jetstar)' },
+        { value: 'self_arrange', label: "Self-arrange (I'll meet at destination)" },
+      ],
+    };
+  }, [tourId, trip?.trip_code]);
+
   if (!trip) {
     return (
       <div className="max-w-lg mx-auto px-4 py-16 text-center text-red-600">
@@ -92,17 +127,18 @@ export default function BookingCheckout() {
   }
 
   const portfolio = PORTFOLIO_TOURS.find((t) => t.id === trip.id);
-  const tripType: TripType =
-    portfolio?.category === 'overnight' ? 'overnight' : 'one_day';
-  const pickupOptions = pickupOptionsForTripType(tripType);
   const isSharedGroup = pkg === 'STANDARD';
   const blockedByBuffer = shouldBlockSharedLowPaxNearDate(isSharedGroup, partyPax, selectedDate);
 
+  // If the currently-selected pickup is not valid for the active tour type
+  // (e.g. tour code changed, or stale state), reset to the first option so the
+  // form never submits a stale/invalid value.
   useEffect(() => {
-    if (tripType === 'overnight') {
-      setPickupLocation('airport_terminal');
+    const values = pickupConfig.options.map((o) => o.value);
+    if (!values.includes(pickupLocation)) {
+      setPickupLocation(pickupConfig.options[0]?.value ?? '');
     }
-  }, [tripType]);
+  }, [pickupConfig, pickupLocation]);
 
   const tourPhoto =
     portfolio?.image ??
@@ -117,7 +153,7 @@ export default function BookingCheckout() {
 
   const canProceedStep1 = Boolean(selectedDate) && quote?.valid;
   const pickupRequiresSuburb =
-    pickupLocation === 'route_waypoint' || pickupLocation === 'custom_accommodation';
+    pickupConfig.kind === 'day' && pickupLocation === 'route_waypoint';
 
   const canProceedStep3 =
     fullName.trim() &&
@@ -133,10 +169,9 @@ export default function BookingCheckout() {
     if (!canProceedStep3) return;
     if (blockedByBuffer) return;
 
-    try {
-      handlePickupValidation(tripType, pickupLocation);
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Invalid pickup');
+    const validPickupValues = pickupConfig.options.map((o) => o.value);
+    if (!validPickupValues.includes(pickupLocation)) {
+      setSubmitError('Please select a valid pickup / meeting point.');
       return;
     }
 
@@ -401,25 +436,19 @@ export default function BookingCheckout() {
               />
             </div>
             <div>
-              <label className="text-xs text-slate-500 block mb-1">Pickup location</label>
-              {tripType === 'overnight' ? (
-                <p className="rounded-xl border border-teal/40 bg-teal/10 px-3 py-2 text-sm text-slate-800">
-                  {pickupOptions[0]?.labelEn}
-                </p>
-              ) : (
-                <select
-                  value={pickupLocation}
-                  onChange={(e) => setPickupLocation(e.target.value as PickupId)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-teal/30"
-                >
-                  {pickupOptions.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.labelEn}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {tripType === 'one_day' && pickupLocation === 'route_waypoint' && (
+              <label className="text-xs text-slate-500 block mb-1">{pickupConfig.label}</label>
+              <select
+                value={pickupLocation}
+                onChange={(e) => setPickupLocation(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-teal/30"
+              >
+                {pickupConfig.options.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              {pickupConfig.kind === 'day' && pickupLocation === 'route_waypoint' && (
                 <>
                   <p className="mt-2 text-xs bg-orange-100 border border-orange-400 text-orange-900 rounded-lg p-2">
                     ต้องเป็นย่านที่เป็นทางผ่านหลักเท่านั้น — รอทีมงานคอนเฟิร์มหลังไมค์
@@ -522,12 +551,12 @@ export default function BookingCheckout() {
                 <span>Package</span>
                 <span className="font-mono text-white/90">{packageDef.title}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-3">
                 <span>Pickup</span>
-                <span className="font-mono text-white/90">
-                  {pickupLocation === 'custom_accommodation'
-                    ? `🏨 ${hotelName || 'CBD hotel'}`
-                    : '📍 Thai Town, Sydney'}
+                <span className="font-mono text-white/90 text-right">
+                  {pickupRequiresSuburb && hotelName.trim()
+                    ? `📍 ${hotelName.trim()}`
+                    : pickupConfig.options.find((o) => o.value === pickupLocation)?.label ?? '—'}
                 </span>
               </div>
 
