@@ -277,6 +277,16 @@ export default function PackingAssistant({ tourCode, language: initialLang, stor
 
   return (
     <div className="min-h-screen bg-gray-50 pb-28">
+      {/* Intro video */}
+      <video
+        src="https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/VDO/AD/t2t%20oneday%20tripAdventure.mp4"
+        autoPlay
+        muted
+        loop
+        playsInline
+        style={{ width: '100%', height: 250, objectFit: 'cover', borderRadius: 12, marginBottom: 12 }}
+      />
+
       {/* Header */}
       <div className="bg-white px-4 pt-5 pb-3 border-b border-gray-100 sticky top-0 z-10 shadow-sm">
         <div className="flex justify-between items-start">
