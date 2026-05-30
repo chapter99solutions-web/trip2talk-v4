@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { daysUntilTrip, MARGIN_TABLE } from '../../lib/bookingRules';
 import { generatePortalLink } from '../../lib/platformBookings';
 import { supabase } from '../../lib/supabase';
@@ -212,6 +223,8 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
   const navigate = useNavigate();
   const [lang, setLang] = useState<Lang>(() => (localStorage.getItem('trip2talk_language') === 'EN' ? 'EN' : 'TH'));
   const [now, setNow] = useState(() => new Date());
+  const [view, setView] = useState<'financial' | 'crm'>('financial');
+  const [crmSegment, setCrmSegment] = useState<'all' | 'model' | 'photographer'>('all');
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -495,6 +508,87 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
     return rows.sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999')).slice(0, 12);
   }, [trips, bookings]);
 
+  // P&L by trip — gross revenue and estimated net margin per tour code (top 8 by revenue).
+  const plByTrip = useMemo(() => {
+    const map = new Map<string, { revenue: number; pax: number }>();
+    for (const b of bookings) {
+      const key = b.tourCode.toUpperCase() || '—';
+      const prev = map.get(key) ?? { revenue: 0, pax: 0 };
+      prev.revenue += b.totalAmount;
+      prev.pax += b.pax;
+      map.set(key, prev);
+    }
+    return Array.from(map.entries())
+      .map(([code, v]) => ({
+        code,
+        revenue: Math.round(v.revenue),
+        net: Math.round(estimateNetMargin(v.revenue, v.pax)),
+      }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 8);
+  }, [bookings]);
+
+  // Monthly revenue trend (last 6 months that have bookings).
+  const monthlyRevenue = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const b of bookings) {
+      if (!b.tourDate) continue;
+      const d = new Date(b.tourDate);
+      if (!Number.isFinite(d.getTime())) continue;
+      map.set(monthKey(d), (map.get(monthKey(d)) ?? 0) + b.totalAmount);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .slice(-6)
+      .map(([month, revenue]) => ({ month: month.slice(2), revenue: Math.round(revenue) }));
+  }, [bookings]);
+
+  // AU GST is 1/11 of a GST-inclusive total.
+  const allTimeRevenue = useMemo(() => bookings.reduce((s, b) => s + b.totalAmount, 0), [bookings]);
+  const gstCollectedMonth = monthRevenue / 11;
+  const gstCollectedAllTime = allTimeRevenue / 11;
+
+  // CRM — aggregate bookings per client (lifetime value + trips + segment heuristic).
+  const crmClients = useMemo(() => {
+    const map = new Map<
+      string,
+      { name: string; trips: number; ltv: number; lastDate: string; photoStyle: string; segment: 'model' | 'photographer' }
+    >();
+    for (const b of bookings) {
+      const name = b.customerName || '—';
+      const prev =
+        map.get(name) ?? { name, trips: 0, ltv: 0, lastDate: '', photoStyle: '', segment: 'model' as const };
+      prev.trips += 1;
+      prev.ltv += b.totalAmount;
+      if ((b.tourDate || '') > prev.lastDate) prev.lastDate = b.tourDate || prev.lastDate;
+      if (b.photoStyle) prev.photoStyle = b.photoStyle;
+      // Heuristic: landscape-leaning clients = photographer, otherwise model (no explicit field in sheet).
+      prev.segment = /landscape|photograph/i.test(prev.photoStyle) ? 'photographer' : 'model';
+      map.set(name, prev);
+    }
+    return Array.from(map.values()).sort((a, b) => b.ltv - a.ltv);
+  }, [bookings]);
+
+  const filteredCrm = useMemo(
+    () => (crmSegment === 'all' ? crmClients : crmClients.filter((c) => c.segment === crmSegment)),
+    [crmClients, crmSegment]
+  );
+
+  const broadcastMessenger = async () => {
+    const audience = crmSegment === 'all' ? (lang === 'TH' ? 'ลูกค้าทุกคน' : 'all clients') : crmSegment;
+    const msg =
+      lang === 'TH'
+        ? `📢 ข่าวสารทริปใหม่จาก Trip2Talk! (กลุ่ม: ${audience})\nทักแชทเพื่อรับโปรโมชั่นพิเศษและรอบเดินทางล่าสุดได้เลยค่ะ 📸\nhttps://m.me/trip2talk.chapter99`
+        : `📢 New trip news from Trip2Talk! (audience: ${audience})\nMessage us for the latest departures and special offers 📸\nhttps://m.me/trip2talk.chapter99`;
+    try {
+      await navigator.clipboard.writeText(msg);
+      showToast('ok', lang === 'TH' ? 'คัดลอกข้อความ Broadcast แล้ว' : 'Broadcast message copied');
+    } catch {
+      showToast('err', lang === 'TH' ? 'คัดลอกไม่สำเร็จ' : 'Copy failed');
+    }
+    window.open('https://m.me/trip2talk.chapter99', '_blank', 'noopener,noreferrer');
+  };
+
   const copyUpgradeMessage = async (tourCode: string, pax: number, dateIso: string) => {
     const days = dateIso ? daysUntilTrip(dateIso) : null;
     const msgTh = `⚡ อัปเกรดเป็นทริปไพรเวท (4 คน)\nทริป: ${tourCode}\nจำนวนตอนนี้: ${pax} คน\nวันเดินทาง: ${dateIso || '—'}\n\nเนื่องจากใกล้วันเดินทาง (${days ?? '—'} วัน) และยอดแชร์ยังไม่ถึง 6 คน\nขอเสนออัปเกรดเป็นไพรเวท เพื่อคอนเฟิร์มออกเดินทางแน่นอนครับ\n\nยอดอัปเกรด: +$130 AUD / คน (รวม 4 คน)\nหากสะดวกตอบกลับ “CONFIRM PRIVATE” ได้เลยครับ`;
@@ -592,6 +686,30 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
           </div>
         )}
 
+        {/* Tab switcher — Financial | CRM */}
+        <div className="flex gap-2">
+          {([
+            { key: 'financial' as const, th: '💰 การเงิน', en: '💰 Financial' },
+            { key: 'crm' as const, th: '👥 ลูกค้า (CRM)', en: '👥 CRM' },
+          ]).map((tb) => (
+            <button
+              key={tb.key}
+              type="button"
+              onClick={() => setView(tb.key)}
+              className="px-4 py-2 rounded-full text-sm font-semibold border transition-colors"
+              style={
+                view === tb.key
+                  ? { borderColor: GOLD, color: NAVY, background: GOLD }
+                  : { borderColor: 'rgba(255,255,255,0.15)', color: 'white', background: 'rgba(255,255,255,0.05)' }
+              }
+            >
+              {lang === 'TH' ? tb.th : tb.en}
+            </button>
+          ))}
+        </div>
+
+        {view === 'financial' && (
+          <>
         {/* SECTION 2 — Revenue Summary Cards */}
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-3">
@@ -658,6 +776,88 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
               <p className="text-2xl font-semibold mt-1" style={{ color: TEAL }}>
                 {formatAud(confirmedRevenue)}
               </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Tax / GST display */}
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold tracking-wide" style={{ color: GOLD }}>
+            {lang === 'TH' ? 'ภาษี / GST (AUD)' : 'Tax / GST (AUD)'}
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-xs text-white/60">
+                {lang === 'TH' ? 'GST เดือนนี้ (1/11 ของยอดรวม)' : 'GST this month (1/11 of inc.)'}
+              </p>
+              <p className="text-2xl font-semibold mt-1" style={{ color: GOLD }}>
+                {formatAud(gstCollectedMonth)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-xs text-white/60">
+                {lang === 'TH' ? 'GST รวมทั้งหมด' : 'GST collected all-time'}
+              </p>
+              <p className="text-2xl font-semibold mt-1" style={{ color: GOLD }}>
+                {formatAud(gstCollectedAllTime)}
+              </p>
+            </div>
+          </div>
+          <p className="text-[11px] text-white/40">
+            {lang === 'TH'
+              ? 'GST คำนวณแบบรวมภาษี (1/11) จากยอดจองทั้งหมด — ใช้เพื่อการประเมินเบื้องต้นเท่านั้น'
+              : 'GST estimated as 1/11 of GST-inclusive booking totals — indicative only.'}
+          </p>
+        </section>
+
+        {/* P&L by trip (bar) + monthly revenue (line) */}
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold tracking-wide" style={{ color: GOLD }}>
+            {lang === 'TH' ? 'กำไรขาดทุนรายทริป & รายได้รายเดือน' : 'P&L by trip & monthly revenue'}
+          </h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-xs text-white/60 mb-3">
+                {lang === 'TH' ? 'รายได้ (เขียว) vs กำไรสุทธิ (ทอง) ต่อทริป' : 'Revenue (teal) vs net margin (gold) per trip'}
+              </p>
+              {plByTrip.length === 0 ? (
+                <p className="text-sm text-white/50 py-10 text-center">{lang === 'TH' ? 'ยังไม่มีข้อมูล' : 'No data yet'}</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={plByTrip} margin={{ top: 8, right: 8, bottom: 8, left: -12 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                    <XAxis dataKey="code" tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 10 }} interval={0} angle={-20} textAnchor="end" height={48} />
+                    <YAxis tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 10 }} />
+                    <Tooltip
+                      contentStyle={{ background: NAVY, border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, color: 'white' }}
+                      formatter={(v) => formatAud(Number(v) || 0)}
+                    />
+                    <Bar dataKey="revenue" name="Revenue" fill={TEAL} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="net" name="Net margin" fill={GOLD} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <p className="text-xs text-white/60 mb-3">
+                {lang === 'TH' ? 'รายได้รายเดือน (6 เดือนล่าสุด)' : 'Monthly revenue (last 6 months)'}
+              </p>
+              {monthlyRevenue.length === 0 ? (
+                <p className="text-sm text-white/50 py-10 text-center">{lang === 'TH' ? 'ยังไม่มีข้อมูล' : 'No data yet'}</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={260}>
+                  <LineChart data={monthlyRevenue} margin={{ top: 8, right: 8, bottom: 8, left: -12 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                    <XAxis dataKey="month" tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 10 }} />
+                    <YAxis tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 10 }} />
+                    <Tooltip
+                      contentStyle={{ background: NAVY, border: '1px solid rgba(255,255,255,0.15)', borderRadius: 12, color: 'white' }}
+                      formatter={(v) => formatAud(Number(v) || 0)}
+                    />
+                    <Line type="monotone" dataKey="revenue" name="Revenue" stroke={TEAL} strokeWidth={2} dot={{ fill: GOLD, r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
         </section>
@@ -1011,6 +1211,103 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
             lang={lang}
           />
         </section>
+          </>
+        )}
+
+        {view === 'crm' && (
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold tracking-wide" style={{ color: GOLD }}>
+                {lang === 'TH' ? 'รายชื่อลูกค้า + Lifetime Value' : 'Client list + Lifetime Value'}
+              </h2>
+              <div className="flex flex-wrap items-center gap-2">
+                {([
+                  { key: 'all' as const, th: 'ทั้งหมด', en: 'All' },
+                  { key: 'model' as const, th: '👗 นางแบบ', en: '👗 Model' },
+                  { key: 'photographer' as const, th: '📷 ช่างภาพ', en: '📷 Photographer' },
+                ]).map((seg) => (
+                  <button
+                    key={seg.key}
+                    type="button"
+                    onClick={() => setCrmSegment(seg.key)}
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors"
+                    style={
+                      crmSegment === seg.key
+                        ? { borderColor: TEAL, color: NAVY, background: TEAL }
+                        : { borderColor: 'rgba(255,255,255,0.15)', color: 'white', background: 'rgba(255,255,255,0.05)' }
+                    }
+                  >
+                    {lang === 'TH' ? seg.th : seg.en}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => void broadcastMessenger()}
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold border"
+                  style={{ borderColor: GOLD, color: NAVY, background: GOLD }}
+                >
+                  📢 {lang === 'TH' ? 'Broadcast Messenger' : 'Messenger broadcast'}
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 overflow-x-auto">
+              <table className="min-w-[720px] w-full text-left">
+                <thead className="text-[11px] uppercase tracking-wider text-white/60">
+                  <tr className="border-b border-white/10">
+                    <th className="p-3">Client</th>
+                    <th className="p-3">Segment</th>
+                    <th className="p-3">Trips</th>
+                    <th className="p-3">Lifetime value</th>
+                    <th className="p-3">Last trip</th>
+                  </tr>
+                </thead>
+                <tbody className="text-sm">
+                  {filteredCrm.length === 0 ? (
+                    <tr>
+                      <td className="p-4 text-white/60" colSpan={5}>
+                        {lang === 'TH' ? 'ยังไม่มีข้อมูลลูกค้า' : 'No client data yet'}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredCrm.map((c) => (
+                      <tr key={c.name} className="border-b border-white/5">
+                        <td className="p-3 text-white/90">{c.name}</td>
+                        <td className="p-3">
+                          <span
+                            className={`inline-flex items-center px-2 py-1 rounded-full border text-xs font-semibold ${
+                              c.segment === 'photographer'
+                                ? 'bg-sky-500/15 text-sky-200 border-sky-400/25'
+                                : 'bg-pink-500/15 text-pink-200 border-pink-400/25'
+                            }`}
+                          >
+                            {c.segment === 'photographer'
+                              ? lang === 'TH'
+                                ? '📷 ช่างภาพ'
+                                : '📷 Photographer'
+                              : lang === 'TH'
+                                ? '👗 นางแบบ'
+                                : '👗 Model'}
+                          </span>
+                        </td>
+                        <td className="p-3 font-mono text-xs text-white/80">{c.trips}</td>
+                        <td className="p-3 font-mono text-xs" style={{ color: TEAL }}>
+                          {formatAud(c.ltv)}
+                        </td>
+                        <td className="p-3 font-mono text-xs text-white/70">{c.lastDate || '—'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[11px] text-white/40">
+              {lang === 'TH'
+                ? 'หมายเหตุ: ระบบแบ่งกลุ่ม Model/Photographer จาก Photo Style ของการจอง (ไม่มีฟิลด์แยกใน Sheet)'
+                : 'Note: Model/Photographer segment is derived from each booking’s Photo Style (no dedicated field in the sheet).'}
+            </p>
+          </section>
+        )}
       </main>
 
       {intakeBooking && (

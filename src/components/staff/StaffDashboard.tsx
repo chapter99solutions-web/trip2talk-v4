@@ -2,6 +2,19 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import IntakeFormModal from '../IntakeFormModal';
 import { fetchConfirmedBookings, type PlatformBooking } from '../../lib/platformBookings';
+import { logConsentToSheet } from '../../lib/tripsSheetApi';
+import { saveExpenseLocally } from '../../lib/expenseDb';
+import type { ATOCategory, Expense } from '../../types/tour';
+
+const ATO_CATEGORIES: ATOCategory[] = [
+  'Transport',
+  'Accommodation',
+  'Meals',
+  'Attractions',
+  'Marketing',
+  'Insurance',
+  'Other',
+];
 
 type Lang = 'TH' | 'EN';
 
@@ -132,6 +145,72 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
   const [manifestBookings, setManifestBookings] = useState<PlatformBooking[]>([]);
   const [manifestError, setManifestError] = useState<string | null>(null);
   const [intakeTarget, setIntakeTarget] = useState<PlatformBooking | null>(null);
+  const [checkedIn, setCheckedIn] = useState<Set<string>>(() => new Set());
+  const [checkingId, setCheckingId] = useState<string | null>(null);
+  const [staffToast, setStaffToast] = useState<{ tone: 'ok' | 'err'; msg: string } | null>(null);
+
+  // Quick expense drop (saved offline to IndexedDB, synced later).
+  const [expAmount, setExpAmount] = useState('');
+  const [expCategory, setExpCategory] = useState<ATOCategory>('Meals');
+  const [expVendor, setExpVendor] = useState('');
+  const [expHasGst, setExpHasGst] = useState(true);
+  const [expBusy, setExpBusy] = useState(false);
+
+  const flashToast = useCallback((tone: 'ok' | 'err', msg: string) => {
+    setStaffToast({ tone, msg });
+    window.setTimeout(() => setStaffToast(null), 2600);
+  }, []);
+
+  const handleCheckIn = async (b: IntakeBooking) => {
+    if (checkedIn.has(b.bookingId) || checkingId) return;
+    setCheckingId(b.bookingId);
+    try {
+      await logConsentToSheet({
+        timestampIso: new Date().toISOString(),
+        bookingId: b.bookingId,
+        customerName: b.fullNamePassport || b.customerName,
+        tourCode: b.tourCode,
+        consentStatus: 'CHECKED_IN',
+      });
+      setCheckedIn((prev) => new Set(prev).add(b.bookingId));
+      flashToast('ok', lang === 'TH' ? `เช็คอิน ${b.customerName} แล้ว` : `Checked in ${b.customerName}`);
+    } catch (e) {
+      flashToast('err', e instanceof Error ? e.message : 'Check-in failed');
+    } finally {
+      setCheckingId(null);
+    }
+  };
+
+  const submitExpense = async () => {
+    const amount = Number(expAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      flashToast('err', lang === 'TH' ? 'กรอกจำนวนเงินให้ถูกต้อง' : 'Enter a valid amount');
+      return;
+    }
+    setExpBusy(true);
+    try {
+      const expense: Expense = {
+        id: crypto.randomUUID(),
+        tour_id: assignedTourCode || null,
+        amount_aud: Math.round(amount * 100) / 100,
+        has_gst: expHasGst,
+        gst_amount_aud: expHasGst ? Math.round((amount / 11) * 100) / 100 : 0,
+        ato_category: expCategory,
+        vendor_name: expVendor.trim() || 'Unknown',
+        receipt_filename: '',
+        is_synced: false,
+        created_at: new Date().toISOString(),
+      };
+      await saveExpenseLocally(expense, new Blob([], { type: 'application/octet-stream' }));
+      setExpAmount('');
+      setExpVendor('');
+      flashToast('ok', lang === 'TH' ? 'บันทึกค่าใช้จ่ายแล้ว (ออฟไลน์)' : 'Expense saved (offline)');
+    } catch (e) {
+      flashToast('err', e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setExpBusy(false);
+    }
+  };
 
   const assignedTourCode = (params.get('tourCode') || sessionStorage.getItem('t2t_staff_tourCode') || '').trim();
   const assignedTripDate = (params.get('date') || sessionStorage.getItem('t2t_staff_tripDate') || '').trim();
@@ -286,6 +365,76 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
 
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
         {error && <div className="rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-200">{error}</div>}
+        {staffToast && (
+          <div
+            className={`rounded-2xl border px-4 py-3 text-sm ${
+              staffToast.tone === 'ok'
+                ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+                : 'border-red-400/30 bg-red-500/10 text-red-200'
+            }`}
+          >
+            {staffToast.msg}
+          </div>
+        )}
+
+        {/* Quick expense drop */}
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold tracking-wide" style={{ color: GOLD }}>
+            {lang === 'TH' ? 'บันทึกค่าใช้จ่ายด่วน' : 'Quick expense drop'}
+          </h2>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <label className="block">
+              <span className="text-xs text-white/60">{lang === 'TH' ? 'จำนวน (AUD)' : 'Amount (AUD)'}</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                value={expAmount}
+                onChange={(e) => setExpAmount(e.target.value)}
+                placeholder="0.00"
+                className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs text-white/60">{lang === 'TH' ? 'หมวด ATO' : 'ATO category'}</span>
+              <select
+                value={expCategory}
+                onChange={(e) => setExpCategory(e.target.value as ATOCategory)}
+                className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white"
+              >
+                {ATO_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block sm:col-span-2 lg:col-span-1">
+              <span className="text-xs text-white/60">{lang === 'TH' ? 'ร้านค้า / ผู้ขาย' : 'Vendor'}</span>
+              <input
+                type="text"
+                value={expVendor}
+                onChange={(e) => setExpVendor(e.target.value)}
+                placeholder={lang === 'TH' ? 'เช่น ปั๊มน้ำมัน' : 'e.g. Fuel station'}
+                className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white"
+              />
+            </label>
+            <label className="flex items-center gap-2 mt-5">
+              <input type="checkbox" checked={expHasGst} onChange={(e) => setExpHasGst(e.target.checked)} className="h-4 w-4" />
+              <span className="text-xs text-white/70">{lang === 'TH' ? 'รวม GST' : 'Has GST'}</span>
+            </label>
+            <button
+              type="button"
+              disabled={expBusy}
+              onClick={() => void submitExpense()}
+              className="mt-5 px-4 py-2.5 rounded-full text-sm font-semibold border disabled:opacity-50"
+              style={{ borderColor: TEAL, color: NAVY, background: TEAL }}
+            >
+              {expBusy ? '…' : lang === 'TH' ? 'บันทึก' : 'Save expense'}
+            </button>
+          </div>
+        </section>
 
         <section className="space-y-3">
           <h2 className="text-sm font-semibold tracking-wide" style={{ color: GOLD }}>
@@ -450,12 +599,13 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
                   <th className="p-3">Motion</th>
                   <th className="p-3">Birthday</th>
                   <th className="p-3">Emergency</th>
+                  <th className="p-3">Check-in</th>
                 </tr>
               </thead>
               <tbody className="text-sm">
                 {scoped.length === 0 ? (
                   <tr>
-                    <td className="p-4 text-white/60" colSpan={6}>
+                    <td className="p-4 text-white/60" colSpan={7}>
                       {lang === 'TH' ? 'ไม่มีข้อมูลสำหรับทริปนี้' : 'No bookings for this trip'}
                     </td>
                   </tr>
@@ -487,6 +637,22 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
                             </details>
                           ) : (
                             '—'
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {checkedIn.has(b.bookingId) ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full border text-xs font-semibold bg-emerald-500/15 text-emerald-200 border-emerald-400/25">
+                              ✅ {lang === 'TH' ? 'เช็คอินแล้ว' : 'Checked in'}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={checkingId === b.bookingId}
+                              onClick={() => void handleCheckIn(b)}
+                              className="px-3 py-1.5 rounded-full text-xs font-semibold border border-white/15 bg-white/5 hover:bg-white/10 disabled:opacity-50"
+                            >
+                              {checkingId === b.bookingId ? '…' : lang === 'TH' ? 'เช็คอิน' : 'Check in'}
+                            </button>
                           )}
                         </td>
                       </tr>
