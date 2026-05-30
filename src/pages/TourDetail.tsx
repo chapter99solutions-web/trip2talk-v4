@@ -273,6 +273,7 @@ export default function TourDetail() {
       ? staticFallback.highlightIcons
       : DEFAULT_HIGHLIGHT_ICONS;
   const itinerary = staticFallback?.itinerary ?? [];
+  const subPackages = staticFallback?.subPackages ?? [];
   const included = staticFallback?.included ?? [];
   const excluded = staticFallback?.excluded ?? [];
   const accommodation = staticFallback?.accommodation;
@@ -549,6 +550,31 @@ export default function TourDetail() {
                     {highlightIcons[i % highlightIcons.length]}
                   </span>
                   <p className="text-sm leading-relaxed text-slate-700 font-medium">{h}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Sub-packages — selectable photoshoot options with their own scope/price */}
+        {subPackages.length > 0 && (
+          <section>
+            <h2 className="font-serif text-2xl font-semibold text-slate-900 mb-4">
+              Packages — แพ็กเกจที่เลือกได้
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {subPackages.map((pkg, i) => (
+                <div
+                  key={i}
+                  className="rounded-2xl border border-slate-100 bg-slate-50 p-5 flex flex-col gap-2 hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="text-base font-semibold text-slate-900">{pkg.name}</h3>
+                    <span className="flex-shrink-0 inline-flex items-center px-3 py-1 rounded-full bg-teal/10 border border-teal/30 text-teal-700 text-xs font-bold">
+                      {pkg.price}
+                    </span>
+                  </div>
+                  <p className="text-sm leading-relaxed text-slate-600">{pkg.detail}</p>
                 </div>
               ))}
             </div>

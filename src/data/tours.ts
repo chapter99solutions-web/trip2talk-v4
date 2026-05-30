@@ -8,6 +8,13 @@ export type ItineraryDay = {
   desc: string;
 };
 
+/** A selectable sub-package within a trip (different scope/price options). */
+export type SubPackage = {
+  name: string;
+  detail: string;
+  price: string;
+};
+
 export type TourFallback = {
   tourCode: string;
   anonymizedTitle: string;
@@ -52,6 +59,8 @@ export type TourFallback = {
   galleryPhotos?: string[];
   /** Portfolio bucket folder whose images auto-populate the gallery at runtime (overrides galleryPhotos for the strip; galleryPhotos[0] stays the hero/cover). */
   galleryFolder?: string;
+  /** Selectable sub-packages (different scope/price options). Renders a dedicated "Packages" section in TourDetail when present. */
+  subPackages?: SubPackage[];
 };
 
 const PORTFOLIO_BASE =
@@ -502,15 +511,57 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
   {
     tourCode: 'SYD-1DAY',
     anonymizedTitle: 'Secret Sydney',
+    tourName: 'One Day Trip in Sydney & Photoshoot Packages (1 Day)',
+    nameTh:
+      'แพ็กเกจทริปถ่ายภาพซิดนีย์ 1 วันเต็ม (One Day Trip in Sydney & Photoshoot Packages)',
+    location: 'Sydney & surrounds, NSW',
     tripType: 'one_day',
     standardPrice: 250,
-    privatePrice: 680,
+    privatePrice: 250,
     durationLabel: '1 Day',
     season: 'all',
     maxPax: 4,
-    highlights: ['Sydney Hidden Gems', 'Milky Way Hunt', 'Anna Bay Dunes'],
+    rating: 4.8,
+    departureLabel: 'All seasons · 08:00 - 18:00 (Milky Way: Winter only, 18:00 - 23:00)',
+    weather: 'All seasons',
+    category: 'ทริปวันเดียว',
+    tagline:
+      'เริ่มต้น $250/ท่าน · มัดจำ $100 (No Refund Policy) · เวลา 08:00 - 18:00 (Milky Way: เฉพาะฤดูหนาว 18:00 - 23:00)',
+    highlights: ['Sydney 5 Best Locations', 'Anna Bay Sand Dunes', 'Milky Way Hunt', 'Kiama Coast'],
+    highlightIcons: ['📸', '🏜️', '🌌', '🌊'],
+    seatsLeft: 4,
     pickupType: 'thaitown_main',
-    description: "Discover Sydney's secret photography spots — from coastal cliffs to starlit skies.",
+    description:
+      'เปิดประสบการณ์การเดินทางถ่ายรูปสุดพิเศษในซิดนีย์ กับแพ็กเกจหลากหลายสไตล์ ไม่ต้องขับรถเอง มีตากล้องมืออาชีพพร้อมโดรนคอยบันทึกภาพ การันตีรูปโปรไฟล์ปังจน Instagram ลุกเป็นไฟ!',
+    subPackages: [
+      {
+        name: '1. Influencer Photoshoot',
+        detail:
+          '5 locations Sydney South & North · 3 hrs · unlimited outfit changes (เปลี่ยนชุดได้ไม่จำกัด)',
+        price: '$680 AUD/person',
+      },
+      {
+        name: '2. Sydney - Anna Bay',
+        detail: 'Long Jetty + Catherine Hill Bay + Anna Bay sand dunes',
+        price: 'from $250 AUD',
+      },
+      {
+        name: '3. Sydney - Kiama',
+        detail: 'Old Helensburgh Station + Seacliff Bridge + Bombo Headland',
+        price: 'from $250 AUD',
+      },
+      {
+        name: '4. Milky Way Hunt',
+        detail: 'Winter only · 18:00 - 23:00 · dark sky portrait + Milky Way',
+        price: 'from $250 AUD',
+      },
+    ],
+    included: ['รถ + คนขับ', 'ช่างภาพมืออาชีพ', 'โดรน', 'น้ำดื่ม'],
+    excluded: ['อาหาร', 'ประกันการเดินทาง'],
+    galleryPhotos: [
+      `${PORTFOLIO_BASE}/SYDNEY/506861557_10236863821565478_6038697174671264606_n.jpg`,
+    ],
+    galleryFolder: 'SYDNEY',
   },
 ];
 
