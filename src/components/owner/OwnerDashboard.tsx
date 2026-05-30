@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { daysUntilTrip, MARGIN_TABLE } from '../../lib/bookingRules';
 import { generatePortalLink } from '../../lib/platformBookings';
+import { supabase } from '../../lib/supabase';
+import { resolveDefaultTenantId } from '../../lib/customerJourney';
+import type { TourStatus } from '../../types/tour';
 import IntakeFormModal from '../IntakeFormModal';
 import FBInboxTrigger from '../FBInboxTrigger';
 
@@ -30,6 +33,93 @@ type TripRow = {
   departureStart?: string;
   departureEnd?: string;
 };
+
+// Row shape for the Supabase-backed `tours` table (subset we read/write here).
+type SupaTour = {
+  id: string;
+  trip_code: string | null;
+  title: string | null;
+  anonymized_title: string | null;
+  destination: string | null;
+  duration_text: string | null;
+  price_aud: number | null;
+  price_per_person: number | null;
+  private_price_aud: number | null;
+  max_pax: number | null;
+  start_date: string | null;
+  end_date: string | null;
+  status: TourStatus | null;
+  trip_type: string | null;
+  environment_tags: string[] | null;
+  description: string | null;
+  cover_image_url: string | null;
+};
+
+type TripForm = {
+  trip_code: string;
+  name_en: string;
+  name_th: string;
+  destination: string;
+  duration_text: string;
+  price_aud: string;
+  private_price_aud: string;
+  max_pax: string;
+  start_date: string;
+  end_date: string;
+  status: TourStatus;
+  trip_type: 'one_day' | 'overnight';
+  weather: string;
+  description: string;
+  cover_image_url: string;
+};
+
+const EMPTY_TRIP_FORM: TripForm = {
+  trip_code: '',
+  name_en: '',
+  name_th: '',
+  destination: '',
+  duration_text: '',
+  price_aud: '',
+  private_price_aud: '',
+  max_pax: '5',
+  start_date: '',
+  end_date: '',
+  status: 'ACTIVE',
+  trip_type: 'one_day',
+  weather: '',
+  description: '',
+  cover_image_url: '',
+};
+
+// Real tour_status enum values (supabase/01-schema-tours-staff.sql) with bilingual labels.
+const TOUR_STATUS_OPTIONS: { value: TourStatus; th: string; en: string }[] = [
+  { value: 'PLANNING', th: 'ร่าง (Planning)', en: 'Draft / Planning' },
+  { value: 'CONFIRMED', th: 'ยืนยันแล้ว', en: 'Confirmed' },
+  { value: 'ACTIVE', th: 'เปิดรับจอง', en: 'Active' },
+  { value: 'COMPLETED', th: 'จบทริปแล้ว', en: 'Completed' },
+  { value: 'CANCELLED', th: 'ยกเลิก', en: 'Cancelled' },
+];
+
+function statusLabel(lang: Lang, status: string | null): string {
+  const opt = TOUR_STATUS_OPTIONS.find((o) => o.value === status);
+  if (!opt) return status || '—';
+  return lang === 'TH' ? opt.th : opt.en;
+}
+
+function tourStatusBadge(status: string | null): string {
+  switch (status) {
+    case 'ACTIVE':
+      return 'bg-emerald-500/15 text-emerald-200 border-emerald-400/25';
+    case 'CONFIRMED':
+      return 'bg-amber-500/15 text-amber-200 border-amber-400/25';
+    case 'CANCELLED':
+      return 'bg-red-500/15 text-red-200 border-red-400/25';
+    case 'COMPLETED':
+      return 'bg-sky-500/15 text-sky-200 border-sky-400/25';
+    default:
+      return 'bg-white/5 text-white/70 border-white/10';
+  }
+}
 
 const NAVY = '#0d1b2a';
 const GOLD = '#d4af37';
@@ -136,10 +226,154 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
   const lastSyncedIso = useMemo(() => localStorage.getItem('t2t_owner_last_synced') || '', []);
   const [lastSynced, setLastSynced] = useState(lastSyncedIso);
 
+  // Supabase-backed tours management (Add / Edit / status toggle).
+  const [supaTours, setSupaTours] = useState<SupaTour[]>([]);
+  const [supaLoading, setSupaLoading] = useState(true);
+  const [tripModalOpen, setTripModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [tripForm, setTripForm] = useState<TripForm>(EMPTY_TRIP_FORM);
+  const [savingTrip, setSavingTrip] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  const showToast = useCallback((tone: 'ok' | 'err', msg: string, ms = 2600) => {
+    setToast({ tone, msg });
+    window.setTimeout(() => setToast(null), ms);
+  }, []);
+
+  const loadSupaTours = useCallback(async () => {
+    setSupaLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('tours')
+        .select('*')
+        .order('start_date', { ascending: true });
+      if (error) throw error;
+      setSupaTours((data ?? []) as SupaTour[]);
+    } catch (e) {
+      showToast('err', e instanceof Error ? e.message : 'Failed to load trips');
+      setSupaTours([]);
+    } finally {
+      setSupaLoading(false);
+    }
+  }, [showToast]);
+
+  useEffect(() => {
+    void loadSupaTours();
+  }, [loadSupaTours]);
+
+  const openAddTrip = () => {
+    setEditingId(null);
+    setTripForm(EMPTY_TRIP_FORM);
+    setTripModalOpen(true);
+  };
+
+  const openEditTrip = (row: SupaTour) => {
+    setEditingId(row.id);
+    setTripForm({
+      trip_code: row.trip_code || '',
+      name_en: row.title || '',
+      name_th: row.anonymized_title || '',
+      destination: row.destination || '',
+      duration_text: row.duration_text || '',
+      price_aud: row.price_aud != null ? String(row.price_aud) : '',
+      private_price_aud: row.private_price_aud != null ? String(row.private_price_aud) : '',
+      max_pax: row.max_pax != null ? String(row.max_pax) : '5',
+      start_date: row.start_date || '',
+      end_date: row.end_date || '',
+      status: (row.status as TourStatus) || 'PLANNING',
+      trip_type: row.trip_type === 'overnight' ? 'overnight' : 'one_day',
+      weather: Array.isArray(row.environment_tags) ? row.environment_tags[0] || '' : '',
+      description: row.description || '',
+      cover_image_url: row.cover_image_url || '',
+    });
+    setTripModalOpen(true);
+  };
+
+  const closeTripModal = () => {
+    if (savingTrip) return;
+    setTripModalOpen(false);
+    setEditingId(null);
+  };
+
+  const updateForm = <K extends keyof TripForm>(key: K, value: TripForm[K]) => {
+    setTripForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const saveTrip = async () => {
+    const tripCode = tripForm.trip_code.trim();
+    const nameEn = tripForm.name_en.trim();
+    const nameTh = tripForm.name_th.trim();
+    if (!tripCode || !nameEn || !nameTh) {
+      showToast('err', lang === 'TH' ? 'กรอกรหัสทริป + ชื่อ EN/TH ก่อน' : 'Tour Code, Name EN and Name TH are required');
+      return;
+    }
+
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const numericPrice = tripForm.price_aud.trim() ? Number(tripForm.price_aud) : 0;
+    const numericPrivate = tripForm.private_price_aud.trim() ? Number(tripForm.private_price_aud) : null;
+    const numericPax = tripForm.max_pax.trim() ? Number(tripForm.max_pax) : 5;
+
+    const payload: Record<string, unknown> = {
+      trip_code: tripCode,
+      title: nameEn,
+      anonymized_title: nameTh,
+      destination: tripForm.destination.trim() || nameEn,
+      duration_text: tripForm.duration_text.trim() || null,
+      price_aud: Number.isFinite(numericPrice) ? numericPrice : 0,
+      price_per_person: Number.isFinite(numericPrice) ? numericPrice : null,
+      private_price_aud: numericPrivate != null && Number.isFinite(numericPrivate) ? numericPrivate : null,
+      max_pax: Number.isFinite(numericPax) ? numericPax : 5,
+      start_date: tripForm.start_date || todayIso,
+      end_date: tripForm.end_date || tripForm.start_date || todayIso,
+      status: tripForm.status,
+      trip_type: tripForm.trip_type,
+      environment_tags: tripForm.weather.trim() ? [tripForm.weather.trim()] : null,
+      description: tripForm.description.trim() || null,
+      cover_image_url: tripForm.cover_image_url.trim() || null,
+    };
+
+    setSavingTrip(true);
+    try {
+      if (editingId) {
+        const { error } = await supabase.from('tours').update(payload).eq('id', editingId);
+        if (error) throw error;
+        showToast('ok', lang === 'TH' ? '✅ บันทึกการแก้ไขแล้ว' : '✅ Trip updated successfully');
+      } else {
+        const tenantId = await resolveDefaultTenantId();
+        if (tenantId) payload.tenant_id = tenantId;
+        const { error } = await supabase.from('tours').insert(payload);
+        if (error) throw error;
+        showToast('ok', '✅ Trip added successfully');
+      }
+      setTripModalOpen(false);
+      setEditingId(null);
+      await loadSupaTours();
+    } catch (e) {
+      showToast('err', e instanceof Error ? e.message : 'Save failed', 5000);
+    } finally {
+      setSavingTrip(false);
+    }
+  };
+
+  const toggleTripStatus = async (row: SupaTour) => {
+    const next: TourStatus = row.status === 'ACTIVE' ? 'CONFIRMED' : 'ACTIVE';
+    setTogglingId(row.id);
+    try {
+      const { error } = await supabase.from('tours').update({ status: next }).eq('id', row.id);
+      if (error) throw error;
+      showToast('ok', lang === 'TH' ? `อัปเดตสถานะเป็น ${next}` : `Status set to ${next}`);
+      await loadSupaTours();
+    } catch (e) {
+      showToast('err', e instanceof Error ? e.message : 'Status update failed', 5000);
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   const load = useCallback(async () => {
     const gasUrl = (import.meta.env.VITE_GAS_WEBAPP_URL as string | undefined)?.trim() || '';
@@ -595,6 +829,116 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
           </div>
         </section>
 
+        {/* SECTION 3.5 — Manage trips (Supabase tours) */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold tracking-wide" style={{ color: GOLD }}>
+              {lang === 'TH' ? 'จัดการทริป (Supabase)' : 'Manage trips (Supabase)'}
+            </h2>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void loadSupaTours()}
+                className="text-xs font-mono text-white/70 hover:text-white"
+              >
+                {lang === 'TH' ? 'รีเฟรช' : 'Refresh'}
+              </button>
+              <button
+                type="button"
+                onClick={openAddTrip}
+                className="px-3 py-2 rounded-full text-xs font-semibold border"
+                style={{ borderColor: GOLD, color: NAVY, background: GOLD }}
+              >
+                + {lang === 'TH' ? 'เพิ่มทริป' : 'Add Trip'}
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 overflow-x-auto">
+            <table className="min-w-[860px] w-full text-left">
+              <thead className="text-[11px] uppercase tracking-wider text-white/60">
+                <tr className="border-b border-white/10">
+                  <th className="p-3">Tour Code</th>
+                  <th className="p-3">Trip Name</th>
+                  <th className="p-3">Dates</th>
+                  <th className="p-3">Price</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="text-sm">
+                {supaLoading ? (
+                  <tr>
+                    <td className="p-4 text-white/60" colSpan={6}>
+                      {lang === 'TH' ? 'กำลังโหลด…' : 'Loading…'}
+                    </td>
+                  </tr>
+                ) : supaTours.length === 0 ? (
+                  <tr>
+                    <td className="p-4 text-white/60" colSpan={6}>
+                      {lang === 'TH' ? 'ยังไม่มีทริป กด “+ เพิ่มทริป”' : 'No trips yet — click “+ Add Trip”'}
+                    </td>
+                  </tr>
+                ) : (
+                  supaTours.map((t) => (
+                    <tr key={t.id} className="border-b border-white/5 align-top">
+                      <td className="p-3 font-mono text-xs" style={{ color: TEAL }}>
+                        {t.trip_code || '—'}
+                      </td>
+                      <td className="p-3">
+                        <div className="text-white/90">{t.title || '—'}</div>
+                        {t.anonymized_title && (
+                          <div className="text-xs text-white/50">{t.anonymized_title}</div>
+                        )}
+                      </td>
+                      <td className="p-3 font-mono text-xs text-white/70">
+                        {t.start_date || '—'}
+                        {t.end_date ? ` → ${t.end_date}` : ''}
+                      </td>
+                      <td className="p-3 font-mono text-xs text-white/80">
+                        {t.price_aud != null ? formatAud(t.price_aud) : '—'}
+                      </td>
+                      <td className="p-3">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full border text-xs font-semibold ${tourStatusBadge(t.status)}`}>
+                          {statusLabel(lang, t.status)}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openEditTrip(t)}
+                            className="px-3 py-1.5 rounded-full text-xs font-semibold border border-white/15 bg-white/5 hover:bg-white/10"
+                          >
+                            {lang === 'TH' ? 'แก้ไข' : 'Edit'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={togglingId === t.id}
+                            onClick={() => void toggleTripStatus(t)}
+                            className="px-3 py-1.5 rounded-full text-xs font-semibold border disabled:opacity-50"
+                            style={{ borderColor: TEAL, color: TEAL }}
+                          >
+                            {togglingId === t.id
+                              ? '…'
+                              : t.status === 'ACTIVE'
+                                ? lang === 'TH'
+                                  ? 'ตั้งเป็น Confirmed'
+                                  : 'Set Confirmed'
+                                : lang === 'TH'
+                                  ? 'ตั้งเป็น Active'
+                                  : 'Set Active'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         {/* SECTION 4 — Financial Margin Calculator */}
         <section className="space-y-3">
           <h2 className="text-sm font-semibold tracking-wide" style={{ color: GOLD }}>
@@ -680,6 +1024,214 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
             void load();
           }}
         />
+      )}
+
+      {tripModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+          onClick={closeTripModal}
+        >
+          <div
+            className="w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl border border-white/10"
+            style={{ background: NAVY }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-5 py-4 border-b border-white/10 backdrop-blur" style={{ background: 'rgba(13,27,42,0.92)' }}>
+              <div>
+                <p className="text-[11px] font-semibold tracking-[0.28em]" style={{ color: GOLD }}>
+                  {editingId ? (lang === 'TH' ? 'แก้ไขทริป' : 'EDIT TRIP') : lang === 'TH' ? 'เพิ่มทริปใหม่' : 'ADD NEW TRIP'}
+                </p>
+                <p className="text-xs text-white/50 font-mono">tours · Supabase</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeTripModal}
+                className="px-3 py-2 rounded-full text-xs font-semibold border border-white/15 bg-white/5 hover:bg-white/10"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="px-5 py-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label className="block sm:col-span-1">
+                <span className="text-xs text-white/60">{lang === 'TH' ? 'รหัสทริป (เช่น MEL-4D3N)' : 'Tour Code (e.g. MEL-4D3N)'} *</span>
+                <input
+                  value={tripForm.trip_code}
+                  onChange={(e) => updateForm('trip_code', e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  placeholder="MEL-4D3N"
+                />
+              </label>
+              <label className="block sm:col-span-1">
+                <span className="text-xs text-white/60">{lang === 'TH' ? 'หมวดหมู่' : 'Category'}</span>
+                <select
+                  value={tripForm.trip_type}
+                  onChange={(e) => updateForm('trip_type', e.target.value as TripForm['trip_type'])}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                >
+                  <option value="one_day">ทริปวันเดียว (One day)</option>
+                  <option value="overnight">ทริปค้างคืน (Overnight)</option>
+                </select>
+              </label>
+
+              <label className="block sm:col-span-1">
+                <span className="text-xs text-white/60">{lang === 'TH' ? 'ชื่อทริป (EN)' : 'Trip Name EN'} *</span>
+                <input
+                  value={tripForm.name_en}
+                  onChange={(e) => updateForm('name_en', e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  placeholder="Melbourne 4D3N"
+                />
+              </label>
+              <label className="block sm:col-span-1">
+                <span className="text-xs text-white/60">{lang === 'TH' ? 'ชื่อทริป (TH)' : 'Trip Name TH'} *</span>
+                <input
+                  value={tripForm.name_th}
+                  onChange={(e) => updateForm('name_th', e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  placeholder="เมลเบิร์น 4 วัน 3 คืน"
+                />
+              </label>
+
+              <label className="block sm:col-span-1">
+                <span className="text-xs text-white/60">{lang === 'TH' ? 'สถานที่' : 'Location'}</span>
+                <input
+                  value={tripForm.destination}
+                  onChange={(e) => updateForm('destination', e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  placeholder="Melbourne"
+                />
+              </label>
+              <label className="block sm:col-span-1">
+                <span className="text-xs text-white/60">{lang === 'TH' ? 'ระยะเวลา' : 'Duration'}</span>
+                <input
+                  value={tripForm.duration_text}
+                  onChange={(e) => updateForm('duration_text', e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  placeholder="4 Days 3 Nights"
+                />
+              </label>
+
+              <label className="block sm:col-span-1">
+                <span className="text-xs text-white/60">{lang === 'TH' ? 'ราคา/คน (AUD)' : 'Price per person (AUD)'}</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={tripForm.price_aud}
+                  onChange={(e) => updateForm('price_aud', e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  placeholder="0"
+                />
+              </label>
+              <label className="block sm:col-span-1">
+                <span className="text-xs text-white/60">{lang === 'TH' ? 'ราคาไพรเวท (AUD)' : 'Private price (AUD)'}</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={tripForm.private_price_aud}
+                  onChange={(e) => updateForm('private_price_aud', e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  placeholder="0"
+                />
+              </label>
+
+              <label className="block sm:col-span-1">
+                <span className="text-xs text-white/60">{lang === 'TH' ? 'จำนวนคนสูงสุด' : 'Max Pax'}</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={tripForm.max_pax}
+                  onChange={(e) => updateForm('max_pax', e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  placeholder="5"
+                />
+              </label>
+              <label className="block sm:col-span-1">
+                <span className="text-xs text-white/60">{lang === 'TH' ? 'สถานะ' : 'Status'}</span>
+                <select
+                  value={tripForm.status}
+                  onChange={(e) => updateForm('status', e.target.value as TourStatus)}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                >
+                  {TOUR_STATUS_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {lang === 'TH' ? o.th : o.en}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block sm:col-span-1">
+                <span className="text-xs text-white/60">{lang === 'TH' ? 'วันเริ่มทริป' : 'Trip Start Date'}</span>
+                <input
+                  type="date"
+                  value={tripForm.start_date}
+                  onChange={(e) => updateForm('start_date', e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                />
+              </label>
+              <label className="block sm:col-span-1">
+                <span className="text-xs text-white/60">{lang === 'TH' ? 'วันจบทริป' : 'Trip End Date'}</span>
+                <input
+                  type="date"
+                  value={tripForm.end_date}
+                  onChange={(e) => updateForm('end_date', e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                />
+              </label>
+
+              <label className="block sm:col-span-1">
+                <span className="text-xs text-white/60">{lang === 'TH' ? 'สภาพอากาศ' : 'Weather'}</span>
+                <input
+                  value={tripForm.weather}
+                  onChange={(e) => updateForm('weather', e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  placeholder="Sunny 18-24°C"
+                />
+              </label>
+              <label className="block sm:col-span-1">
+                <span className="text-xs text-white/60">{lang === 'TH' ? 'รูปปก (URL)' : 'Cover image URL'}</span>
+                <input
+                  value={tripForm.cover_image_url}
+                  onChange={(e) => updateForm('cover_image_url', e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  placeholder="https://…supabase.co/storage/…"
+                />
+              </label>
+
+              <label className="block sm:col-span-2">
+                <span className="text-xs text-white/60">{lang === 'TH' ? 'รายละเอียด' : 'Description'}</span>
+                <textarea
+                  value={tripForm.description}
+                  onChange={(e) => updateForm('description', e.target.value)}
+                  rows={3}
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm resize-y"
+                  placeholder={lang === 'TH' ? 'รายละเอียดทริป…' : 'Trip details…'}
+                />
+              </label>
+            </div>
+
+            <div className="sticky bottom-0 flex items-center justify-end gap-3 px-5 py-4 border-t border-white/10 backdrop-blur" style={{ background: 'rgba(13,27,42,0.92)' }}>
+              <button
+                type="button"
+                onClick={closeTripModal}
+                disabled={savingTrip}
+                className="px-4 py-2.5 rounded-full text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 disabled:opacity-50"
+              >
+                {lang === 'TH' ? 'ยกเลิก' : 'Cancel'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveTrip()}
+                disabled={savingTrip}
+                className="px-5 py-2.5 rounded-full text-sm font-semibold border disabled:opacity-50"
+                style={{ borderColor: GOLD, color: NAVY, background: GOLD }}
+              >
+                {savingTrip ? '…' : lang === 'TH' ? 'บันทึกทริป' : 'Save Trip'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
