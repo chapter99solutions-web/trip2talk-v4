@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 export type AppLanguage = 'TH' | 'EN';
 
@@ -61,6 +61,10 @@ const I18nContext = createContext<I18nContextValue | null>(null);
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<AppLanguage>(() => readStoredLanguage());
+
+  useEffect(() => {
+    document.documentElement.lang = lang === 'TH' ? 'th' : 'en';
+  }, [lang]);
 
   const setLang = useCallback((next: AppLanguage) => {
     setLangState(next);

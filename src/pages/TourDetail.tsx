@@ -58,8 +58,12 @@ export default function TourDetail() {
   }, [sheetTrip, staticFallback]);
 
   const usingFallback = Boolean(!sheetTrip && staticFallback && resolvedSheet);
+  const hasContent = Boolean(trip || resolvedSheet);
 
-  if (sheetLoading) {
+  // Only block on the network when there is nothing to show yet. When a static
+  // fallback (or local trip) exists we render immediately and let the live
+  // sheet data hydrate in the background — no full-screen spinner gate.
+  if (!hasContent && sheetLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="w-10 h-10 border-4 border-teal-500 border-t-transparent rounded-full animate-spin" />
@@ -67,7 +71,7 @@ export default function TourDetail() {
     );
   }
 
-  if (!trip && !resolvedSheet) {
+  if (!hasContent) {
     return (
       <div className="max-w-lg mx-auto px-4 py-16 text-center">
         <p className="text-red-600 font-sans">Trip not found.</p>
@@ -154,8 +158,18 @@ export default function TourDetail() {
 
   return (
     <div className="min-h-screen bg-white text-slate-900 pb-24">
-      <section className="relative h-[55vh] min-h-[360px] overflow-hidden">
-        <img src={heroImage} alt={title} className="absolute inset-0 w-full h-full object-cover" />
+      <section className="relative h-[55vh] min-h-[360px] overflow-hidden bg-slate-300">
+        <img
+          src={heroImage}
+          alt={title}
+          className="absolute inset-0 w-full h-full object-cover"
+          fetchPriority="high"
+          decoding="async"
+          onError={(e) => {
+            const img = e.currentTarget;
+            if (img.src !== FALLBACK_HERO) img.src = FALLBACK_HERO;
+          }}
+        />
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/60" />
 
         <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
@@ -183,7 +197,13 @@ export default function TourDetail() {
           </p>
 
           <h1 className="mt-3 text-[24px] leading-snug font-semibold text-slate-900">{title}</h1>
-          {(sheetError || usingFallback) && (
+          {sheetLoading && (
+            <p className="text-xs text-slate-400 mt-2 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" aria-hidden />
+              Updating live details…
+            </p>
+          )}
+          {!sheetLoading && (sheetError || usingFallback) && (
             <p className="text-xs text-amber-700 mt-2">
               {sheetError
                 ? 'Live sheet unavailable — showing curated trip details.'

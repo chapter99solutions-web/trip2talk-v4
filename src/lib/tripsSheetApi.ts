@@ -557,7 +557,44 @@ async function postToAppsScript(payload: Record<string, unknown>): Promise<void>
   }
 }
 
+const TRIPS_CACHE_TTL_MS = 5 * 60 * 1000;
+const GAS_ATTEMPT_TIMEOUT_MS = 7000;
+let tripsCache: { at: number; rows: TripSheetRow[] } | null = null;
+let tripsInflight: Promise<TripSheetRow[]> | null = null;
+
+/** fetch() with an AbortController timeout so a cold/slow GAS can't hang the UI. */
+function fetchWithTimeout(url: string, ms = GAS_ATTEMPT_TIMEOUT_MS): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { method: 'GET', cache: 'no-store', signal: ctrl.signal }).finally(() =>
+    clearTimeout(timer)
+  );
+}
+
+/**
+ * Cached + de-duped trips loader. Returns the memoized list within the TTL and
+ * collapses concurrent callers onto a single in-flight request. Successful
+ * results are cached; failures are not (so the next call retries).
+ */
 export async function fetchTripsFromSheet(): Promise<TripSheetRow[]> {
+  if (tripsCache && Date.now() - tripsCache.at < TRIPS_CACHE_TTL_MS) {
+    return tripsCache.rows;
+  }
+  if (tripsInflight) return tripsInflight;
+
+  tripsInflight = fetchTripsFromSheetUncached()
+    .then((rows) => {
+      tripsCache = { at: Date.now(), rows };
+      return rows;
+    })
+    .finally(() => {
+      tripsInflight = null;
+    });
+
+  return tripsInflight;
+}
+
+async function fetchTripsFromSheetUncached(): Promise<TripSheetRow[]> {
   const url = requireGasUrl();
 
   const attempts: { url: string; label: string }[] = [
@@ -572,7 +609,7 @@ export async function fetchTripsFromSheet(): Promise<TripSheetRow[]> {
 
   for (const { url: u, label } of attempts) {
     try {
-      const res = await fetch(u, { method: 'GET', cache: 'no-store' });
+      const res = await fetchWithTimeout(u);
       const bodyText = await res.text();
       if (!res.ok) {
         console.error('[GAS][Trips_Data] HTTP error', {

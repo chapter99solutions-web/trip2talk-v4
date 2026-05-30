@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useModelGallery } from '../hooks/useModelGallery';
 
 export interface PackingAssistantProps {
   tourCode: string;
@@ -6,704 +7,282 @@ export interface PackingAssistantProps {
   storageKey?: string;
 }
 
-interface PackingItem {
-  id: string;
+type Lang = 'TH' | 'EN';
+type ProfileId = 'AUS' | 'NZ';
+
+interface Bi {
   th: string;
   en: string;
-  category: 'prohibited' | 'declare' | 'recommended' | 'info';
 }
 
-interface WeightItem {
+interface PackGroup {
   id: string;
-  name: string;
-  weight: number;
+  icon: string;
+  title: Bi;
+  items: Bi[];
 }
+
+interface TripProfile {
+  id: ProfileId;
+  flag: string;
+  accent: string; // tailwind gradient classes for hero
+  shortLabel: Bi;
+  duration: Bi;
+  name: Bi;
+  heroWhy: Bi;
+  clothesSummary: Bi;
+  packGroups: PackGroup[];
+  avoid: Bi[];
+}
+
+const SLOGAN = 'แพ็คน้อย เที่ยวสบาย';
+const SLOGAN_EN = 'Pack light, travel easy';
+
+/** Shared minivan context — 8-seat van: 6 guests + guide Saen + driver. */
+const WHY_LIGHT: { icon: string; title: Bi; body: Bi }[] = [
+  {
+    icon: '🚐',
+    title: { th: 'พื้นที่ในรถตู้แชร์กัน', en: 'Shared van space' },
+    body: {
+      th: 'รถตู้ 8 ที่นั่ง (ลูกทัวร์ 6 + พี่แสน + คนขับ) พื้นที่เก็บกระเป๋าจำกัด ทุกคนต้องแพ็คเบาเพื่อให้ของลงครบ',
+      en: '8-seat van (6 guests + Saen + driver). Storage is limited — everyone packs light so all bags fit.',
+    },
+  },
+  {
+    icon: '📸',
+    title: { th: 'คล่องตัวเวลาเก็บภาพ', en: 'Mobility at photo spots' },
+    body: {
+      th: 'หลายจุดถ่ายต้องเดินเลาะ ขึ้น-ลงรถบ่อย กระเป๋าเบาทำให้ขยับไว ไม่พลาดช่วงแสงสวย',
+      en: 'Many spots need short walks and frequent van stops. Light bags = quick moves, no missed golden light.',
+    },
+  },
+  {
+    icon: '🧳',
+    title: { th: 'ยกขนสบาย ไม่เมื่อย', en: 'Easy luggage handling' },
+    body: {
+      th: 'เช็คอินโรงแรมหลายคืน ยกกระเป๋าขึ้น-ลงเอง กระเป๋าใบเดียวจัดการง่ายกว่าเยอะ',
+      en: 'Multiple hotel check-ins, lifting your own bags — one bag is far easier to manage.',
+    },
+  },
+];
+
+const CAMERA_BASE: Bi[] = [
+  { th: 'กล้อง + เลนส์ที่ถนัด (พกเท่าที่จำเป็น)', en: 'Camera + your go-to lens (only what you need)' },
+  { th: 'แบตเตอรี่สำรอง + การ์ดความจำสำรอง', en: 'Spare batteries + extra memory cards' },
+  { th: 'ที่ชาร์จ + หัวแปลงปลั๊ก (ออส/นิวซีแลนด์ ใช้ Type I)', en: 'Chargers + plug adapter (AU/NZ Type I)' },
+  { th: 'พาวเวอร์แบงก์ (พกขึ้นเครื่องเท่านั้น ห้ามโหลด)', en: 'Power bank (carry-on only — never checked)' },
+];
+
+const TOILETRIES_BASE: Bi[] = [
+  { th: 'ของใช้ขนาดพกพา (ของเหลวไม่เกิน 100ml ต่อชิ้น)', en: 'Travel-size items (liquids ≤100ml each)' },
+  { th: 'ครีมกันแดด SPF50+ + ลิปมัน + แว่นกันแดด', en: 'SPF50+ sunscreen + lip balm + sunglasses' },
+  { th: 'ยาประจำตัว + ยาสามัญ (พารา, ยาแก้เมารถ)', en: 'Personal meds + basics (paracetamol, motion-sickness)' },
+];
+
+const PROFILES: Record<ProfileId, TripProfile> = {
+  AUS: {
+    id: 'AUS',
+    flag: '🇦🇺',
+    accent: 'from-teal-500 to-emerald-600',
+    shortLabel: { th: 'ออสเตรเลีย', en: 'Australia' },
+    duration: { th: '3 คืน 4 วัน', en: '3N4D' },
+    name: { th: 'ทริปออสเตรเลีย · 3 คืน 4 วัน', en: 'Australia Trip · 3N4D' },
+    heroWhy: {
+      th: 'ทริปสั้นกระชับ ขนของน้อย เดินทางคล่อง เก็บภาพได้เต็มที่ทุกพิกัด',
+      en: 'A short, snappy trip — pack minimal, move freely, and capture every spot.',
+    },
+    clothesSummary: { th: 'เสื้อผ้า 3-4 ชุด', en: '3-4 outfits' },
+    packGroups: [
+      {
+        id: 'clothes',
+        icon: '👕',
+        title: { th: 'เสื้อผ้า', en: 'Clothes' },
+        items: [
+          { th: 'เสื้อผ้า 3-4 ชุด เน้นมิกซ์แอนด์แมตช์ได้หลายลุค', en: '3-4 outfits, mix-and-match friendly' },
+          { th: 'แจ็คเก็ตกันลม 1 ตัว (เช้า-เย็นอากาศเย็น)', en: '1 windproof jacket (cool mornings/evenings)' },
+          { th: 'ชุดนอน + ชุดชั้นในพอดีจำนวนวัน', en: 'Sleepwear + underwear for the trip length' },
+          { th: 'รองเท้าผ้าใบ 1 คู่ + รองเท้าแตะ 1 คู่', en: '1 pair sneakers + 1 pair sandals' },
+        ],
+      },
+      { id: 'camera', icon: '📷', title: { th: 'อุปกรณ์กล้อง', en: 'Camera gear' }, items: CAMERA_BASE },
+      { id: 'toiletries', icon: '🧴', title: { th: 'ของใช้ส่วนตัว', en: 'Toiletries' }, items: TOILETRIES_BASE },
+      {
+        id: 'docs',
+        icon: '📄',
+        title: { th: 'เอกสารสำคัญ', en: 'Documents' },
+        items: [
+          { th: 'พาสปอร์ต (เหลืออายุ 6 เดือนขึ้นไป)', en: 'Passport (6+ months validity)' },
+          { th: 'วีซ่า/ETA + เอกสารประกันเดินทาง', en: 'Visa/ETA + travel insurance' },
+          { th: 'สำเนาใบจองทริป + ตั๋วเครื่องบิน', en: 'Booking confirmation + flight tickets' },
+        ],
+      },
+    ],
+    avoid: [
+      { th: 'กระเป๋าเดินทางใบใหญ่เกินไป — ใต้ท้องรถตู้พื้นที่จำกัด', en: 'Oversized luggage — van storage is limited' },
+      { th: 'รองเท้าหลายคู่ (2 คู่พอ)', en: 'Too many shoes (2 pairs is plenty)' },
+      { th: 'เสื้อผ้าเผื่อเยอะเกินจำนวนวัน', en: 'More clothes than days' },
+      { th: 'ไดร์เป่าผม/อุปกรณ์ไฟฟ้าหนัก — ที่พักมีให้', en: 'Hair dryer/heavy appliances — provided at stays' },
+      { th: 'ของมีค่าชิ้นใหญ่/เครื่องประดับไม่จำเป็น', en: 'Bulky valuables/unnecessary jewelry' },
+    ],
+  },
+  NZ: {
+    id: 'NZ',
+    flag: '🇳🇿',
+    accent: 'from-sky-600 to-indigo-700',
+    shortLabel: { th: 'นิวซีแลนด์', en: 'New Zealand' },
+    duration: { th: '5 คืน 6 วัน', en: '5N6D' },
+    name: { th: 'ทริปนิวซีแลนด์ · 5 คืน 6 วัน', en: 'New Zealand Trip · 5N6D' },
+    heroWhy: {
+      th: 'ทริปยาวขึ้น เน้นเลเยอร์เสื้อผ้าตามอากาศที่เปลี่ยนไว และต้องผ่านกฎ Biosecurity ที่เข้มงวด',
+      en: 'A longer trip — layer for fast-changing weather and prepare for strict biosecurity checks.',
+    },
+    clothesSummary: { th: 'เสื้อผ้า 5-6 ชุด + เลเยอร์', en: '5-6 outfits + layers' },
+    packGroups: [
+      {
+        id: 'clothes',
+        icon: '👕',
+        title: { th: 'เสื้อผ้า (เน้นเลเยอร์)', en: 'Clothes (layer up)' },
+        items: [
+          { th: 'เสื้อผ้า 5-6 ชุด ใส่ซ้อนเลเยอร์ปรับตามอากาศได้', en: '5-6 outfits, layer-friendly' },
+          { th: 'เสื้อกันหนาว + เสื้อฮีทเทค (กลางคืนหนาวจัด)', en: 'Warm jacket + thermal base layer (cold nights)' },
+          { th: 'เสื้อกันฝน/แจ็คเก็ตกันน้ำ (อากาศ NZ เปลี่ยนไว)', en: 'Rain jacket (NZ weather changes fast)' },
+          { th: 'หมวกไหมพรม + ถุงมือ + ผ้าพันคอ', en: 'Beanie + gloves + scarf' },
+          { th: 'รองเท้าเดินสบายกันลื่น 1 คู่ + รองเท้าแตะ', en: '1 pair comfy non-slip shoes + sandals' },
+        ],
+      },
+      {
+        id: 'camera',
+        icon: '📷',
+        title: { th: 'อุปกรณ์กล้อง', en: 'Camera gear' },
+        items: [
+          ...CAMERA_BASE,
+          { th: 'ถุงทำความร้อน (Hand Warmer) ห่อแบตสำรอง — อากาศหนาวแบตหมดไว', en: 'Hand warmers for spare batteries (cold drains them fast)' },
+        ],
+      },
+      { id: 'toiletries', icon: '🧴', title: { th: 'ของใช้ส่วนตัว', en: 'Toiletries' }, items: TOILETRIES_BASE },
+      {
+        id: 'docs',
+        icon: '📄',
+        title: { th: 'เอกสารสำคัญ', en: 'Documents' },
+        items: [
+          { th: 'พาสปอร์ต (เหลืออายุ 6 เดือนขึ้นไป)', en: 'Passport (6+ months validity)' },
+          { th: 'NZeTA + IVL (ลงทะเบียนออนไลน์ก่อนเดินทาง)', en: 'NZeTA + IVL (register online before travel)' },
+          { th: 'เอกสารประกันเดินทาง', en: 'Travel insurance documents' },
+          { th: 'สำเนาใบจองทริป + ตั๋วเครื่องบิน', en: 'Booking confirmation + flight tickets' },
+        ],
+      },
+    ],
+    avoid: [
+      { th: 'อาหารสด/ของกินติดมือ — ผิดกฎ Biosecurity (ดูด้านล่าง)', en: 'Fresh food/snacks — breaks biosecurity rules (see below)' },
+      { th: 'กระเป๋าเดินทางใบใหญ่เกินไป — ใต้ท้องรถตู้พื้นที่จำกัด', en: 'Oversized luggage — van storage is limited' },
+      { th: 'รองเท้าหลายคู่ (2 คู่พอ)', en: 'Too many shoes (2 pairs is plenty)' },
+      { th: 'เสื้อผ้าฤดูร้อนล้วน — NZ หนาวและเปลี่ยนอากาศไว', en: 'Summer-only clothes — NZ is cold and unpredictable' },
+      { th: 'ไดร์เป่าผม/อุปกรณ์ไฟฟ้าหนัก — ที่พักมีให้', en: 'Hair dryer/heavy appliances — provided at stays' },
+    ],
+  },
+};
+
+const NZ_BIOSECURITY_PROHIBITED: Bi[] = [
+  { th: '🍎 ผลไม้สด & ผักสดทุกชนิด', en: '🍎 All fresh fruit & vegetables' },
+  { th: '🥩 เนื้อสัตว์ทุกชนิด (สด / แห้ง / แปรรูป)', en: '🥩 Any meat (fresh / dried / processed)' },
+  { th: '🍯 น้ำผึ้ง & ผลิตภัณฑ์จากผึ้ง', en: '🍯 Honey & bee products' },
+  { th: '🌱 เมล็ดพันธุ์ พืช ดอกไม้สด', en: '🌱 Seeds, plants, fresh flowers' },
+  { th: '🥾 ดินติดรองเท้า/อุปกรณ์ — ล้างให้สะอาดก่อนบิน!', en: '🥾 Soil on shoes/gear — clean before flying!' },
+  { th: '🪵 ไม้ ของแกะสลักไม้ งานจักสาน', en: '🪵 Wood, wooden carvings, woven items' },
+];
 
 interface LookbookCard {
   id: string;
-  locationTH: string;
-  locationEN: string;
-  outfitTH: string;
-  outfitEN: string;
-  poseTH: string;
-  poseEN: string;
-  image: string;
+  location: Bi;
+  outfit: Bi;
+  pose: Bi;
   season: string;
 }
 
-const CARRY_ON_PROHIBITED: PackingItem[] = [
+/** Editorial outfit & pose ideas — paired with model photos from Supabase. */
+const LOOKBOOK: LookbookCard[] = [
   {
-    id: 'powerbank',
-    th: 'Power Bank — ต้องพกขึ้นเครื่องเท่านั้น ห้ามโหลดใต้เครื่องเด็ดขาด (ไม่เกิน 32,000 mAh)',
-    en: 'Power Bank — Carry-on ONLY. Never check in. (Max 32,000 mAh)',
-    category: 'prohibited',
+    id: 'helensburgh',
+    location: { th: 'สถานีรถไฟร้าง Helensburgh', en: 'Helensburgh Old Station' },
+    outfit: { th: 'เสื้อ Vintage ลายตาราง + กางเกงผ้าทีโทน', en: 'Vintage plaid shirt + neutral wide-leg trousers' },
+    pose: { th: 'หันหลังมองในอุโมงค์ แสงลอดผ่าน', en: 'Back-to-camera gazing into the tunnel light' },
+    season: '🍂 Autumn/Winter',
   },
   {
-    id: 'liquids',
-    th: 'ของเหลวเกิน 100ml — รวมไม่เกิน 1,000ml ใส่ถุง Zip Lock ใส 1 ลิตร',
-    en: 'Liquids over 100ml — Max 1,000ml total in 1L clear zip lock bag',
-    category: 'prohibited',
+    id: 'bombo',
+    location: { th: 'เสาหินบะซอลต์ Bombo Headland', en: 'Bombo Headland Quarry' },
+    outfit: { th: 'Windbreaker สีสด + กางเกงยีนส์ทรงกระบอก', en: 'Bright windbreaker + straight-leg jeans' },
+    pose: { th: 'เดินตัดเฟรมหินพร้อมลมพัด ไดนามิก', en: 'Dynamic walk pose between basalt columns' },
+    season: '❄️ Winter',
   },
   {
-    id: 'sharp',
-    th: 'วัตถุมีคม — กรรไกร มีดพก มีดตัดเล็บ และอาวุธทุกชนิด',
-    en: 'Sharp objects — Scissors, pocket knives, nail clippers with blades, all weapons',
-    category: 'prohibited',
-  },
-  {
-    id: 'lighter',
-    th: 'ไฟแช็ก/ไม้ขีดไฟ — ห้ามโหลดใต้เครื่อง บางสายการบินห้ามพกขึ้นด้วย ตรวจสอบก่อนบิน',
-    en: "Lighters/Matches — Prohibited in checked baggage. Check your airline's carry-on rules",
-    category: 'prohibited',
-  },
-  {
-    id: 'battery',
-    th: 'แบตเตอรี่ลิเธียม 100-160Wh — ต้องขออนุญาตสายการบินก่อนบินทุกครั้ง',
-    en: 'Lithium Batteries 100-160Wh — Require airline approval before every flight',
-    category: 'prohibited',
+    id: 'seacliff',
+    location: { th: 'สะพาน Seacliff Bridge', en: 'Seacliff Bridge' },
+    outfit: { th: 'เดรสลายดอกเล็ก + รองเท้า Sneaker ขาว', en: 'Small floral dress + white sneakers' },
+    pose: { th: 'เอนพิงราวสะพาน มองทะเลด้านล่าง', en: 'Leaning on railing gazing at ocean below' },
+    season: '🌸 Spring',
   },
 ];
 
-const NZ_PROHIBITED: PackingItem[] = [
-  {
-    id: 'nz-food',
-    th: '🍎 อาหารสด & ผลไม้ — ผลไม้สด ผักสด เนื้อสัตว์ดิบ ไส้กรอก กุนเชียง หมูแดดเดียว ไข่สด',
-    en: '🍎 Fresh Food & Fruits — Fresh fruits, vegetables, raw meat, sausages, pork jerky, fresh eggs',
-    category: 'prohibited',
-  },
-  {
-    id: 'nz-plants',
-    th: '🌾 พืช เมล็ดพันธุ์ & ดิน — เมล็ดพันธุ์ ต้นไม้ ดินติดรองเท้า (ล้างรองเท้าก่อนบิน!) ขนนก ขนสัตว์ดิบ',
-    en: '🌾 Plants, Seeds & Soil — Seeds, live plants, soil on shoes (Clean boots before flying!), feathers, raw wool',
-    category: 'prohibited',
-  },
-  {
-    id: 'nz-meds',
-    th: '💊 ยา & อาหารเสริม — ยาบางชนิดต้องมีใบสั่งแพทย์ภาษาอังกฤษ, CBD Oil/กัญชา ผิดกฎหมายเด็ดขาด',
-    en: '💊 Medicine & Supplements — Some meds need English prescription. CBD Oil/Cannabis strictly illegal',
-    category: 'prohibited',
-  },
-  {
-    id: 'nz-animals',
-    th: '🐾 ผลิตภัณฑ์จากสัตว์ — อาหารสัตว์เลี้ยง หนังสัตว์ดิบ กระดูกดิบ ผลิตภัณฑ์ยังไม่ผ่านแปรรูป',
-    en: '🐾 Animal Products — Pet food, raw skins, bones, unprocessed animal products',
-    category: 'prohibited',
-  },
-];
-
-const NZ_DECLARE: PackingItem[] = [
-  {
-    id: 'nz-processed',
-    th: 'อาหารแปรรูปในบรรจุภัณฑ์ปิดสนิท เช่น บะหมี่กึ่งสำเร็จรูป ขนมถุง',
-    en: 'Packaged processed foods e.g. instant noodles, sealed snack bags',
-    category: 'declare',
-  },
-  {
-    id: 'nz-rx',
-    th: 'ยาประจำตัวพร้อมเอกสารแพทย์ภาษาอังกฤษ',
-    en: "Prescription medicines with English doctor's documents",
-    category: 'declare',
-  },
-  {
-    id: 'nz-gear',
-    th: 'อุปกรณ์เดินป่า/แคมป์ที่เคยใช้งานแล้ว และรองเท้าเดินป่า',
-    en: 'Used camping/hiking gear and previously worn hiking boots',
-    category: 'declare',
-  },
-];
-
-const LOOKBOOK_DATA: Record<string, LookbookCard[]> = {
-  KIA: [
-    {
-      id: 'kia-1',
-      locationTH: 'สถานีรถไฟร้าง Helensburgh',
-      locationEN: 'Helensburgh Old Station',
-      outfitTH: 'เสื้อ Vintage ลายตาราง + กางเกงผ้าทีโทน',
-      outfitEN: 'Vintage plaid shirt + neutral wide-leg trousers',
-      poseTH: 'หันหลังมองในอุโมงค์ แสงลอดผ่าน',
-      poseEN: 'Back-to-camera gazing into the tunnel light',
-      image: '/images/placeholder-lookbook1.jpg',
-      season: '🍂 Autumn/Winter',
-    },
-    {
-      id: 'kia-2',
-      locationTH: 'เสาหินบะซอลต์ Bombo Headland',
-      locationEN: 'Bombo Headland Quarry',
-      outfitTH: 'Windbreaker สีสด + กางเกงยีนส์ทรงกระบอก',
-      outfitEN: 'Bright windbreaker + straight-leg jeans',
-      poseTH: 'เดินตัดเฟรมหินพร้อมลมพัด ไดนามิก',
-      poseEN: 'Dynamic walk pose between basalt columns',
-      image: '/images/placeholder-lookbook2.jpg',
-      season: '❄️ Winter',
-    },
-    {
-      id: 'kia-3',
-      locationTH: 'สะพาน Seacliff Bridge',
-      locationEN: 'Seacliff Bridge',
-      outfitTH: 'เดรสลายดอกเล็ก + รองเท้า Sneaker ขาว',
-      outfitEN: 'Small floral dress + white sneakers',
-      poseTH: 'เอนพิงราวสะพาน มองทะเลด้านล่าง',
-      poseEN: 'Leaning on railing gazing at ocean below',
-      image: '/images/placeholder-lookbook3.jpg',
-      season: '🌸 Spring',
-    },
-  ],
-  MEL: [
-    {
-      id: 'mel-1',
-      locationTH: '12 Apostles ยามพระอาทิตย์ตก',
-      locationEN: '12 Apostles Sunset',
-      outfitTH: 'แจ็กเก็ตสีมัสตาร์ด + กางเกงสีดำ',
-      outfitEN: 'Mustard jacket + black trousers',
-      poseTH: 'จับขอบหมวก มองออกทะเล แสงทอง',
-      poseEN: 'Hold hat brim, gaze to sea in golden light',
-      image: '/images/placeholder-lookbook1.jpg',
-      season: '🍂 Autumn',
-    },
-    {
-      id: 'mel-2',
-      locationTH: 'Pink Lake ทุ่งสีชมพู',
-      locationEN: 'Pink Lake',
-      outfitTH: 'เดรสสีขาวหรือพาสเทล ล้อสีทะเลสาบ',
-      outfitEN: "White or pastel dress echoing the lake's hue",
-      poseTH: 'หมุนตัว กระโปรงบาน กลางทะเลสาบสีชมพู',
-      poseEN: 'Twirling dress spin with pink lake as backdrop',
-      image: '/images/placeholder-lookbook2.jpg',
-      season: '🌸 Spring',
-    },
-    {
-      id: 'mel-3',
-      locationTH: 'Melbourne Street Art Lanes',
-      locationEN: 'Melbourne Street Art',
-      outfitTH: 'เสื้อโค้ทสีสด + รองเท้าบูทหนัง',
-      outfitEN: 'Bold color coat + leather ankle boots',
-      poseTH: 'เดินหันหน้าเข้าตรอก อาร์ตดิบ',
-      poseEN: 'Walking toward lane with graffiti walls',
-      image: '/images/placeholder-lookbook3.jpg',
-      season: '🍂 Autumn',
-    },
-  ],
-  ULU: [
-    {
-      id: 'ulu-1',
-      locationTH: 'Uluru พระอาทิตย์ตก',
-      locationEN: 'Uluru Sunset',
-      outfitTH: 'เสื้อโบโฮมิเอน สีน้ำตาลดิน + หมวกปีกกว้าง',
-      outfitEN: 'Bohemian earth-tone top + wide-brim hat',
-      poseTH: 'โปรไฟล์ข้าง มองทะเลทราย แสงส้มแดง',
-      poseEN: 'Side profile gazing at desert in warm red light',
-      image: '/images/placeholder-lookbook1.jpg',
-      season: '☀️ All year',
-    },
-    {
-      id: 'ulu-2',
-      locationTH: 'Field of Light 50,000 ดวง',
-      locationEN: 'Field of Light',
-      outfitTH: 'เดรสสีเข้ม Navy/Burgundy ตัดกับแสงไฟ',
-      outfitEN: 'Dark navy or burgundy dress against glowing lights',
-      poseTH: 'นั่งกลางแสงไฟ มองขึ้นฟ้าดาว',
-      poseEN: 'Sitting among lights gazing up at star-filled sky',
-      image: '/images/placeholder-lookbook2.jpg',
-      season: '🌙 Night',
-    },
-    {
-      id: 'ulu-3',
-      locationTH: 'Kata Tjuta The Olgas',
-      locationEN: 'Kata Tjuta Domes',
-      outfitTH: 'เสื้อลินิน สีครีม + กางเกงขาบาน',
-      outfitEN: 'Cream linen shirt + wide-leg pants',
-      poseTH: 'เดินระหว่างโดมหิน แสงย้อน Silhouette',
-      poseEN: 'Walking between giant domes — dramatic silhouette',
-      image: '/images/placeholder-lookbook3.jpg',
-      season: '🌅 Golden hour',
-    },
-  ],
-  NZ: [
-    {
-      id: 'nz-1',
-      locationTH: 'Lake Tekapo ดอกลูพิน',
-      locationEN: 'Lake Tekapo Lupins',
-      outfitTH: 'เดรสสีม่วงลาเวนเดอร์ ล้อสีดอกลูพิน',
-      outfitEN: 'Lavender dress echoing the lupin flowers',
-      poseTH: 'นั่งกลางทุ่งลูพิน มองทะเลสาบ',
-      poseEN: 'Sitting in lupin field gazing toward the lake',
-      image: '/images/placeholder-lookbook1.jpg',
-      season: '🌸 Spring',
-    },
-    {
-      id: 'nz-2',
-      locationTH: 'Wanaka ต้นไม้กลางน้ำ',
-      locationEN: 'Wanaka Lone Tree',
-      outfitTH: 'เสื้อโค้ทสีแคมแมล + บูทหนัง',
-      outfitEN: 'Camel coat + leather boots',
-      poseTH: 'ยืนในน้ำมองต้นไม้โดดเดี่ยว แสงอาทิตย์ขึ้น',
-      poseEN: 'Standing in shallow water facing the lone tree at sunrise',
-      image: '/images/placeholder-lookbook2.jpg',
-      season: '🍂 Autumn',
-    },
-    {
-      id: 'nz-3',
-      locationTH: 'Milford Sound หน้าผาน้ำตก',
-      locationEN: 'Milford Sound Waterfall',
-      outfitTH: 'ชุดกันลม Rain jacket สีสด + หมวก Beanie',
-      outfitEN: 'Bright rain jacket + cozy beanie',
-      poseTH: 'กางแขนออก รับสายน้ำตกเบื้องหลัง',
-      poseEN: 'Arms wide open with waterfall cascading behind',
-      image: '/images/placeholder-lookbook3.jpg',
-      season: '❄️ Winter',
-    },
-  ],
-  TAS: [
-    {
-      id: 'tas-1',
-      locationTH: 'Mt. Wellington ล่าแสงใต้',
-      locationEN: 'Mt. Wellington Aurora Hunt',
-      outfitTH: 'โค้ทหนาสีเข้ม + ถุงมือและหมวกไหมพรม',
-      outfitEN: 'Dark heavy coat + warm beanie and gloves',
-      poseTH: 'ยืนหันหลัง มองแสงออโรร่าบนท้องฟ้า',
-      poseEN: 'Back-to-camera silhouette under aurora lights',
-      image: '/images/placeholder-lookbook1.jpg',
-      season: '❄️ Winter',
-    },
-    {
-      id: 'tas-2',
-      locationTH: 'Bruny Island The Neck',
-      locationEN: 'Bruny Island The Neck',
-      outfitTH: 'เสื้อสีฟ้าครามหรือเขียว ตัดกับทะเล',
-      outfitEN: 'Teal or ocean blue top against seascape',
-      poseTH: 'เดินบนสันดอนทราย มองสองฝั่งทะเล',
-      poseEN: 'Walking the narrow sandbar between two seas',
-      image: '/images/placeholder-lookbook2.jpg',
-      season: '🌸 All seasons',
-    },
-    {
-      id: 'tas-3',
-      locationTH: 'Bridestowe Lavender',
-      locationEN: 'Bridestowe Lavender Farm',
-      outfitTH: 'เดรสสีขาวหรือลาเวนเดอร์ ล้อทุ่งม่วง',
-      outfitEN: 'White or lavender dress among purple fields',
-      poseTH: 'นอนตะแคงกลางแถวลาเวนเดอร์',
-      poseEN: 'Lying sideways between rows of lavender',
-      image: '/images/placeholder-lookbook3.jpg',
-      season: '🌸 Summer',
-    },
-  ],
-  CAN: [
-    {
-      id: 'can-1',
-      locationTH: 'ทุ่งดอกคาโนล่า Cowra',
-      locationEN: 'Cowra Canola Fields',
-      outfitTH: 'เดรสสีขาวหรือ Sage Green ตัดกับเหลืองทอง',
-      outfitEN: 'White or sage green dress against golden canola',
-      poseTH: 'กางแขน หมุนตัว กลางทุ่งเหลืองทอง',
-      poseEN: 'Spinning in canola field arms wide open',
-      image: '/images/placeholder-lookbook1.jpg',
-      season: '🌸 Spring',
-    },
-    {
-      id: 'can-2',
-      locationTH: 'สวนญี่ปุ่น Cowra',
-      locationEN: 'Cowra Japanese Garden',
-      outfitTH: 'เสื้อสีพาสเทล + กางเกงสีครีม สไตล์ญี่ปุ่น',
-      outfitEN: 'Pastel top + cream pants — minimal Japanese style',
-      poseTH: 'นั่งริมสะพานสีแดง มองลำธาร',
-      poseEN: 'Sitting on red bridge gazing at stream below',
-      image: '/images/placeholder-lookbook2.jpg',
-      season: '🌸 Spring',
-    },
-  ],
-  SYD: [
-    {
-      id: 'syd-1',
-      locationTH: 'Anna Bay เนินทรายขาว',
-      locationEN: 'Anna Bay Sand Dunes',
-      outfitTH: 'เดรสหรือเสื้อสีขาว ล้อทรายสีครีม',
-      outfitEN: 'White or cream dress echoing the pale dunes',
-      poseTH: 'วิ่งลงเนินทราย กระโปรงบาน',
-      poseEN: 'Running down dune with flowing skirt',
-      image: '/images/placeholder-lookbook1.jpg',
-      season: '☀️ Summer',
-    },
-    {
-      id: 'syd-2',
-      locationTH: 'Long Jetty ท่าเรือไม้ยาว',
-      locationEN: 'Long Jetty Pier',
-      outfitTH: 'เสื้อแถบแนวนอนสีน้ำเงิน/ขาว ธีม Nautical',
-      outfitEN: 'Navy/white nautical stripes top',
-      poseTH: 'เดินบนท่าเรือ มองออกทะเล ไม่หันหน้า',
-      poseEN: 'Walking jetty toward sea — back to camera',
-      image: '/images/placeholder-lookbook2.jpg',
-      season: '🌸 All seasons',
-    },
-  ],
-};
-
-function getLookbookCards(tourCode: string): LookbookCard[] {
-  const code = tourCode.toUpperCase();
-  for (const key of Object.keys(LOOKBOOK_DATA)) {
-    if (code.includes(key)) return LOOKBOOK_DATA[key]!;
-  }
-  return LOOKBOOK_DATA.SYD!;
+function resolveProfile(tourCode: string): ProfileId {
+  return tourCode.toUpperCase().includes('NZ') ? 'NZ' : 'AUS';
 }
 
-function getPackingItems(tourCode: string): PackingItem[] {
-  const code = tourCode.toUpperCase();
-  const items: PackingItem[] = [
-    {
-      id: 'camera',
-      th: 'กล้อง + เลนส์ + ฟิลเตอร์ ND/CPL + การ์ดความจำสำรองเผื่อเยอะ ๆ',
-      en: 'Camera + lenses + ND/CPL filters + extra memory cards',
-      category: 'recommended',
-    },
-    {
-      id: 'chargers',
-      th: 'สายชาร์จกล้อง + มือถือ + รางปลั๊กพกพา (แชร์ชาร์จใน Dorm ได้สะดวก)',
-      en: 'Camera + phone charger + portable power strip (great for dorm sharing)',
-      category: 'recommended',
-    },
-    {
-      id: 'toiletries',
-      th: 'ผ้าขนหนูเล็ก + แปรงสีฟัน + แชมพู/สบู่พกพา',
-      en: 'Small towel + toothbrush + travel-size shampoo/soap',
-      category: 'recommended',
-    },
-    {
-      id: 'passport',
-      th: 'หนังสือเดินทาง — ตรวจสอบอายุเหลือ 6 เดือน+',
-      en: 'Passport — verify at least 6 months remaining validity',
-      category: 'info',
-    },
-    {
-      id: 'insurance',
-      th: 'เอกสารประกันเดินทาง',
-      en: 'Travel insurance documents',
-      category: 'info',
-    },
-    {
-      id: 'booking',
-      th: 'สำเนาใบจองทริป + เอกสารสำคัญ',
-      en: 'Booking confirmation printout + important documents',
-      category: 'info',
-    },
-  ];
-
-  if (code.includes('TAS') || code.includes('NZ') || code === 'KIA-1DAY') {
-    items.push(
-      {
-        id: 'heattech',
-        th: 'เสื้อฮีทเทค Ultra Warm + โค้ทกันลม/ขนเป็ด (Mt.Wellington & Cradle Mountain หนาวจัดช่วงค่ำ!)',
-        en: 'Ultra Warm Heattech + windproof/down jacket (Mt.Wellington & Cradle are freezing at night!)',
-        category: 'recommended',
-      },
-      {
-        id: 'beanie',
-        th: 'หมวกไหมพรม + ถุงมือเปิดปลายนิ้ว (กดกล้อง/มือถือสะดวกหน้างาน)',
-        en: 'Beanie + fingerless gloves (essential for camera & phone operation)',
-        category: 'recommended',
-      },
-      {
-        id: 'hotpacks',
-        th: 'ถุงทรายร้อน (Hot Packs) ห่อแบตกล้องสำรอง — ความหนาวทำแบตหมดเร็วเท่าตัว!',
-        en: 'Hand warmers to wrap spare camera batteries — cold drains them 2x faster!',
-        category: 'recommended',
-      },
-      {
-        id: 'boots',
-        th: 'รองเท้าหุ้มส้นดอกยางลึกกันลื่น สำหรับเดินเลาะเสาหินและเทรลธรรมชาติ',
-        en: 'Ankle-support non-slip boots for rocky terrain and nature trails',
-        category: 'recommended',
-      }
-    );
-  }
-
-  if (code.includes('ULU')) {
-    items.push(
-      {
-        id: 'flynet',
-        th: '🪲 หมวกตาข่ายกันแมลง (Fly Net) — ไอเทมลับที่ต้องมี! แมลงวัน Outback เยอะมากช่วงกลางวัน',
-        en: '🪲 Fly net hat — SECRET WEAPON! Outback flies are relentless during the day',
-        category: 'recommended',
-      },
-      {
-        id: 'layers',
-        th: 'เสื้อโปร่งระบายอากาศกลางวัน + เสื้อหนาวสำหรับกลางคืน (ทะเลทรายหนาวจัดตอนดึก)',
-        en: 'Breathable clothing for daytime + heavy jacket for nights (desert gets freezing after dark)',
-        category: 'recommended',
-      },
-      {
-        id: 'uvfilter',
-        th: 'UV Filter ป้องกันฝุ่นแดง Outback ขูดหน้าเลนส์ + ผ้าคลุมกล้อง',
-        en: 'UV filter to protect lens from red Outback dust + camera cover cloth',
-        category: 'recommended',
-      },
-      {
-        id: 'sun',
-        th: 'ครีมกันแดด SPF50+, หมวกปีกกว้าง, แว่นกันแดด, ลิปบาล์ม',
-        en: 'SPF50+ sunscreen, wide-brim hat, sunglasses, lip balm',
-        category: 'recommended',
-      }
-    );
-  }
-
-  if (code.includes('MEL') || code.includes('CAN') || code.includes('SYD')) {
-    items.push(
-      {
-        id: 'outfits',
-        th: 'เสื้อผ้าสีตัดกับฉากหลัง — ขาว เดรสลายดอก พาสเทล สำหรับทุ่งคาโนล่าและ Great Ocean Road',
-        en: 'Color-contrast outfits — white, floral, pastels for canola fields & Great Ocean Road',
-        category: 'recommended',
-      },
-      {
-        id: 'slipon',
-        th: 'รองเท้า Slip-on น้ำหนักเบา (บางพิกัดต้องถอดรองเท้า เช่น Pink Lake และ Anna Bay)',
-        en: 'Lightweight slip-on shoes (some spots need barefoot walking e.g. Pink Lake, Anna Bay)',
-        category: 'recommended',
-      },
-      {
-        id: 'daypack',
-        th: 'กระเป๋าเป้เล็ก — พกเครื่องสำอางเติมหน้า ทิชชู่เปียก และพร็อพถ่ายรูป (แว่น หมวกเบเร่ต์)',
-        en: 'Small daypack — touch-up makeup, wet wipes, and photo props (sunglasses, beret)',
-        category: 'recommended',
-      }
-    );
-  }
-
-  return items;
-}
-
-function WeightTracker({
-  labelTH,
-  labelEN,
-  limit,
-  lang,
-  warnThreshold,
-}: {
-  labelTH: string;
-  labelEN: string;
-  limit: number;
-  lang: 'TH' | 'EN';
-  warnThreshold: number;
-}) {
-  const [items, setItems] = useState<WeightItem[]>([]);
-  const [name, setName] = useState('');
-  const [weight, setWeight] = useState('');
-
-  const total = items.reduce((s, i) => s + i.weight, 0);
-  const pct = Math.min((total / limit) * 100, 100);
-  const over = total > limit;
-  const warn = total > warnThreshold && !over;
-
-  const addItem = () => {
-    const w = parseFloat(weight);
-    if (!name.trim() || Number.isNaN(w) || w <= 0) return;
-    setItems([...items, { id: Date.now().toString(), name: name.trim(), weight: w }]);
-    setName('');
-    setWeight('');
-  };
-
-  return (
-    <div className="bg-gray-50 rounded-2xl p-4 mb-3">
-      <div className="flex justify-between items-center mb-3">
-        <div>
-          <p className="font-semibold text-gray-800 text-sm">{lang === 'TH' ? labelTH : labelEN}</p>
-          <p className="text-xs text-gray-500">Limit: {limit} kg</p>
-        </div>
-        <span
-          className={`text-sm font-bold px-3 py-1 rounded-full ${
-            over ? 'bg-red-100 text-red-600' : warn ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
-          }`}
-        >
-          {total.toFixed(1)} / {limit} kg
-        </span>
-      </div>
-
-      <div className="w-full bg-gray-200 rounded-full h-3 mb-2 overflow-hidden">
-        <div
-          className={`h-3 rounded-full transition-all duration-500 ${
-            over ? 'bg-red-500' : warn ? 'bg-yellow-400' : 'bg-green-500'
-          }`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-
-      {over && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-3">
-          <p className="text-xs text-red-700 font-semibold">
-            {lang === 'TH'
-              ? '🚨 น้ำหนักเกิน! กรุณาแบ่งของออกหรือเฉลี่ยกับเพื่อนร่วมทริป'
-              : '🚨 Overweight! Please remove items or share weight with your group.'}
-          </p>
-          <p className="text-xs text-red-600 mt-1">
-            {lang === 'TH' ? 'ℹ️ ค่าปรับโดยทั่วไป $15-30 AUD / kg' : 'ℹ️ Standard airline fee is $15-30 AUD / kg'}
-          </p>
-        </div>
-      )}
-
-      <div className="flex gap-2">
-        <input
-          className="flex-1 text-sm border border-gray-200 rounded-xl px-3 py-2.5 bg-white outline-none focus:border-teal-400 focus:ring-1 focus:ring-teal-200"
-          placeholder={lang === 'TH' ? 'ชื่อสิ่งของ' : 'Item name'}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && addItem()}
-        />
-        <input
-          className="w-20 text-sm border border-gray-200 rounded-xl px-3 py-2.5 bg-white outline-none focus:border-teal-400 text-center"
-          placeholder="kg"
-          type="number"
-          step="0.1"
-          min="0"
-          value={weight}
-          onChange={(e) => setWeight(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && addItem()}
-        />
-        <button
-          type="button"
-          onClick={addItem}
-          className="bg-teal-500 hover:bg-teal-600 text-white text-lg px-4 py-2.5 rounded-xl font-bold active:scale-95 transition-all"
-        >
-          +
-        </button>
-      </div>
-
-      {items.length > 0 && (
-        <div className="mt-3 space-y-1.5">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className="flex justify-between items-center text-xs bg-white rounded-xl px-3 py-2 border border-gray-100"
-            >
-              <span className="text-gray-700">{item.name}</span>
-              <div className="flex items-center gap-3">
-                <span className="font-semibold text-gray-800">{item.weight} kg</span>
-                <button
-                  type="button"
-                  onClick={() => setItems(items.filter((i) => i.id !== item.id))}
-                  className="text-red-400 hover:text-red-600 text-base leading-none w-5 h-5 flex items-center justify-center"
-                  aria-label={lang === 'TH' ? 'ลบ' : 'Remove'}
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function PackingAssistant({
-  tourCode,
-  language: initialLang,
-  storageKey,
-}: PackingAssistantProps) {
-  const [lang, setLang] = useState<'TH' | 'EN'>(initialLang);
+export default function PackingAssistant({ tourCode, language: initialLang, storageKey }: PackingAssistantProps) {
+  const [lang, setLang] = useState<Lang>(initialLang);
+  const [profileId, setProfileId] = useState<ProfileId>(() => resolveProfile(tourCode));
   const [checked, setChecked] = useState<Record<string, boolean>>({});
-  const [openSections, setOpenSections] = useState({
-    weight: true,
-    carryon: false,
-    nz: true,
-    packing: true,
-    lookbook: true,
-  });
+  const { urls: modelUrls, loading: modelLoading } = useModelGallery();
 
   useEffect(() => {
     setLang(initialLang);
   }, [initialLang]);
 
   useEffect(() => {
-    if (!storageKey) return;
-    try {
-      const raw = localStorage.getItem(`t2t_packing_checked_${storageKey}`);
-      if (raw) setChecked(JSON.parse(raw) as Record<string, boolean>);
-    } catch {
-      /* ignore */
-    }
-  }, [storageKey]);
+    setProfileId(resolveProfile(tourCode));
+  }, [tourCode]);
+
+  const checkKey = storageKey ? `t2t_packing_guide_${storageKey}_${profileId}` : null;
 
   useEffect(() => {
-    if (!storageKey) return;
-    localStorage.setItem(`t2t_packing_checked_${storageKey}`, JSON.stringify(checked));
-  }, [checked, storageKey]);
+    if (!checkKey) {
+      setChecked({});
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(checkKey);
+      setChecked(raw ? (JSON.parse(raw) as Record<string, boolean>) : {});
+    } catch {
+      setChecked({});
+    }
+  }, [checkKey]);
 
-  const isNZ = tourCode.toUpperCase().includes('NZ');
-  const packingList = useMemo(() => getPackingItems(tourCode), [tourCode]);
-  const lookbookCards = useMemo(() => getLookbookCards(tourCode), [tourCode]);
+  useEffect(() => {
+    if (!checkKey) return;
+    localStorage.setItem(checkKey, JSON.stringify(checked));
+  }, [checked, checkKey]);
 
-  const totalItems = packingList.length;
-  const packedItems = packingList.filter((i) => checked[i.id]).length;
-  const allPacked = packedItems === totalItems && totalItems > 0;
+  const profile = PROFILES[profileId];
+  const t = (bi: Bi) => (lang === 'TH' ? bi.th : bi.en);
 
-  const toggle = (id: string) => {
-    setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  const toggleSection = (key: keyof typeof openSections) => {
-    setOpenSections((s) => ({ ...s, [key]: !s[key] }));
-  };
-
-  const borderLeft: Record<string, string> = {
-    prohibited: 'border-l-4 border-red-400',
-    declare: 'border-l-4 border-yellow-400',
-    recommended: 'border-l-4 border-green-500',
-    info: 'border-l-4 border-blue-400',
-  };
-
-  const bgColor: Record<string, string> = {
-    prohibited: 'bg-red-50',
-    declare: 'bg-yellow-50',
-    recommended: 'bg-green-50',
-    info: 'bg-blue-50',
-  };
-
-  const textColor: Record<string, string> = {
-    prohibited: 'text-red-800',
-    declare: 'text-yellow-800',
-    recommended: 'text-green-800',
-    info: 'text-blue-800',
-  };
-
-  const SectionHeader = ({
-    sectionKey,
-    icon,
-    titleTH,
-    titleEN,
-    badge,
-  }: {
-    sectionKey: keyof typeof openSections;
-    icon: string;
-    titleTH: string;
-    titleEN: string;
-    badge?: string;
-  }) => (
-    <button
-      type="button"
-      onClick={() => toggleSection(sectionKey)}
-      className="w-full flex justify-between items-center py-3.5 text-left"
-    >
-      <div className="flex items-center gap-2">
-        <span className="text-base">{icon}</span>
-        <span className="font-semibold text-gray-800 text-sm">{lang === 'TH' ? titleTH : titleEN}</span>
-        {badge && (
-          <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">{badge}</span>
-        )}
-      </div>
-      <span
-        className={`text-gray-400 transition-transform duration-200 ${openSections[sectionKey] ? 'rotate-180' : ''}`}
-      >
-        ▾
-      </span>
-    </button>
+  const allItems = useMemo(
+    () => profile.packGroups.flatMap((g) => g.items.map((_, i) => `${g.id}-${i}`)),
+    [profile]
   );
+  const packedCount = allItems.filter((id) => checked[id]).length;
+  const totalCount = allItems.length;
+  const pct = totalCount ? Math.round((packedCount / totalCount) * 100) : 0;
+
+  const toggle = (id: string) => setChecked((prev) => ({ ...prev, [id]: !prev[id] }));
 
   return (
     <div className="min-h-screen bg-gray-50 pb-28">
+      {/* Header */}
       <div className="bg-white px-4 pt-5 pb-3 border-b border-gray-100 sticky top-0 z-10 shadow-sm">
         <div className="flex justify-between items-start">
           <div>
             <h1 className="font-bold text-gray-900 text-xl">
-              {lang === 'TH' ? '🧳 แพ็กกระเป๋า' : '🧳 Packing Assistant'}
+              {lang === 'TH' ? '🧳 คู่มือแพ็คกระเป๋า' : '🧳 Packing Guide'}
             </h1>
             <p className="text-xs text-gray-500 mt-0.5 font-mono">{tourCode}</p>
           </div>
@@ -716,234 +295,319 @@ export default function PackingAssistant({
           </button>
         </div>
 
-        <div className="mt-3 flex items-center gap-3">
-          <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
-            <div
-              className="h-2 rounded-full bg-teal-500 transition-all duration-700"
-              style={{ width: `${totalItems > 0 ? (packedItems / totalItems) * 100 : 0}%` }}
-            />
-          </div>
-          <span className="text-xs font-semibold text-gray-600 whitespace-nowrap">
-            {packedItems}/{totalItems} {lang === 'TH' ? 'รายการ' : 'items'}
-          </span>
+        {/* Trip profile selector */}
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {(Object.keys(PROFILES) as ProfileId[]).map((id) => {
+            const p = PROFILES[id];
+            const active = id === profileId;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setProfileId(id)}
+                className={`rounded-2xl border px-3 py-2.5 text-left transition-all active:scale-[0.98] ${
+                  active
+                    ? 'border-teal-500 bg-teal-50 ring-1 ring-teal-200'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">{p.flag}</span>
+                  <div>
+                    <p className={`text-sm font-bold leading-tight ${active ? 'text-teal-700' : 'text-gray-800'}`}>
+                      {t(p.shortLabel)}
+                    </p>
+                    <p className="text-xs text-gray-500">{t(p.duration)}</p>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
-
-        {allPacked && (
-          <div className="mt-2 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 text-center">
-            <p className="text-green-700 text-sm font-bold">
-              {lang === 'TH' ? '✅ พร้อมเดินทางแล้ว!' : "✅ You're all packed and ready!"}
-            </p>
-          </div>
-        )}
       </div>
 
       <div className="px-4 pt-4 space-y-3">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 divide-y divide-gray-50">
-            <SectionHeader sectionKey="weight" icon="⚖️" titleTH="คำนวณน้ำหนักกระเป๋า" titleEN="Baggage Weight Tracker" />
+        {/* 1. Hero */}
+        <div className={`rounded-3xl bg-gradient-to-br ${profile.accent} text-white p-5 shadow-sm`}>
+          <div className="flex items-center gap-2 text-white/90 text-sm font-semibold">
+            <span className="text-2xl">{profile.flag}</span>
+            <span>{t(profile.name)}</span>
           </div>
-          {openSections.weight && (
-            <div className="px-4 pb-4">
-              <WeightTracker labelTH="กระเป๋าโหลดใต้เครื่อง" labelEN="Checked Baggage" limit={20} lang={lang} warnThreshold={15} />
-              <WeightTracker labelTH="กระเป๋าถือขึ้นเครื่อง" labelEN="Carry-on Baggage" limit={7} lang={lang} warnThreshold={5.5} />
-            </div>
-          )}
+          <p className="mt-3 text-2xl font-extrabold tracking-tight leading-snug">{SLOGAN}</p>
+          <p className="text-white/80 text-xs font-medium">{SLOGAN_EN}</p>
+          <p className="mt-3 text-sm text-white/90 leading-relaxed">{t(profile.heroWhy)}</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4">
-            <SectionHeader
-              sectionKey="carryon"
-              icon="✈️"
-              titleTH="สิ่งต้องห้ามนำขึ้นเครื่อง"
-              titleEN="Carry-on Prohibited Items"
-              badge={lang === 'TH' ? 'ทุกเที่ยวบิน' : 'All flights'}
-            />
-          </div>
-          {openSections.carryon && (
-            <div className="px-4 pb-4 space-y-2">
-              {CARRY_ON_PROHIBITED.map((item) => (
-                <div
-                  key={item.id}
-                  className={`${borderLeft[item.category]} ${bgColor[item.category]} rounded-r-xl px-3 py-2.5`}
-                >
-                  <p className={`text-xs leading-relaxed ${textColor[item.category]}`}>
-                    ❌ {lang === 'TH' ? item.th : item.en}
-                  </p>
-                </div>
-              ))}
+        {/* 2. Recommended bag */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <p className="font-bold text-gray-900 text-sm mb-3">
+            🎒 {lang === 'TH' ? 'กระเป๋าที่แนะนำ' : 'Recommended bags'}
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-teal-100 bg-teal-50 p-3">
+              <p className="text-2xl">🧳</p>
+              <p className="text-sm font-bold text-teal-800 mt-1">
+                {lang === 'TH' ? 'กระเป๋าถือขึ้นเครื่อง' : 'Carry-on'}
+              </p>
+              <p className="text-xs text-teal-700 mt-0.5">
+                {lang === 'TH' ? 'ใบเดียว · ไม่เกิน 7 กก.' : '1 bag · max 7 kg'}
+              </p>
             </div>
-          )}
+            <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3">
+              <p className="text-2xl">🎒</p>
+              <p className="text-sm font-bold text-amber-800 mt-1">{lang === 'TH' ? 'กระเป๋าเป้เล็ก' : 'Daypack'}</p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                {lang === 'TH' ? 'ใส่กล้อง + ของใช้ระหว่างวัน' : 'Camera + day essentials'}
+              </p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 mt-3 leading-relaxed">
+            {lang === 'TH'
+              ? 'แค่ 2 ใบนี้ก็พอสำหรับทั้งทริป — ไม่ต้องโหลดกระเป๋าใบใหญ่ใต้เครื่อง'
+              : 'These two are enough for the whole trip — no need for a large checked bag.'}
+          </p>
         </div>
 
-        {isNZ && (
-          <div className="bg-white rounded-2xl shadow-sm border border-red-200 overflow-hidden">
-            <div className="px-4 bg-red-50">
-              <SectionHeader
-                sectionKey="nz"
-                icon="🇳🇿"
-                titleTH="กฎด่านตรวจนิวซีแลนด์"
-                titleEN="NZ Biosecurity Rules"
-                badge="NZ Only"
-              />
-            </div>
-            {openSections.nz && (
-              <div className="px-4 pb-4 pt-3 space-y-3">
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-3">
-                  <p className="text-xs font-bold text-red-700">
-                    ⚠️{' '}
-                    {lang === 'TH'
-                      ? 'ค่าปรับสูงสุด NZD $400 ทันที ณ ด่านตรวจ หากไม่ได้สำแดงสิ่งของต้องห้าม'
-                      : 'Instant fine up to NZD $400 for failing to declare prohibited items.'}
-                  </p>
-                </div>
-
-                <p className="text-xs font-bold text-red-700 uppercase tracking-wider">
-                  {lang === 'TH' ? '🚫 ห้ามนำเข้าเด็ดขาด' : '🚫 Strictly Prohibited'}
-                </p>
-                <div className="space-y-2">
-                  {NZ_PROHIBITED.map((item) => (
-                    <div key={item.id} className="border-l-4 border-red-400 bg-red-50 rounded-r-xl px-3 py-2.5">
-                      <p className="text-xs text-red-800 leading-relaxed">{lang === 'TH' ? item.th : item.en}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <p className="text-xs font-bold text-yellow-700 uppercase tracking-wider pt-1">
-                  {lang === 'TH' ? '⚠️ ต้องแจ้งเจ้าหน้าที่' : '⚠️ Must Declare'}
-                </p>
-                <div className="space-y-2">
-                  {NZ_DECLARE.map((item) => (
-                    <div key={item.id} className="border-l-4 border-yellow-400 bg-yellow-50 rounded-r-xl px-3 py-2.5">
-                      <p className="text-xs text-yellow-800 leading-relaxed">{lang === 'TH' ? item.th : item.en}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="border-l-4 border-green-500 bg-green-50 rounded-r-xl px-4 py-3">
-                  <p className="text-xs font-bold text-green-800 mb-1">
-                    💡 {lang === 'TH' ? 'แนะนำจากพี่แสน' : "P'Saen's Tip"}
-                  </p>
-                  <p className="text-xs text-green-700 leading-relaxed">
-                    {lang === 'TH'
-                      ? 'ให้ติ๊กช่อง แจ้ง (Declare) ในใบ ตม. ทุกสิ่งที่ไม่แน่ใจ ดีกว่าโดนปรับครับ เจ้าหน้าที่จะตัดสินใจเองว่าให้ผ่านหรือไม่ การซ่อนของมีโทษหนักและเสียเวลามาก'
-                      : 'When in doubt, Declare it on your arrival card! Officers decide if items can enter. Hiding prohibited items results in heavy fines and long delays.'}
-                  </p>
+        {/* 3. Why pack light */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <p className="font-bold text-gray-900 text-sm mb-3">
+            💡 {lang === 'TH' ? 'ทำไมต้องแพ็คเบา' : 'Why pack light'}
+          </p>
+          <div className="space-y-3">
+            {WHY_LIGHT.map((r) => (
+              <div key={r.title.en} className="flex gap-3">
+                <span className="text-xl flex-shrink-0">{r.icon}</span>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">{t(r.title)}</p>
+                  <p className="text-xs text-gray-600 leading-relaxed mt-0.5">{t(r.body)}</p>
                 </div>
               </div>
-            )}
+            ))}
           </div>
-        )}
-
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4">
-            <SectionHeader
-              sectionKey="packing"
-              icon="📋"
-              titleTH="รายการแพ็กของ"
-              titleEN="Packing List"
-              badge={`${packedItems}/${totalItems}`}
-            />
-          </div>
-          {openSections.packing && (
-            <div className="px-4 pb-4 space-y-2">
-              {packingList.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => toggle(item.id)}
-                  className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left active:scale-[0.98] transition-all duration-150 ${
-                    checked[item.id]
-                      ? 'bg-gray-50 border-gray-100'
-                      : `${borderLeft[item.category]} bg-white border-gray-100`
-                  }`}
-                >
-                  <div
-                    className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-all duration-200 ${
-                      checked[item.id] ? 'border-teal-500 bg-teal-500' : 'border-gray-300 bg-white'
-                    }`}
-                  >
-                    {checked[item.id] && (
-                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                  </div>
-                  <p
-                    className={`text-xs leading-relaxed transition-all ${
-                      checked[item.id] ? 'line-through text-gray-400' : 'text-gray-700'
-                    }`}
-                  >
-                    {lang === 'TH' ? item.th : item.en}
-                  </p>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4">
-            <SectionHeader sectionKey="lookbook" icon="📸" titleTH="ไอเดียแต่งตัว & ท่าโพส" titleEN="Outfit & Pose Ideas" />
+        {/* 4. Smart packing list */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <div className="flex items-center justify-between mb-1">
+            <p className="font-bold text-gray-900 text-sm">
+              📋 {lang === 'TH' ? 'รายการแพ็คของอัจฉริยะ' : 'Smart packing list'}
+            </p>
+            <span className="text-xs font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full">
+              {t(profile.clothesSummary)}
+            </span>
           </div>
-          {openSections.lookbook && (
-            <div className="pb-4">
-              <div className="flex gap-3 overflow-x-auto px-4 pb-2 snap-x snap-mandatory">
-                {lookbookCards.map((card) => (
-                  <div
-                    key={card.id}
-                    className="flex-shrink-0 w-56 rounded-2xl overflow-hidden border border-gray-100 shadow-sm snap-start"
-                  >
-                    <div
-                      className="h-36 bg-gradient-to-br from-gray-200 to-gray-300 relative bg-cover bg-center"
-                      style={{ backgroundImage: `url(${card.image})` }}
-                    >
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                      <div className="absolute bottom-2 left-3 right-3">
-                        <span className="text-white text-xs font-bold leading-tight block">
-                          {lang === 'TH' ? card.locationTH : card.locationEN}
+          <div className="flex items-center gap-3 mb-3">
+            <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+              <div className="h-2 rounded-full bg-teal-500 transition-all duration-500" style={{ width: `${pct}%` }} />
+            </div>
+            <span className="text-xs font-semibold text-gray-500 whitespace-nowrap">
+              {packedCount}/{totalCount}
+            </span>
+          </div>
+
+          <div className="space-y-4">
+            {profile.packGroups.map((group) => (
+              <div key={group.id}>
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                  {group.icon} {t(group.title)}
+                </p>
+                <div className="space-y-1.5">
+                  {group.items.map((item, i) => {
+                    const id = `${group.id}-${i}`;
+                    const isChecked = !!checked[id];
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => toggle(id)}
+                        className={`w-full flex items-start gap-3 p-2.5 rounded-xl border text-left active:scale-[0.98] transition-all ${
+                          isChecked ? 'bg-gray-50 border-gray-100' : 'bg-white border-gray-100'
+                        }`}
+                      >
+                        <span
+                          className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-all ${
+                            isChecked ? 'border-teal-500 bg-teal-500' : 'border-gray-300 bg-white'
+                          }`}
+                        >
+                          {isChecked && (
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
                         </span>
-                        <span className="text-white/80 text-xs">{card.season}</span>
+                        <span className={`text-xs leading-relaxed ${isChecked ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+                          {t(item)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Editorial outfit & pose slideshow */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <div className="flex items-center justify-between mb-1">
+            <p className="font-bold text-gray-900 text-sm">
+              📸 {lang === 'TH' ? 'ไอเดียแต่งตัว & ท่าโพส' : 'Outfit & Pose Ideas'}
+            </p>
+            <span className="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-semibold">Lookbook</span>
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            {lang === 'TH' ? 'ปัดเพื่อดูเพิ่ม →' : 'Swipe to explore →'}
+          </p>
+
+          <div className="-mx-4 overflow-x-auto snap-x snap-mandatory scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex gap-4 px-4 pb-2">
+              {LOOKBOOK.map((card, idx) => {
+                const photo = modelUrls.length ? modelUrls[idx % modelUrls.length] : null;
+                return (
+                  <article
+                    key={card.id}
+                    className="snap-start shrink-0 w-[80%] sm:w-[58%] lg:w-[calc((100%-2rem)/3)] h-[440px] rounded-3xl overflow-hidden bg-white border border-gray-100 shadow-md hover:shadow-xl transition-shadow duration-300 flex flex-col"
+                  >
+                    {/* Photo — 60% height, cover fit */}
+                    <div className="relative h-[60%] overflow-hidden bg-gradient-to-br from-gray-200 to-gray-300">
+                      {photo ? (
+                        <img
+                          src={photo}
+                          alt={lang === 'TH' ? card.location.th : card.location.en}
+                          loading="lazy"
+                          decoding="async"
+                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out hover:scale-105"
+                        />
+                      ) : (
+                        <div className={`absolute inset-0 ${modelLoading ? 'animate-pulse' : ''}`} />
+                      )}
+                      <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                      <span className="absolute top-3 left-3 text-[11px] font-semibold text-white bg-black/40 backdrop-blur-sm rounded-full px-2.5 py-1">
+                        {card.season}
+                      </span>
+                      <span className="absolute top-3 right-3 text-[10px] font-bold text-white/90 tracking-widest">
+                        {String(idx + 1).padStart(2, '0')}/{String(LOOKBOOK.length).padStart(2, '0')}
+                      </span>
+                      <div className="absolute bottom-3 left-4 right-4">
+                        <p className="text-[10px] uppercase tracking-[0.18em] text-white/70 font-semibold mb-0.5">
+                          {lang === 'TH' ? 'พิกัด' : 'Location'}
+                        </p>
+                        <p className="text-white font-bold text-sm leading-snug drop-shadow">
+                          {lang === 'TH' ? card.location.th : card.location.en}
+                        </p>
                       </div>
                     </div>
-                    <div className="p-3 bg-white">
-                      <div className="mb-2">
-                        <p className="text-xs font-semibold text-gray-700 mb-0.5">
+
+                    {/* Text — outfit then pose */}
+                    <div className="flex-1 p-4 flex flex-col gap-3">
+                      <div>
+                        <p className="text-[11px] font-bold text-gray-800 mb-0.5">
                           👗 {lang === 'TH' ? 'คอสตูม' : 'Outfit'}
                         </p>
                         <p className="text-xs text-gray-600 leading-relaxed">
-                          {lang === 'TH' ? card.outfitTH : card.outfitEN}
+                          {lang === 'TH' ? card.outfit.th : card.outfit.en}
                         </p>
                       </div>
-                      <div>
-                        <p className="text-xs font-semibold text-gray-700 mb-0.5">
+                      <div className="border-t border-gray-100 pt-3">
+                        <p className="text-[11px] font-bold text-gray-800 mb-0.5">
                           🤳 {lang === 'TH' ? 'ท่าโพส' : 'Pose'}
                         </p>
-                        <p className="text-xs text-gray-600 leading-relaxed">{lang === 'TH' ? card.poseTH : card.poseEN}</p>
+                        <p className="text-xs text-gray-600 leading-relaxed">
+                          {lang === 'TH' ? card.pose.th : card.pose.en}
+                        </p>
                       </div>
                     </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* 5. What NOT to bring */}
+        <div className="bg-white rounded-2xl shadow-sm border border-rose-100 p-4">
+          <p className="font-bold text-rose-700 text-sm mb-1">
+            🚫 {lang === 'TH' ? 'สิ่งที่ไม่ควรเอามา' : "What NOT to bring"}
+          </p>
+          <p className="text-xs text-gray-500 mb-3">
+            {lang === 'TH' ? 'ข้อผิดพลาดที่ทำให้แพ็คของเยอะเกินไป' : 'Common overpacking mistakes'}
+          </p>
+          <div className="space-y-2">
+            {profile.avoid.map((item) => (
+              <div key={item.en} className="flex items-start gap-2 border-l-4 border-rose-300 bg-rose-50 rounded-r-xl px-3 py-2">
+                <span className="text-rose-400 text-sm leading-none mt-0.5">✕</span>
+                <p className="text-xs text-rose-800 leading-relaxed">{t(item)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 6. NZ ONLY — Biosecurity */}
+        {profileId === 'NZ' && (
+          <div className="bg-white rounded-2xl shadow-sm border-2 border-red-300 overflow-hidden">
+            <div className="bg-red-600 px-4 py-3">
+              <p className="text-white font-bold text-sm flex items-center gap-2">
+                🇳🇿 {lang === 'TH' ? 'กฎ Biosecurity นิวซีแลนด์' : 'NZ Biosecurity Rules'}
+              </p>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-3">
+                <p className="text-sm font-extrabold text-red-700">
+                  ⚠️ {lang === 'TH' ? 'ค่าปรับทันที NZD $400' : 'Instant fine: NZD $400'}
+                </p>
+                <p className="text-xs text-red-600 mt-1 leading-relaxed">
+                  {lang === 'TH'
+                    ? 'หากไม่สำแดงสิ่งของต้องห้าม จะถูกปรับทันที $400 NZD ณ ด่านตรวจ — ไม่มีข้อยกเว้น'
+                    : 'Failing to declare prohibited items = an instant NZD $400 fine at the border. No exceptions.'}
+                </p>
+              </div>
+
+              <p className="text-xs font-bold text-red-700 uppercase tracking-wider">
+                {lang === 'TH' ? '🚫 ห้ามนำเข้าเด็ดขาด' : '🚫 Strictly prohibited'}
+              </p>
+              <div className="space-y-2">
+                {NZ_BIOSECURITY_PROHIBITED.map((item) => (
+                  <div key={item.en} className="border-l-4 border-red-400 bg-red-50 rounded-r-xl px-3 py-2.5">
+                    <p className="text-xs text-red-800 leading-relaxed">{t(item)}</p>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-        </div>
 
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4">
-          <p className="text-xs font-bold text-amber-800 mb-1">
-            👗 {lang === 'TH' ? 'คอสตูมยังไม่พร้อม?' : 'Not sure what to wear?'}
+              <div className="border-l-4 border-amber-400 bg-amber-50 rounded-r-xl px-3 py-3">
+                <p className="text-xs font-bold text-amber-800 mb-1">
+                  ✅ {lang === 'TH' ? 'สำแดงทุกอย่างที่ไม่แน่ใจ' : 'Declare everything you are unsure of'}
+                </p>
+                <p className="text-xs text-amber-700 leading-relaxed">
+                  {lang === 'TH'
+                    ? 'ถ้าไม่แน่ใจ ให้ติ๊ก "Yes / Declare" เสมอ เจ้าหน้าที่จะเป็นคนตัดสินว่าผ่านได้ไหม การสำแดงไม่มีโทษ แต่การซ่อนมีโทษหนัก'
+                    : 'When in doubt, always tick "Yes / Declare". Officers decide what may enter. Declaring is free — hiding is heavily penalised.'}
+                </p>
+              </div>
+
+              <div className="border-l-4 border-sky-400 bg-sky-50 rounded-r-xl px-3 py-3">
+                <p className="text-xs font-bold text-sky-800 mb-1">
+                  📝 {lang === 'TH' ? 'อย่าลืมบัตร MPI (Arrival Card)' : "Don't forget your MPI Arrival Card"}
+                </p>
+                <p className="text-xs text-sky-700 leading-relaxed">
+                  {lang === 'TH'
+                    ? 'กรอกบัตรขาเข้า MPI (Passenger Arrival Card) ให้ครบทุกช่อง ตอบตามจริง — รับบนเครื่องบินหรือที่ด่านตรวจ'
+                    : 'Fill in the MPI Passenger Arrival Card completely and honestly — handed out on the plane or at arrivals.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Footer note */}
+        <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100 rounded-2xl p-4 text-center">
+          <p className="text-sm font-bold text-teal-800">
+            {lang === 'TH' ? `${SLOGAN} 🌿` : `${SLOGAN_EN} 🌿`}
           </p>
-          <p className="text-xs text-amber-700 mb-3 leading-relaxed">
+          <p className="text-xs text-teal-600 mt-1 leading-relaxed">
             {lang === 'TH'
-              ? 'ดูคู่มือโทนสีแต่งตัวและแต่งหน้าตามฤดูกาลของออสเตรเลีย'
-              : 'Check our Australia season style & makeup colour guide'}
+              ? 'มีคำถามเรื่องการแพ็คของ? ทักหาพี่แสนได้เลยครับ'
+              : 'Questions about packing? Just message Saen anytime.'}
           </p>
-          <a
-            href="/trips"
-            className="inline-block text-xs bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-full font-semibold active:scale-95 transition-all"
-          >
-            {lang === 'TH' ? 'ดูคู่มือตามฤดูกาล →' : 'View Season Style Guide →'}
-          </a>
         </div>
       </div>
     </div>

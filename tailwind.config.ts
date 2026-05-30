@@ -4,9 +4,26 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['DM Sans', 'system-ui', 'sans-serif'],
-        serif: ['Playfair Display', 'Georgia', 'serif'],
+        // Latin glyphs render in DM Sans; Thai glyphs auto-fall back to Sarabun
+        // (DM Sans has no Thai glyphs), so English keeps its font and Thai uses Sarabun.
+        sans: ['DM Sans', 'Sarabun', 'system-ui', 'sans-serif'],
+        serif: ['Playfair Display', 'Sarabun', 'Georgia', 'serif'],
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', '"Liberation Mono"', '"Courier New"', 'monospace'],
+      },
+      // Enlarged, more readable scale (target: Thai users 40+). Body sizes use a
+      // generous 1.7 line-height for Thai; headings stay tighter.
+      fontSize: {
+        xs: ['0.875rem', { lineHeight: '1.65' }], // 12 → 14 (captions/small)
+        sm: ['1rem', { lineHeight: '1.7' }], // 14 → 16 (buttons)
+        base: ['1.125rem', { lineHeight: '1.7' }], // 16 → 18 (body)
+        lg: ['1.35rem', { lineHeight: '1.55' }], // 18 → ~21.6 (+20%, section headings)
+        xl: ['1.5rem', { lineHeight: '1.5' }], // 20 → 24 (+20%, section headings)
+        '2xl': ['1.725rem', { lineHeight: '1.4' }], // 24 → ~27.6 (+15%, hero)
+        '3xl': ['2.156rem', { lineHeight: '1.3' }], // 30 → ~34.5 (+15%, hero)
+        '4xl': ['2.588rem', { lineHeight: '1.2' }], // 36 → ~41.4 (+15%, hero)
+        '5xl': ['3.45rem', { lineHeight: '1.1' }], // 48 → ~55.2 (+15%)
+        '6xl': ['4.3125rem', { lineHeight: '1.05' }], // 60 → ~69 (+15%)
+        '7xl': ['5.175rem', { lineHeight: '1' }], // 72 → ~82.8 (+15%)
       },
       keyframes: {
         shake: {

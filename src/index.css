@@ -5,6 +5,11 @@
 body {
   @apply bg-[color:var(--navy)] text-neutral-100 antialiased selection:bg-[color:var(--gold)] selection:text-[color:var(--navy)];
   margin: 0;
+  /* Modern Thai-first typography: Sarabun (via sans fallback), medium weight,
+     generous line-height for readability (target audience: Thai users 40+). */
+  font-family: theme('fontFamily.sans');
+  font-weight: 500;
+  line-height: 1.7;
 }
 
 /* Soft-minimalist surfaces (Client pages override with `bg-sage-50 text-[#1C1C1E]`). */
