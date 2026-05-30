@@ -3,7 +3,7 @@ import { useI18n } from '../../lib/i18n';
 import { SEASON_PREP_CARDS } from '../../lib/seasonPrepGuide';
 import PortraitGalleryGrid from './PortraitGalleryGrid';
 import LandscapeGalleryGrid from './LandscapeGalleryGrid';
-import SeasonGalleryGrid from './SeasonGalleryGrid';
+import SeasonVideoHero from './SeasonVideoHero';
 import SeasonPrepInfoCard from './SeasonPrepInfoCard';
 
 type GalleryTab = 'portrait' | 'landscape' | 'season';
@@ -52,6 +52,8 @@ export default function PortfolioGallery({ title }: { title: string }) {
         ))}
       </div>
 
+      {tab === 'season' && <SeasonVideoHero />}
+
       {tab === 'season' && (
         <div className="flex flex-wrap justify-center gap-2 mb-6">
           {SEASON_TABS.map((s) => (
@@ -76,10 +78,7 @@ export default function PortfolioGallery({ title }: { title: string }) {
       ) : tab === 'landscape' ? (
         <LandscapeGalleryGrid />
       ) : (
-        <>
-          <SeasonGalleryGrid />
-          {activeSeason ? <SeasonPrepInfoCard card={activeSeason} /> : null}
-        </>
+        <>{activeSeason ? <SeasonPrepInfoCard card={activeSeason} /> : null}</>
       )}
     </section>
   );
