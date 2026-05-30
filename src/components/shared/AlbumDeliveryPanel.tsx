@@ -7,6 +7,7 @@ import {
   updateAlbumDelivery,
 } from '../../lib/albumDelivery';
 import AlbumDeliveryCard, { AlbumDeliveryBooking } from './AlbumDeliveryCard';
+import AlbumMessageGenerator from './AlbumMessageGenerator';
 
 const STATUSES: AlbumStatus[] = ['pending', 'processing', 'delivered', 'expired'];
 
@@ -105,7 +106,7 @@ export default function AlbumDeliveryPanel({ theme = 'cyber' }: { theme?: 'cyber
       {loading ? (
         <p className={theme === 'cyber' ? 'text-neutral-500 text-sm' : 'text-white/50 text-sm'}>Loading bookings…</p>
       ) : rows.length === 0 ? (
-        <p className={theme === 'cyber' ? 'text-neutral-500 text-sm' : 'text-white/50 text-sm'}>NO BOOKINGS YET</p>
+        <AlbumMessageGenerator theme={theme} />
       ) : (
         <div className="space-y-6">
           {rows.map((row) => {
