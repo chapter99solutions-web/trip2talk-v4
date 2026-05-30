@@ -4,15 +4,16 @@ const SLIDE_MS = 5000;
 const FADE_MS = 1000;
 
 // Hardcoded hero media — no Supabase storage.list() / async fetching.
+// Every URL below was verified to return HTTP 200 from the public portfolio bucket.
+// Real photos live under Cover/Mixed/ (the top-level "Mixed Cover" folder does not exist).
 const HERO_MEDIA = [
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Mixed%20Cover/01.jpg',
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Mixed%20Cover/02.jpg',
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Mixed%20Cover/03.jpg',
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Mixed%20Cover/04.jpg',
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Mixed%20Cover/05.png',
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Mixed%20Cover/06.jpg',
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Mixed%20Cover/07.jpg',
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Cover/AD/Copy%20of%202026%20t2t%20tripLandscape.mp4',
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Cover/Mixed/01.jpg',
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Cover/Mixed/02.jpg',
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Cover/Mixed/03.jpg',
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Cover/Mixed/04.jpg',
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Cover/Mixed/05.png',
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Cover/Mixed/06.jpg',
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Cover/Mixed/07.jpg',
 ];
 
 const isVideo = (url: string) => /\.(mp4|webm|mov)(\?|$)/i.test(url);
