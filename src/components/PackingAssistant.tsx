@@ -128,7 +128,7 @@ const PROFILES: Record<ProfileId, TripProfile> = {
   NZ: {
     id: 'NZ',
     flag: '🇳🇿',
-    accent: 'from-sky-600 to-indigo-700',
+    accent: 'from-slate-700 to-slate-900',
     shortLabel: { th: 'นิวซีแลนด์', en: 'New Zealand' },
     duration: { th: '5 คืน 6 วัน', en: '5N6D' },
     name: { th: 'ทริปนิวซีแลนด์ · 5 คืน 6 วัน', en: 'New Zealand Trip · 5N6D' },

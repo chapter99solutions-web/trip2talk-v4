@@ -7,7 +7,10 @@ export default {
         // Latin glyphs render in DM Sans; Thai glyphs auto-fall back to Sarabun
         // (DM Sans has no Thai glyphs), so English keeps its font and Thai uses Sarabun.
         sans: ['DM Sans', 'Sarabun', 'system-ui', 'sans-serif'],
-        serif: ['Playfair Display', 'Sarabun', 'Georgia', 'serif'],
+        // Headings use Fraunces; Thai glyphs auto-fall back to Sarabun
+        // (Fraunces has no Thai glyphs), keeping Thai content in Sarabun.
+        serif: ['Fraunces', 'Playfair Display', 'Sarabun', 'Georgia', 'serif'],
+        display: ['Fraunces', 'Sarabun', 'serif'],
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', '"Liberation Mono"', '"Courier New"', 'monospace'],
       },
       // Enlarged, more readable scale (target: Thai users 40+). Body sizes use a

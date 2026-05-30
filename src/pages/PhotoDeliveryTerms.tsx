@@ -38,25 +38,25 @@ const TERMS_TILES = [
   {
     icon: '🟠',
     title: 'No RAW Files',
-    tone: 'border-orange-200 bg-orange-50 text-orange-900',
+    tone: 'border-slate-200 bg-slate-50 text-slate-900',
     body: 'ส่งแค่ .JPG — ไม่มีไฟล์ RAW, DNG, CR2 หรือไฟล์จากกล้องดิบ',
   },
   {
     icon: '🔵',
     title: 'Link Expiry',
-    tone: 'border-blue-200 bg-blue-50 text-blue-900',
+    tone: 'border-slate-200 bg-slate-50 text-slate-900',
     body: '60 วัน — ดาวน์โหลดเก็บไว้เองก่อนลิงก์หมดอายุ',
   },
   {
     icon: '🟣',
     title: 'Copyright',
-    tone: 'border-purple-200 bg-purple-50 text-purple-900',
+    tone: 'border-slate-200 bg-slate-50 text-slate-900',
     body: 'Personal Use only — ใช้ส่วนตัว/โซเชียลได้ ไม่ใช่เชิงพาณิชย์โดยไม่ซื้อลิขสิทธิ์',
   },
   {
     icon: '🔴',
     title: 'No Re-filter',
-    tone: 'border-rose-200 bg-rose-50 text-rose-900',
+    tone: 'border-slate-200 bg-slate-50 text-slate-900',
     body: 'ห้ามใส่ฟิลเตอร์ทับ — อย่าแก้สี/สไตล์ทับงานที่ส่งมาแล้ว',
   },
 ] as const;

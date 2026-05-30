@@ -12,6 +12,19 @@ body {
   line-height: 1.7;
 }
 
+/* Headings default to Fraunces (display serif). Thai glyphs fall back to
+   Sarabun via the serif chain, so Thai headings stay in Sarabun. Components
+   can still override with an explicit font utility. */
+@layer base {
+  h1,
+  h2,
+  .hero-title,
+  .page-title,
+  .tour-name {
+    font-family: theme('fontFamily.serif');
+  }
+}
+
 /* Soft-minimalist surfaces (Client pages override with `bg-sage-50 text-[#1C1C1E]`). */
 
 @keyframes slide-up {
