@@ -264,7 +264,7 @@ export default function TourDetail() {
   const seatsLeft = staticFallback?.seatsLeft ?? 1 + (stableHash(tripId) % 3);
   const joinedCount = 8 + (stableHash(`${tripId}joined`) % 25);
   const originalPrice = priceAud > 0 ? Math.round((priceAud * 1.25) / 5) * 5 : 0;
-  const departLabel = formatTripDate(nextDate);
+  const departLabel = staticFallback?.departureLabel || formatTripDate(nextDate);
   const urgencyText = departLabel
     ? `🔥 เหลือ ${seatsLeft} ที่นั่ง · ออกเดินทาง ${departLabel}`
     : `🔥 ${seatsLeft} ${seatsLeft === 1 ? 'spot' : 'spots'} left`;

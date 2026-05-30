@@ -42,7 +42,7 @@ export default function SeasonVideoHero() {
       {/* Caption */}
       <div className="absolute bottom-0 inset-x-0 p-6 sm:p-8">
         <p className="text-white font-serif text-2xl sm:text-3xl font-semibold drop-shadow-lg">
-          ภาพจริงจากทริปของเรา
+          สไตล์ที่ใช่ สำหรับทริปที่ชอบ
         </p>
       </div>
     </div>

@@ -30,6 +30,8 @@ export type TourFallback = {
   rating?: number;
   /** ISO date of the next departure, e.g. "2026-02-22". */
   nextDate?: string;
+  /** Literal departure label that overrides the formatted nextDate, e.g. "All Year Round". */
+  departureLabel?: string;
   endDate?: string;
   weather?: string;
   /** Thai marketing tagline. */
@@ -44,6 +46,8 @@ export type TourFallback = {
   highlightIcons?: string[];
   /** Seats remaining, shown in the urgency badge. */
   seatsLeft?: number;
+  /** Flagship/featured treatment in the trips listing grid. */
+  featured?: boolean;
   /** Hardcoded gallery photo URLs — consumed by TourDetail before any bucket lookup (first = hero). */
   galleryPhotos?: string[];
 };
@@ -201,15 +205,86 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
   {
     tourCode: 'NZ-6D5N',
     anonymizedTitle: 'The Alpine Kingdom',
+    tourName: 'The Alpine Kingdom (6D5N)',
+    nameTh: 'ทริปถ่ายภาพ 6 วัน 5 คืน: New Zealand South Island',
+    location: 'NZ · NEW ZEALAND',
     tripType: 'overnight',
     standardPrice: 2300,
     privatePrice: 2300,
     durationLabel: '6 Days 5 Nights',
     season: 'all',
     maxPax: 5,
-    highlights: ['Lake Tekapo', 'Milford Sound', 'Wanaka', 'Mt Cook'],
+    rating: 4.9,
+    departureLabel: 'All Year Round',
+    weather: 'Varies by season',
+    category: 'ทริปค้างคืน',
+    tagline:
+      'ทริปที่ยาวที่สุด ไกลที่สุด และสวยที่สุดที่เราทำ — New Zealand South Island',
+    highlights: [
+      'Milford Sound — ฟยอร์ดที่สวยที่สุดในโลก ยามฝนและหมอก',
+      'Lake Tekapo — Church of the Good Shepherd + ท้องฟ้าเต็มดาว Milky Way',
+      'Queenstown & Southern Alps — ภูเขาหิมะ + ทะเลสาบสีฟ้าเทอควอยซ์',
+    ],
+    highlightIcons: ['🏔️', '⛪', '🚠'],
+    seatsLeft: 2,
+    featured: true,
     pickupType: 'airport_terminal',
-    description: 'New Zealand South Island — four seasons, one epic photography adventure.',
+    description:
+      "The ultimate photography journey through New Zealand's South Island — Milford Sound, Lake Tekapo, Queenstown, and the Southern Alps.",
+    itinerary: [
+      {
+        day: 1,
+        title: 'SYD → Christchurch',
+        desc: 'บินสู่ Christchurch → เช็กอิน → เดินสำรวจเมือง',
+      },
+      {
+        day: 2,
+        title: 'Lake Tekapo',
+        desc: 'Church of the Good Shepherd → Lupins (ฤดูใบไม้ผลิ) → ค่ำล่า Milky Way ที่ท้องฟ้ามืดสนิท',
+      },
+      {
+        day: 3,
+        title: 'Mt Cook / Aoraki',
+        desc: 'ภูเขาที่สูงที่สุดใน NZ → Hooker Valley Track → Glacier reflections',
+      },
+      {
+        day: 4,
+        title: 'Queenstown',
+        desc: 'Remarkables Mountain Range → Lake Wakatipu → เช้าตรู่ Mist on the lake',
+      },
+      {
+        day: 5,
+        title: 'Milford Sound',
+        desc: 'ขับรถผ่าน Fiordland → Milford Sound Cruise → น้ำตกและฝนเขตร้อน',
+      },
+      {
+        day: 6,
+        title: 'Queenstown → SYD',
+        desc: 'ถ่ายภาพยามเช้าครั้งสุดท้าย → บินกลับซิดนีย์',
+      },
+    ],
+    included: [
+      'รถ SUV พร้อมคนขับ 6 วัน',
+      'ที่พัก 5 คืน',
+      'ช่างภาพมืออาชีพตลอดทริป',
+      'Milford Sound Cruise',
+      'ค่าเข้าอุทยาน',
+      'น้ำดื่มตลอดทาง',
+      'ช่วยจองตั๋วฟรี',
+    ],
+    excluded: ['ตั๋วเครื่องบินไป-กลับ', 'ค่าอาหารทุกมื้อ', 'ประกันการเดินทาง'],
+    galleryPhotos: [
+      `${PORTFOLIO_BASE}/New%20Zealand/Cover/01.jpg`,
+      `${PORTFOLIO_BASE}/New%20Zealand/Cover/02.jpg`,
+      `${PORTFOLIO_BASE}/New%20Zealand/Cover/03.jpg`,
+      `${PORTFOLIO_BASE}/New%20Zealand/Cover/04.jpg`,
+      `${PORTFOLIO_BASE}/New%20Zealand/Cover/05.jpg`,
+      `${PORTFOLIO_BASE}/New%20Zealand/Cover/06.jpg`,
+      `${PORTFOLIO_BASE}/New%20Zealand/Cover/07.jpg`,
+      `${PORTFOLIO_BASE}/New%20Zealand/Cover/08.jpg`,
+      `${PORTFOLIO_BASE}/New%20Zealand/Cover/09.jpg`,
+      `${PORTFOLIO_BASE}/New%20Zealand/Cover/10.jpg`,
+    ],
   },
   {
     tourCode: 'TAS-3D2N',

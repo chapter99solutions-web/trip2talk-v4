@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PublicBottomNav from '../components/public/PublicBottomNav';
-import { mergeTripsWithFallback } from '../data/tours';
+import { mergeTripsWithFallback, findTourFallbackByCode } from '../data/tours';
 import { fetchTripsFromSheet, TripSheetRow } from '../lib/tripsSheetApi';
 import MeetTheCrew from '../components/public/MeetTheCrew';
 import TestimonialsSection from '../components/public/TestimonialsSection';
@@ -99,7 +99,15 @@ export default function PublicPortfolio() {
     return first ? `/tours/${encodeURIComponent(first.tourCode)}` : '/';
   }, [trips]);
 
-  const filteredTrips = useMemo(() => filterTripsByCategory(trips, tripFilter), [trips, tripFilter]);
+  const filteredTrips = useMemo(() => {
+    const list = filterTripsByCategory(trips, tripFilter);
+    // Flagship/featured trips lead the grid.
+    return [...list].sort((a, b) => {
+      const fa = findTourFallbackByCode(a.tourCode)?.featured ? 1 : 0;
+      const fb = findTourFallbackByCode(b.tourCode)?.featured ? 1 : 0;
+      return fb - fa;
+    });
+  }, [trips, tripFilter]);
   const showSeasonPrep = tripFilter === 'by_season';
 
   return (
