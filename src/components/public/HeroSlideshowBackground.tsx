@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useCoverSlideshow } from '../../hooks/useCoverSlideshow';
 
-const SLIDE_MS = 5000;
+const SLIDE_MS = 4000;
 const FADE_MS = 1500;
 
 type Props = {
@@ -25,7 +25,7 @@ export default function HeroSlideshowBackground({
     if (useSlideshow) {
       console.log('[HeroSlideshow] active slideshow, slides:', urls.length);
     } else if (!loading) {
-      console.warn('[HeroSlideshow] no Mixed Cover images — solid background only');
+      console.warn('[HeroSlideshow] no Cover / Mixed Cover images — solid background only');
     }
   }, [useSlideshow, loading, urls.length]);
 
