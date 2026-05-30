@@ -1,18 +1,26 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import {
+  House,
+  CalendarDays,
+  Aperture,
+  Bookmark,
+  CircleUser,
+  type LucideIcon,
+} from 'lucide-react';
 
 type NavItem = {
   to: string;
   label: string;
-  icon: string;
+  Icon: LucideIcon;
   kind?: 'default' | 'primary';
 };
 
 const NAV: NavItem[] = [
-  { to: '/', label: 'Home', icon: '🏠' },
-  { to: '/tours/nz-aut-2026', label: 'Calendar', icon: '📅' },
-  { to: '/tours/nz-aut-2026', label: 'Camera', icon: '📷', kind: 'primary' },
-  { to: '/tours/nz-aut-2026', label: 'Saved', icon: '♡' },
-  { to: '/portal', label: 'Portal', icon: '👤' },
+  { to: '/', label: 'Home', Icon: House },
+  { to: '/tours/nz-aut-2026', label: 'Calendar', Icon: CalendarDays },
+  { to: '/tours/nz-aut-2026', label: 'Camera', Icon: Aperture, kind: 'primary' },
+  { to: '/tours/nz-aut-2026', label: 'Saved', Icon: Bookmark },
+  { to: '/portal', label: 'Portal', Icon: CircleUser },
 ];
 
 // Spring-like easing used for all press interactions.
@@ -58,13 +66,15 @@ export default function PublicBottomNav() {
               ? pathname === '/'
               : pathname.startsWith(item.to.replace(/\/$/, '')) && item.to !== '/';
 
+          const { Icon } = item;
+
           if (item.kind === 'primary') {
             return (
               <button
                 key={item.label}
                 type="button"
                 onClick={goToGallery}
-                className="relative w-14 h-14 rounded-full flex items-center justify-center text-2xl active:scale-[0.92]"
+                className="relative w-14 h-14 rounded-full flex items-center justify-center active:scale-[0.92]"
                 aria-label="Gallery"
                 style={{
                   background:
@@ -75,7 +85,7 @@ export default function PublicBottomNav() {
                   transition: SPRING,
                 }}
               >
-                {item.icon}
+                <Aperture size={26} color="#ffffff" strokeWidth={2.25} />
               </button>
             );
           }
@@ -89,17 +99,15 @@ export default function PublicBottomNav() {
               style={{ transition: SPRING }}
             >
               <span
-                className="leading-none"
+                className="leading-none inline-flex"
                 aria-hidden
                 style={{
-                  fontSize: '24px',
-                  opacity: isActive ? 1 : 0.35,
                   filter: isActive
                     ? 'drop-shadow(0 0 6px rgba(74,222,128,0.7))'
                     : 'none',
                 }}
               >
-                {item.icon}
+                <Icon size={22} color={isActive ? '#ffffff' : 'rgba(255,255,255,0.4)'} />
               </span>
               <span
                 style={{

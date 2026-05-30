@@ -163,7 +163,7 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
       {
         day: 2,
         title: 'Field of Light → Kata Tjuta',
-        desc: '05:15 น. รถบัสพิเศษ → Field of Light ตอนพระอาทิตย์ขึ้น → เดินป่า Kata Tjuta → Sunset Kata Tjuta',
+        desc: 'เดินป่า Kata Tjuta ตลอดวัน → 19:00 น. รถบัสพิเศษเข้าชม Field of Light ยามค่ำคืน → แสงไฟ 50,000 ดวงท่ามกลางความมืด',
       },
       {
         day: 3,
