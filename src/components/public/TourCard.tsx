@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { Bookmark } from 'lucide-react';
 import type { TripSheetRow } from '../../lib/tripsSheetApi';
 import { getPublicTripDisplay } from '../../lib/publicTripDisplay';
 import { findTourFallbackByCode } from '../../data/tours';
@@ -48,12 +49,19 @@ export default function TourCard({ tour, saved, onToggleSave, large }: Props) {
           type="button"
           onClick={(e) => {
             e.preventDefault();
+            e.stopPropagation();
             onToggleSave();
           }}
-          className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-white/90 backdrop-blur flex items-center justify-center text-lg shadow-sm hover:scale-110 transition-transform"
-          aria-label={saved ? 'Unsave' : 'Save'}
+          className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-sm hover:scale-110 transition-transform"
+          aria-label={saved ? 'Unsave trip' : 'Save trip'}
+          aria-pressed={saved}
         >
-          {saved ? '❤️' : '🤍'}
+          <Bookmark
+            size={18}
+            strokeWidth={2.25}
+            className={saved ? 'text-amber-500' : 'text-slate-400'}
+            fill={saved ? 'currentColor' : 'none'}
+          />
         </button>
       </div>
       <div className="p-4 md:p-5">

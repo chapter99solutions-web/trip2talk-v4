@@ -19,7 +19,7 @@ const NAV: NavItem[] = [
   { to: '/', label: 'Home', Icon: House },
   { to: '/calendar', label: 'Calendar', Icon: CalendarDays },
   { to: '/tours/nz-aut-2026', label: 'Camera', Icon: Aperture, kind: 'primary' },
-  { to: '/tours/nz-aut-2026', label: 'Saved', Icon: Bookmark },
+  { to: '/saved', label: 'Saved', Icon: Bookmark },
   { to: '/portal', label: 'Portal', Icon: CircleUser },
 ];
 

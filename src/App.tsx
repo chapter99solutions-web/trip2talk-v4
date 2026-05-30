@@ -19,6 +19,7 @@ const TravelPackageTerms = lazy(() => import('./pages/TravelPackageTerms'));
 const About = lazy(() => import('./pages/About'));
 const Contact = lazy(() => import('./pages/Contact'));
 const Calendar = lazy(() => import('./pages/Calendar'));
+const Saved = lazy(() => import('./pages/Saved'));
 const PINGate = lazy(() => import('./components/PINGate'));
 const StaffDashboard = lazy(() => import('./components/staff/StaffDashboard'));
 const CohostDashboard = lazy(() => import('./components/cohost/CohostDashboard'));
@@ -93,6 +94,7 @@ export default function App() {
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/calendar" element={<Calendar />} />
+            <Route path="/saved" element={<Saved />} />
             <Route path="/album/:tourId" element={<AlbumPrep />} />
             <Route path="/album-prep" element={<AlbumPrepGate />} />
             <Route element={<PublicShell />}>

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { Bookmark } from 'lucide-react';
 import type { TripSheetRow } from '../../lib/tripsSheetApi';
 import { tripDurationBadge, tripMaxPaxLabel, tripPriceFromLabel, tripSeasonBadge } from '../../lib/tripDisplay';
 import { getPublicTripDisplay } from '../../lib/publicTripDisplay';
@@ -69,10 +70,16 @@ export default function TripStackCard({
                 e.stopPropagation();
                 onToggleSave();
               }}
-              className="backdrop-blur-md bg-white/20 rounded-full p-2 text-lg leading-none shadow-sm hover:bg-white/30 transition-colors"
+              className="backdrop-blur-md bg-white/20 rounded-full p-2 leading-none shadow-sm hover:bg-white/30 transition-colors"
               aria-label={saved ? 'Remove from saved' : 'Save trip'}
+              aria-pressed={saved}
             >
-              {saved ? '★' : '☆'}
+              <Bookmark
+                size={18}
+                strokeWidth={2.25}
+                className={saved ? 'text-amber-400' : 'text-white'}
+                fill={saved ? 'currentColor' : 'none'}
+              />
             </button>
           </div>
 

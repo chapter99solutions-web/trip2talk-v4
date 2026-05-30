@@ -13,6 +13,7 @@ import { filterTripsByCategory, TripFilterId } from '../lib/tripFilters';
 import SeasonPrepSection from '../components/public/SeasonPrepSection';
 import HeroSlideshowBackground from '../components/public/HeroSlideshowBackground';
 import TourCard from '../components/public/TourCard';
+import { useSavedTrips } from '../hooks/useSavedTrips';
 
 function scrollToSection(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
@@ -56,7 +57,7 @@ const TRIP_FILTERS: { id: TripFilterId; labelKey: keyof ReturnType<typeof usePub
 
 export default function PublicPortfolio() {
   const t = usePublicStrings();
-  const [saved, setSaved] = useState<Set<string>>(() => new Set());
+  const { saved, toggle: toggleSave } = useSavedTrips();
   const [trips, setTrips] = useState<TripSheetRow[]>([]);
   const [loadingTrips, setLoadingTrips] = useState(true);
   const [tripError, setTripError] = useState<string | null>(null);
@@ -84,15 +85,6 @@ export default function PublicPortfolio() {
       cancelled = true;
     };
   }, []);
-
-  const toggleSave = (id: string) => {
-    setSaved((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
 
   const exploreHref = useMemo(() => {
     const first = trips[0];
