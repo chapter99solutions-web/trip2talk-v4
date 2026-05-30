@@ -405,7 +405,7 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
     excluded: ['ตั๋วเครื่องบิน', 'อาหารทุกมื้อ', 'ประกันการเดินทาง'],
     accommodation: 'Dormitory/Hostel/Motel อัปเกรดห้องเดี่ยวเพิ่ม $250-$550 AUD/คืน',
     galleryPhotos: [
-      `${PORTFOLIO_BASE}/Tasmania/CT99-12.JPG`,
+      `${PORTFOLIO_BASE}/Tasmania/596371362_1428639202594510_8709278754225773992_n.jpg`,
       `${PORTFOLIO_BASE}/Tasmania/CT99-201.JPG`,
       `${PORTFOLIO_BASE}/Tasmania/CT99-446.JPG`,
     ],
