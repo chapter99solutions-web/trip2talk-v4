@@ -4,6 +4,52 @@ import type { ATOCategory } from '../types/tour';
 export const RECEIPTS_BUCKET = 'receipts';
 export const TAX_RECEIPTS_TABLE = 'tax_receipts';
 
+/**
+ * Hardcoded fallback GAS Web App `/exec` endpoint — mirrors the resolution
+ * convention in src/lib/tripsSheetApi.ts (VITE_GAS_WEBAPP_URL → fallback) so a
+ * missing build-time env var still reaches the deployed Apps Script backend.
+ */
+const DEFAULT_GAS_WEBAPP_URL =
+  'https://script.google.com/macros/s/AKfycby_BjSu7zQnPqpBnoYpbELs8_nPFnj44VD-xNFNLVvN328hmfobwSp78wRxdeCtg9rNXg/exec';
+
+function gasWebappUrl(): string {
+  return (import.meta.env.VITE_GAS_WEBAPP_URL as string | undefined)?.trim() || DEFAULT_GAS_WEBAPP_URL;
+}
+
+type ExpenseSheetPayload = {
+  action: 'addExpense';
+  trip_code: string;
+  amount: number;
+  gst_amount: number;
+  category: string;
+  vendor: string;
+  receipt_date: string;
+  image_url: string;
+  notes: string;
+  uploaded_by: string;
+};
+
+/**
+ * Best-effort, NON-BLOCKING mirror of a saved receipt to Google Sheets via the
+ * Apps Script web app (doPost `action: 'addExpense'`). Supabase is the source of
+ * truth — any failure (or missing URL) is swallowed and never bubbles to the UI.
+ * POSTs with 'text/plain;charset=utf-8' to dodge a CORS preflight, the standard
+ * Apps Script doPost pattern (the handler JSON.parse()s e.postData.contents).
+ */
+export async function syncReceiptToSheets(payload: ExpenseSheetPayload): Promise<void> {
+  const url = gasWebappUrl();
+  if (!url) return;
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    console.warn('[receipts] Google Sheets sync failed (non-blocking)', e);
+  }
+}
+
 export type TaxReceipt = {
   id: string;
   trip_code: string | null;
@@ -135,7 +181,23 @@ export async function insertTaxReceipt(input: NewReceiptInput): Promise<TaxRecei
     throw error;
   }
 
-  return data as TaxReceipt;
+  const saved = data as TaxReceipt;
+
+  // Fire-and-forget mirror to Google Sheets; never blocks or fails the save.
+  void syncReceiptToSheets({
+    action: 'addExpense',
+    trip_code: saved.trip_code ?? input.tripCode.trim(),
+    amount: saved.amount_aud,
+    gst_amount: saved.gst_amount_aud,
+    category: saved.ato_category,
+    vendor: saved.vendor_name ?? '',
+    receipt_date: saved.receipt_date ?? '',
+    image_url: saved.image_url ?? imageUrl ?? '',
+    notes: saved.notes ?? '',
+    uploaded_by: saved.uploaded_by ?? '',
+  });
+
+  return saved;
 }
 
 /** Fetch tax-claim receipts, optionally scoped to a trip code. Returns [] when the table is missing. */

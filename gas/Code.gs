@@ -151,6 +151,9 @@ function doPost(e) {
     if (body.action === 'getPendingIntakes') {
       return json_(getPendingIntakes_());
     }
+    if (body.action === 'addExpense') {
+      return json_(appendExpense_(body));
+    }
     return json_({ status: 'error', message: 'Unknown sheet payload' });
   } catch (err) {
     return json_({ status: 'error', message: String(err) });
@@ -670,6 +673,30 @@ function getPendingIntakes_() {
 
 function appendConsent_(consent) {
   return { status: 'ok', message: 'Consents append not implemented in this snippet' };
+}
+
+/** Staff receipt upload (Tax Claim) — appended to the 'Expenses' tab. */
+function expenseHeaders_() {
+  return ['Date', 'Trip', 'Vendor', 'Category', 'Amount', 'GST', 'Image URL', 'Notes'];
+}
+
+function appendExpense_(data) {
+  var d = data || {};
+  var ss = SpreadsheetApp.openById(spreadsheetId_());
+  var sheet = getOrCreateSheet_(ss, 'Expenses', expenseHeaders_());
+  var amount = Number(pick_(d, ['amount', 'Amount'])) || 0;
+  var gst = Number(pick_(d, ['gst_amount', 'GST'])) || 0;
+  sheet.appendRow([
+    pick_(d, ['receipt_date', 'Date']),
+    pick_(d, ['trip_code', 'Trip']),
+    pick_(d, ['vendor', 'Vendor']),
+    pick_(d, ['category', 'Category']),
+    amount,
+    gst,
+    pick_(d, ['image_url', 'Image URL']),
+    pick_(d, ['notes', 'Notes']),
+  ]);
+  return { status: 'ok', message: 'Expense saved' };
 }
 
 /** @deprecated — intake now updates Customer_Bookings via updateIntake_ */
