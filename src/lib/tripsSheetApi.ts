@@ -3,11 +3,25 @@ import { MOCK_CUSTOMER_BOOKINGS } from './mockBookings';
 import { forwardSheetPayload } from './syncPipeline';
 import type { TripSeason, TripType } from './masterTrips';
 
+/**
+ * Hardcoded fallback GAS Web App `/exec` endpoint. Used when
+ * `VITE_GAS_WEBAPP_URL` is not set at build time (e.g. local dev without an
+ * `.env` file) so the app still talks to the deployed Apps Script backend.
+ */
+const DEFAULT_GAS_WEBAPP_URL =
+  'https://script.google.com/macros/s/AKfycby_BjSu7zQnPqpBnoYpbELs8_nPFnj44VD-xNFNLVvN328hmfobwSp78wRxdeCtg9rNXg/exec';
+
+/**
+ * Resolution precedence:
+ *   1. `import.meta.env.VITE_GAS_WEBAPP_URL` (build-time env var; Vercel)
+ *   2. `DEFAULT_GAS_WEBAPP_URL` (hardcoded fallback)
+ * Note: `import.meta.env.*` values are `string | undefined`, so guard the trim.
+ */
 const GAS_WEBAPP_URL =
-  (import.meta.env.VITE_GAS_WEBAPP_URL as string | undefined)?.trim() || '';
+  (import.meta.env.VITE_GAS_WEBAPP_URL as string | undefined)?.trim() || DEFAULT_GAS_WEBAPP_URL;
 
 function requireGasUrl(): string {
-  if (!GAS_WEBAPP_URL) throw new Error('Missing VITE_GAS_WEBAPP_URL');
+  if (!GAS_WEBAPP_URL) throw new Error('Missing GAS Web App URL');
   return GAS_WEBAPP_URL;
 }
 
