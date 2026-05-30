@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { formatAUD } from '../lib/payidCalc';
 import { findTripById } from '../lib/publicTours';
+import { findTourFallbackByCode } from '../data/tours';
 import { quoteTripTotal, resolveTripSizeTier } from '../lib/bookingPolicy';
 import TripSizeTierBadge from '../components/cyber/TripSizeTierBadge';
 import BookingPolicyPanel from '../components/policy/BookingPolicyPanel';
@@ -150,6 +151,29 @@ export default function BookingCheckout() {
   const totalAud = Math.round(baseTotal * packageDef.multiplier * 100) / 100;
   const depositAud = Math.min(500, Math.round(totalAud * 0.3 * 100) / 100);
   const payOnDayAud = Math.max(0, Math.round((totalAud - depositAud) * 100) / 100);
+
+  // Multi-day tours (anything not a 1-day trip) use a 3-installment, interest-free plan.
+  // Reuses the same tour-type detection as the pickup field: kind 'day' === 1-day trip.
+  const isMultiDay = pickupConfig.kind !== 'day';
+  const installmentDeposit = 100;
+  const installmentRemaining = Math.max(0, Math.round((totalAud - installmentDeposit) * 100) / 100);
+  const installment1 = Math.round((installmentRemaining / 2) * 100) / 100;
+  // งวด2 takes the remainder so the two halves sum exactly to `installmentRemaining`.
+  const installment2 = Math.round((installmentRemaining - installment1) * 100) / 100;
+
+  const bookingDate = new Date();
+  const installment1Due = new Date(bookingDate);
+  installment1Due.setDate(installment1Due.getDate() + 30);
+
+  const tripStartIso =
+    findTourFallbackByCode(trip.trip_code)?.nextDate ??
+    (tourId ? findTourFallbackByCode(tourId)?.nextDate : undefined);
+  const tripStartDate = tripStartIso ? new Date(tripStartIso) : null;
+  const installment2Due = tripStartDate ? new Date(tripStartDate) : null;
+  if (installment2Due) installment2Due.setDate(installment2Due.getDate() - 20);
+
+  const fmtThaiDate = (d: Date) =>
+    d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
 
   const canProceedStep1 = Boolean(selectedDate) && quote?.valid;
   const pickupRequiresSuburb =
@@ -493,7 +517,7 @@ export default function BookingCheckout() {
                 </select>
               </div>
               <div>
-                <label className="text-xs text-slate-500 block mb-1">OSHC (if student)</label>
+                <label className="text-xs text-slate-500 block mb-1">OSHC (สำหรับวีซ่านักเรียน)</label>
                 <input
                   value={oshc}
                   onChange={(e) => setOshc(e.target.value)}
@@ -502,6 +526,9 @@ export default function BookingCheckout() {
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-teal/30 disabled:opacity-40"
                   required={visaType === 'student'}
                 />
+                <p className="text-xs text-gray-400 mt-1">
+                  ประกันสุขภาพนักเรียนต่างชาติ (OSHC) — กรอกเลขสมาชิกเพื่อใช้เคลมค่ารักษาพยาบาลหากเกิดอุบัติเหตุระหว่างทริป
+                </p>
               </div>
             </div>
           </div>
@@ -562,14 +589,45 @@ export default function BookingCheckout() {
 
               <div className="my-3 border-t border-white/10" />
 
-              <div className="flex justify-between">
-                <span>Deposit now</span>
-                <span className="font-mono font-semibold text-teal">{formatAUD(depositAud)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Pay on day</span>
-                <span className="font-mono text-white/90">{formatAUD(payOnDayAud)}</span>
-              </div>
+              {isMultiDay ? (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-green-400">มัดจำ (จ่ายวันนี้)</span>
+                    <span className="font-mono font-semibold text-green-400">
+                      {formatAUD(installmentDeposit)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-white/60">
+                      งวดที่ 1 — ครบกำหนด {fmtThaiDate(installment1Due)} (30 วันหลังจอง)
+                    </span>
+                    <span className="font-mono text-white/90 whitespace-nowrap">
+                      {formatAUD(installment1)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-white/60">
+                      งวดที่ 2 — ครบกำหนด{' '}
+                      {installment2Due ? `${fmtThaiDate(installment2Due)} ` : ''}(ก่อนออกทริป 20 วัน)
+                    </span>
+                    <span className="font-mono text-white/90 whitespace-nowrap">
+                      {formatAUD(installment2)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-white/70">📅 ผ่อนชำระได้ 3 งวด ไม่มีดอกเบี้ย</p>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between">
+                    <span>Deposit now</span>
+                    <span className="font-mono font-semibold text-teal">{formatAUD(depositAud)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Pay on day</span>
+                    <span className="font-mono text-white/90">{formatAUD(payOnDayAud)}</span>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between text-white">
                 <span className="font-semibold">Total</span>
                 <span className="font-mono font-semibold">{formatAUD(totalAud)}</span>
