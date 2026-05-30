@@ -50,6 +50,8 @@ export type TourFallback = {
   featured?: boolean;
   /** Hardcoded gallery photo URLs — consumed by TourDetail before any bucket lookup (first = hero). */
   galleryPhotos?: string[];
+  /** Portfolio bucket folder whose images auto-populate the gallery at runtime (overrides galleryPhotos for the strip; galleryPhotos[0] stays the hero/cover). */
+  galleryFolder?: string;
 };
 
 const PORTFOLIO_BASE =
@@ -342,29 +344,105 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
   {
     tourCode: 'TAS-LH-4D3N',
     anonymizedTitle: 'Lavender & Aurora Trail',
+    tourName: 'Tasmania Summer: Launceston – Hobart (4D3N)',
+    nameTh:
+      'ทริปพร้อมช่างภาพ สัมผัสประวัติศาสตร์ ศิลปะ และตามล่าแสงใต้ (Tasmania Summer: Launceston - Hobart)',
+    location: 'AU · AUSTRALIA · TASMANIA',
     tripType: 'overnight',
     standardPrice: 1650,
     privatePrice: 1850,
     durationLabel: '4 Days 3 Nights',
     season: 'summer',
     maxPax: 6,
+    rating: 4.8,
+    nextDate: '2026-03-18',
+    endDate: '2026-03-21',
+    weather: 'Summer 12–22°C',
+    category: 'ทริปค้างคืน',
     highlights: ['Bridestowe Lavender', 'Cradle Mountain', 'MONA'],
+    highlightIcons: ['💜', '🏔️', '🎨'],
+    seatsLeft: 4,
     pickupType: 'airport_terminal',
-    description: 'Purple lavender fields by day, aurora hunting by night across Tasmania.',
+    description:
+      'Tasmania Summer: ครั้งหนึ่งที่ เลนส์ จะเปลี่ยนโลกของคุณ มกราคม-มีนาคมนี้คือช่วงที่แสงสวยที่สุดของปีในแทสเมเนีย มาร่วมทริปที่คัดสรรมาเพื่อคนรักกล้องโดยเฉพาะ โดยมีช่างภาพเป็น Mentor คอยแนะนำเทคนิคหน้างานแบบชิดใกล้',
+    itinerary: [
+      {
+        day: 1,
+        title: 'Bridestowe Lavender → Richmond → Aurora Hunt',
+        desc: 'ลุยทุ่งลาเวนเดอร์ Bridestowe → Richmond Bridge → ค่ำล่าแสงใต้ Aurora Hunt พร้อมสอนตั้งค่ากล้อง',
+      },
+      {
+        day: 2,
+        title: 'Cradle Mountain Full Day',
+        desc: 'Cradle Mountain เต็มวัน รอ Reflection → ถ่ายป่าโบราณและสัตว์ป่า → Aurora Mission Night 2',
+      },
+      {
+        day: 3,
+        title: 'MONA → Hobart → Mt. Wellington',
+        desc: 'MONA → Hobart Market → Cascade Brewery → Mt. Wellington Golden Hour + Aurora Hunt ส่งท้าย',
+      },
+      {
+        day: 4,
+        title: 'Last Capture → SYD',
+        desc: 'Last Capture เช้าเมืองโฮบาร์ต → Waterfront → บินกลับซิดนีย์',
+      },
+    ],
+    included: [
+      'รถ + คนขับ Launceston-Hobart',
+      'ช่างภาพ Mentor',
+      'น้ำดื่ม',
+      'ค่าเข้าสถานที่ทั้งหมด (รวมตั๋วลาเวนเดอร์ + MONA)',
+    ],
+    excluded: ['ตั๋วเครื่องบิน', 'อาหารทุกมื้อ', 'ประกันการเดินทาง'],
+    accommodation: 'Dormitory/Hostel/Motel อัปเกรดห้องเดี่ยวเพิ่ม $250-$550 AUD/คืน',
+    galleryPhotos: [
+      `${PORTFOLIO_BASE}/Tasmania/CT99-12.JPG`,
+      `${PORTFOLIO_BASE}/Tasmania/CT99-201.JPG`,
+      `${PORTFOLIO_BASE}/Tasmania/CT99-446.JPG`,
+    ],
   },
   {
     tourCode: 'KIA-1DAY',
     anonymizedTitle: 'The Coastal Cliffs',
+    tourName: 'Sydney – Kiama One Day Photo Trip (1 Day)',
+    nameTh: 'ทริปถ่ายภาพวันเดียว ซิดนีย์ - คิอามา (Sydney - Kiama One Day Photo Trip)',
+    location: 'Sydney - Kiama, NSW',
     tripType: 'one_day',
     standardPrice: 250,
-    privatePrice: 290,
+    privatePrice: 250,
     durationLabel: '1 Day',
     season: 'winter',
     maxPax: 4,
-    highlights: ['Helensburgh Station', 'Seacliff Bridge', 'Bombo Headland'],
+    rating: 4.8,
+    departureLabel: 'Winter Only · 08:00 - 19:00',
+    weather: 'Winter 8–17°C',
+    category: 'ทริปวันเดียว',
+    tagline:
+      'เปิดเฉพาะฤดูหนาว (Winter only) · ออกเดินทาง 08:00 - 19:00 · Peak Season (27 ธ.ค. - 5 ม.ค.) $290 AUD/ท่าน',
+    highlights: ['Helensburgh Old Station', 'Seacliff Bridge', 'Bombo Headland Quarry'],
+    highlightIcons: ['🚉', '🌉', '🪨'],
+    seatsLeft: 4,
     pickupType: 'thaitown_main',
     description:
-      "Sydney's most dramatic winter coastal drive — sea cliffs, basalt columns, and vintage ruins.",
+      'เที่ยวตามรอยสายลมและแสงแดด ไปกับทริปถ่ายภาพสุดประทับใจใกล้ซิดนีย์ สัมผัสธรรมชาติและมุมถ่ายรูปสุด Unseen รับประกันความคุ้มค่า ไม่ต้องขับรถเอง มีรูปโปรไฟล์สวยปังกลับบ้านแน่นอน!',
+    itinerary: [
+      {
+        day: 1,
+        title: 'ตารางทริปวันเดียว (08:00 - 19:00)',
+        desc: '08:00 รับสมาชิก Sydney Thai Town มุ่งหน้าลงใต้ → ช่วงเช้า Helensburgh Old Station (สถานีร้าง วินเทจ), Stanwell Tops Lookout, Seacliff Bridge → ช่วงบ่าย-เย็น Bombo Headland Quarry เสาหินโบราณ รอแสง Twilight → 19:00 ส่งกลับ Sydney Thai Town',
+      },
+    ],
+    included: [
+      'รับ-ส่ง Sydney Thai Town',
+      'รถ + คนขับ',
+      'ช่างภาพมืออาชีพ',
+      'น้ำดื่มตลอดวัน',
+    ],
+    excluded: ['อาหารและเครื่องดื่ม', 'ประกันการเดินทาง'],
+    galleryPhotos: [
+      `${PORTFOLIO_BASE}/One%20day%20trip%20SYD/705320467_10242162489108855_3820285517745745334_n.jpg`,
+    ],
+    galleryFolder: 'One day trip SYD',
   },
   {
     tourCode: 'CAN-2D1N',

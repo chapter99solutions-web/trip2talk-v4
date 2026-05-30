@@ -5,7 +5,7 @@ import { findTripById } from '../lib/publicTours';
 import { formatAUD } from '../lib/payidCalc';
 import { PORTFOLIO_TOURS } from '../lib/portfolioTours';
 import { supabase } from '../lib/supabase';
-import { fetchShuffledMixedCover } from '../lib/galleryStorage';
+import { fetchShuffledMixedCover, listPortfolioFolder } from '../lib/galleryStorage';
 import { fetchTripByCodeFromSheet, TripSheetRow } from '../lib/tripsSheetApi';
 import { getPublicTripDisplay } from '../lib/publicTripDisplay';
 
@@ -90,6 +90,7 @@ export default function TourDetail() {
   const tripId = trip?.id ?? resolvedSheet?.tourCode ?? tourId ?? 'trip';
   const saveKey = useMemo(() => `t2t:savedTours:v1`, []);
   const hardcodedPhotos = staticFallback?.galleryPhotos;
+  const galleryFolder = staticFallback?.galleryFolder;
 
   useEffect(() => {
     try {
@@ -101,18 +102,38 @@ export default function TourDetail() {
     }
   }, [saveKey, tripId]);
 
-  // Gallery photos: hardcoded per-tour list wins, then tour-specific bucket, then portfolio.
+  // Gallery photos: a folder auto-populates the strip, else hardcoded list, then
+  // tour-specific bucket, then portfolio. galleryPhotos[0] always leads as the cover.
   useEffect(() => {
     let cancelled = false;
 
-    if (hardcodedPhotos && hardcodedPhotos.length) {
-      setPhotos(hardcodedPhotos);
-      return () => {
-        cancelled = true;
-      };
-    }
-
     async function loadPhotos() {
+      // Auto-populate the gallery from a portfolio folder when one is configured.
+      if (galleryFolder) {
+        try {
+          const urls = await listPortfolioFolder(galleryFolder, 40);
+          if (urls.length) {
+            const cover = hardcodedPhotos?.[0];
+            const coverFile = cover
+              ? decodeURIComponent(cover.split('/').pop() ?? '')
+              : undefined;
+            const rest = coverFile
+              ? urls.filter((u) => decodeURIComponent(u.split('/').pop() ?? '') !== coverFile)
+              : urls;
+            const ordered = cover ? [cover, ...rest] : urls;
+            if (!cancelled) setPhotos(ordered);
+            return;
+          }
+        } catch {
+          // ignore — fall through to the static/bucket fallbacks below
+        }
+      }
+
+      if (hardcodedPhotos && hardcodedPhotos.length) {
+        if (!cancelled) setPhotos(hardcodedPhotos);
+        return;
+      }
+
       try {
         const prefix = `${tripId}/`;
         const { data, error } = await supabase.storage.from('tour-photos').list(prefix, {
@@ -150,7 +171,7 @@ export default function TourDetail() {
     return () => {
       cancelled = true;
     };
-  }, [tripId, hardcodedPhotos]);
+  }, [tripId, hardcodedPhotos, galleryFolder]);
 
   // Reset gallery position whenever the photo set changes.
   useEffect(() => {
