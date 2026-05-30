@@ -61,8 +61,8 @@ export default function BookingCheckout() {
   const [email, setEmail] = useState('');
   // PICKUP RULE:
   // The option set + label adapt to the tour type derived from the tour code
-  // (see pickupConfig below): 1DAY → day-trip pickups, NZ → New Zealand airports,
-  // otherwise → domestic multi-day airport terminals.
+  // (see pickupConfig below): 1DAY → day-trip pickups, otherwise → all multi-day
+  // tours share one Sydney Airport meeting-point set (we fly together from Sydney).
   const [pickupLocation, setPickupLocation] = useState<string>('thaitown_main');
   const [hotelName, setHotelName] = useState('');
   const [visaType, setVisaType] = useState<VisaType>('student');
@@ -87,30 +87,22 @@ export default function BookingCheckout() {
       return {
         kind: 'day' as const,
         label: 'Pickup location',
+        helper: undefined as string | undefined,
         options: ONE_DAY_PICKUP_OPTIONS.map((p) => ({
           value: p.id as string,
           label: p.labelEn,
         })),
       };
     }
-    if (code.includes('NZ')) {
-      return {
-        kind: 'nz' as const,
-        label: 'Meeting point (Airport Terminal)',
-        options: [
-          { value: 'nz_christchurch', label: 'Christchurch International Airport' },
-          { value: 'nz_queenstown', label: 'Queenstown Airport' },
-          { value: 'nz_auckland', label: 'Auckland Airport (transit)' },
-          { value: 'self_arrange', label: "Self-arrange (I'll meet at destination)" },
-        ],
-      };
-    }
+    // All multi-day tours (MEL-4D3N, ULU-4D3N, NZ-6D5N, …) fly together from
+    // Sydney, so they share ONE Sydney Airport meeting-point set.
     return {
-      kind: 'domestic' as const,
-      label: 'Meeting point (Airport Terminal)',
+      kind: 'multiday' as const,
+      label: 'Meeting point (Sydney Airport)',
+      helper: 'เราบินพร้อมกันจากซิดนีย์ — นัดเจอกันที่สนามบิน Sydney' as string | undefined,
       options: [
-        { value: 'syd_t2t3', label: 'Sydney Domestic Airport T2/T3 (Qantas/Virgin)' },
-        { value: 'syd_t1', label: 'Sydney Domestic Airport T1 (Jetstar)' },
+        { value: 'syd_t1', label: 'Sydney International Airport T1 (Qantas/Jetstar)' },
+        { value: 'syd_t2', label: 'Sydney International Airport T2 (Virgin/Rex)' },
         { value: 'self_arrange', label: "Self-arrange (I'll meet at destination)" },
       ],
     };
@@ -472,6 +464,9 @@ export default function BookingCheckout() {
                   </option>
                 ))}
               </select>
+              {pickupConfig.helper && (
+                <p className="mt-1 text-xs text-slate-500">{pickupConfig.helper}</p>
+              )}
               {pickupConfig.kind === 'day' && pickupLocation === 'route_waypoint' && (
                 <>
                   <p className="mt-2 text-xs bg-orange-100 border border-orange-400 text-orange-900 rounded-lg p-2">
