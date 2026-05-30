@@ -22,6 +22,29 @@ export type PortalLinkRow = {
   created_at: string;
 };
 
+/**
+ * The `public.bookings` table is defined in supabase/migrations/002_portal_intake_schema.sql
+ * (and supabase/14-schema-receipts-bookings.sql). If that DDL has not been run on the live
+ * project, PostgREST reports "Could not find the table 'public.bookings' in the schema cache".
+ * Detect that case so the dashboard degrades to an empty manifest instead of crashing.
+ */
+function isMissingBookingsTable(message: string): boolean {
+  const m = (message || '').toLowerCase();
+  return (
+    m.includes('schema cache') ||
+    m.includes("'public.bookings'") ||
+    m.includes('relation "bookings"') ||
+    (m.includes('bookings') && m.includes('does not exist'))
+  );
+}
+
+export class BookingsTableMissingError extends Error {
+  constructor() {
+    super('Bookings table is not set up yet. Run supabase/14-schema-receipts-bookings.sql.');
+    this.name = 'BookingsTableMissingError';
+  }
+}
+
 export async function fetchPlatformBookings(): Promise<PlatformBooking[]> {
   const { data, error } = await supabase
     .from('bookings')
@@ -31,6 +54,9 @@ export async function fetchPlatformBookings(): Promise<PlatformBooking[]> {
     .order('departure_date', { ascending: true });
 
   if (error) {
+    if (isMissingBookingsTable(error.message)) {
+      throw new BookingsTableMissingError();
+    }
     throw new Error(error.message);
   }
 

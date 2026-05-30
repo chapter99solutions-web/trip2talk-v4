@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import IntakeFormModal from '../IntakeFormModal';
-import { fetchConfirmedBookings, type PlatformBooking } from '../../lib/platformBookings';
+import { BookingsTableMissingError, fetchConfirmedBookings, type PlatformBooking } from '../../lib/platformBookings';
 import { logConsentToSheet } from '../../lib/tripsSheetApi';
 import { saveExpenseLocally } from '../../lib/expenseDb';
+import ReceiptUploadSection from './ReceiptUploadSection';
 import type { ATOCategory, Expense } from '../../types/tour';
 
 const ATO_CATEGORIES: ATOCategory[] = [
@@ -274,10 +275,18 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
       const rows = await fetchConfirmedBookings();
       setManifestBookings(rows);
     } catch (e) {
-      setManifestError(e instanceof Error ? e.message : 'Failed to load intake manifest');
+      if (e instanceof BookingsTableMissingError) {
+        setManifestError(
+          lang === 'TH'
+            ? 'ยังไม่ได้ตั้งค่าตาราง bookings ใน Supabase (รัน supabase/14-schema-receipts-bookings.sql)'
+            : 'Bookings table not set up in Supabase yet (run supabase/14-schema-receipts-bookings.sql)'
+        );
+      } else {
+        setManifestError(e instanceof Error ? e.message : 'Failed to load intake manifest');
+      }
       setManifestBookings([]);
     }
-  }, []);
+  }, [lang]);
 
   useEffect(() => {
     void loadManifest();
@@ -435,6 +444,8 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
             </button>
           </div>
         </section>
+
+        <ReceiptUploadSection lang={lang} tripCode={assignedTourCode} onToast={flashToast} />
 
         <section className="space-y-3">
           <h2 className="text-sm font-semibold tracking-wide" style={{ color: GOLD }}>
