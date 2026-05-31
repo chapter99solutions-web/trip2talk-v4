@@ -3,6 +3,7 @@ import { Bookmark } from 'lucide-react';
 import type { TripSheetRow } from '../../lib/tripsSheetApi';
 import { getPublicTripDisplay } from '../../lib/publicTripDisplay';
 import { findTourFallbackByCode } from '../../data/tours';
+import { hasDepartureDate } from '../../lib/tripDisplay';
 import TripCardBadges from './TripCardBadges';
 import TourCardCover from './TourCardCover';
 
@@ -17,6 +18,12 @@ export default function TourCard({ tour, saved, onToggleSave, large }: Props) {
   const display = getPublicTripDisplay(tour);
   const featured = Boolean(findTourFallbackByCode(tour.tourCode)?.featured);
   const big = large || featured;
+
+  // ด่านวันเดินทาง: ไม่มี departure_start = "ยังไม่เปิดจอง" → แสดงป้าย waitlist.
+  const isOpen = hasDepartureDate(tour.departureStart);
+  // ด่านที่นั่ง: ถ้ามีข้อมูลครบและ slots_booked >= slots_max = เต็มแล้ว.
+  const isFull =
+    tour.slotsMax != null && tour.slotsBooked != null && tour.slotsBooked >= tour.slotsMax;
 
   return (
     <article
@@ -43,6 +50,19 @@ export default function TourCard({ tour, saved, onToggleSave, large }: Props) {
               ⭐ Flagship Trip
             </span>
           </>
+        )}
+
+        {/* ด่านวันเดินทาง: ยังไม่กำหนดวัน = ยังไม่เปิดจอง (เปิดจองเร็ว ๆ นี้ / ลงชื่อรอคิว) */}
+        {!isOpen && (
+          <span className="absolute bottom-3 left-3 z-10 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/85 text-white text-[11px] font-bold shadow-lg">
+            🗓️ Dates coming soon · เปิดจองเร็ว ๆ นี้
+          </span>
+        )}
+        {/* ด่านที่นั่ง: เต็มแล้ว */}
+        {isOpen && isFull && (
+          <span className="absolute bottom-3 left-3 z-10 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-600 text-white text-[11px] font-bold shadow-lg">
+            เต็มแล้ว / Fully booked
+          </span>
         )}
 
         <button

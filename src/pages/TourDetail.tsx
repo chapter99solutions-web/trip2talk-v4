@@ -8,6 +8,8 @@ import { supabase } from '../lib/supabase';
 import { fetchShuffledMixedCover, listPortfolioFolder } from '../lib/galleryStorage';
 import { fetchTripByCodeFromSheet, TripSheetRow } from '../lib/tripsSheetApi';
 import { getPublicTripDisplay } from '../lib/publicTripDisplay';
+import { fetchTripAvailability, type TripAvailability } from '../lib/customerJourney';
+import { hasDepartureDate } from '../lib/tripDisplay';
 
 const FALLBACK_HERO =
   'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1600&q=80';
@@ -45,6 +47,8 @@ export default function TourDetail() {
   const [sheetTrip, setSheetTrip] = useState<TripSheetRow | null>(null);
   const [sheetError, setSheetError] = useState<string | null>(null);
   const [sheetLoading, setSheetLoading] = useState(true);
+  // สถานะที่นั่ง/วันเดินทางสด ๆ จาก DB (source of truth) — ใช้คุมการแสดงปุ่มจอง.
+  const [availability, setAvailability] = useState<TripAvailability | null>(null);
 
   // Hero parallax + cinematic gallery state
   const [scrollY, setScrollY] = useState(0);
@@ -76,6 +80,18 @@ export default function TourDetail() {
       }
     };
     void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [tourId]);
+
+  // โหลดสถานะที่นั่ง/วันเดินทางจาก DB (เป็น source of truth สำหรับด่านจอง).
+  useEffect(() => {
+    let cancelled = false;
+    if (!tourId) return;
+    void fetchTripAvailability(tourId).then((a) => {
+      if (!cancelled) setAvailability(a);
+    });
     return () => {
       cancelled = true;
     };
@@ -282,14 +298,37 @@ export default function TourDetail() {
   const bookingCode = resolvedSheet?.tourCode ?? trip?.id ?? tourId ?? '';
   const bookingHref = `/book/${encodeURIComponent(bookingCode)}`;
 
-  // Conversion boosters — seats-left comes from data when present, else deterministic.
-  const seatsLeft = staticFallback?.seatsLeft ?? 1 + (stableHash(tripId) % 3);
+  // Conversion boosters — seats-left มาจาก DB (source of truth) ก่อน, แล้วค่อย
+  // fallback ไปค่า static/deterministic ถ้ายังไม่มีข้อมูล DB.
+  const fallbackSeats = staticFallback?.seatsLeft ?? 1 + (stableHash(tripId) % 3);
+  const seatsLeft = availability?.seatsLeft ?? fallbackSeats;
   const joinedCount = 8 + (stableHash(`${tripId}joined`) % 25);
   const originalPrice = priceAud > 0 ? Math.round((priceAud * 1.25) / 5) * 5 : 0;
   const departLabel = staticFallback?.departureLabel || formatTripDate(nextDate);
-  const urgencyText = departLabel
-    ? `🔥 เหลือ ${seatsLeft} ที่นั่ง · ออกเดินทาง ${departLabel}`
-    : `🔥 ${seatsLeft} ${seatsLeft === 1 ? 'spot' : 'spots'} left`;
+
+  // ───────── ด่านจอง 2 ชั้น (precedence: DATE GATE ก่อน → SEAT GATE) ─────────
+  // ถ้าพบแถวใน DB ให้ใช้ departure_start ของ DB เป็นตัวตัดสิน (source of truth);
+  // ถ้ายังไม่มีข้อมูล DB (null) ค่อย fallback ไปดูข้อมูล sheet/static เพื่อไม่บล็อก
+  // ก่อนรัน migration. ฝั่ง DB (RPC) เป็นด่านสุดท้ายเสมอ.
+  const departureSource =
+    availability?.departureStart || resolvedSheet?.departureStart || nextDate || '';
+  const bookingOpen =
+    availability != null
+      ? Boolean(availability.departureStart)
+      : hasDepartureDate(departureSource) || Boolean(staticFallback?.departureLabel);
+  const isFull = availability?.seatsLeft != null && availability.seatsLeft <= 0;
+  const canBook = bookingOpen && !isFull;
+  const bookBlockedLabel = !bookingOpen
+    ? 'เปิดจองเร็ว ๆ นี้ / Dates coming soon'
+    : 'เต็มแล้ว / Fully booked';
+
+  const urgencyText = !bookingOpen
+    ? '🗓️ เปิดจองเร็ว ๆ นี้ / Dates coming soon'
+    : isFull
+      ? 'เต็มแล้ว / Fully booked'
+      : departLabel
+        ? `🔥 เหลือ ${seatsLeft} ที่นั่ง · ออกเดินทาง ${departLabel}`
+        : `🔥 ${seatsLeft} ${seatsLeft === 1 ? 'spot' : 'spots'} left`;
 
   const galleryPhotos = photos.length ? photos : hardcodedPhotos ?? [heroImage];
   const heroParallax = Math.min(scrollY * 0.4, 80);
@@ -402,13 +441,23 @@ export default function TourDetail() {
           </div>
         </div>
 
-        {/* Floating CTA — desktop, sticky on scroll */}
-        <Link
-          to={bookingHref}
-          className="hidden md:inline-flex fixed bottom-6 right-6 z-50 items-center justify-center gap-2 px-7 py-4 rounded-full bg-teal text-navy font-bold text-base shadow-2xl shadow-black/30 hover:scale-105 transition-transform"
-        >
-          Book This Trip <span aria-hidden>→</span>
-        </Link>
+        {/* Floating CTA — desktop, sticky on scroll. ปิดเมื่อยังไม่เปิดจอง/เต็ม */}
+        {canBook ? (
+          <Link
+            to={bookingHref}
+            className="hidden md:inline-flex fixed bottom-6 right-6 z-50 items-center justify-center gap-2 px-7 py-4 rounded-full bg-teal text-navy font-bold text-base shadow-2xl shadow-black/30 hover:scale-105 transition-transform"
+          >
+            Book This Trip <span aria-hidden>→</span>
+          </Link>
+        ) : (
+          <button
+            type="button"
+            disabled
+            className="hidden md:inline-flex fixed bottom-6 right-6 z-50 items-center justify-center gap-2 px-7 py-4 rounded-full bg-slate-400 text-white font-bold text-base shadow-2xl shadow-black/30 cursor-not-allowed"
+          >
+            {bookBlockedLabel}
+          </button>
+        )}
       </section>
 
       {/* ============ SOCIAL PROOF + PRICE ANCHOR ============ */}
@@ -658,14 +707,26 @@ export default function TourDetail() {
                   <span className="text-sm font-medium text-slate-500">/person</span>
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
-                  ออกเดินทาง {departLabel || 'ตามรอบที่กำหนด'} · เหลือ {seatsLeft} ที่นั่ง
+                  {!bookingOpen
+                    ? 'เปิดจองเร็ว ๆ นี้ — ยังไม่กำหนดวันออกเดินทาง'
+                    : `ออกเดินทาง ${departLabel || 'ตามรอบที่กำหนด'} · เหลือ ${seatsLeft} ที่นั่ง`}
                 </p>
-                <Link
-                  to={bookingHref}
-                  className="mt-5 inline-flex justify-center items-center gap-2 py-3 rounded-full bg-navy text-white text-sm font-semibold hover:bg-navy-dark transition-colors"
-                >
-                  Book Now <span aria-hidden>→</span>
-                </Link>
+                {canBook ? (
+                  <Link
+                    to={bookingHref}
+                    className="mt-5 inline-flex justify-center items-center gap-2 py-3 rounded-full bg-navy text-white text-sm font-semibold hover:bg-navy-dark transition-colors"
+                  >
+                    Book Now <span aria-hidden>→</span>
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    className="mt-5 inline-flex justify-center items-center gap-2 py-3 rounded-full bg-slate-300 text-slate-600 text-sm font-semibold cursor-not-allowed"
+                  >
+                    {bookBlockedLabel}
+                  </button>
+                )}
               </div>
 
               {hasPrivate && pricePrivate != null && (
@@ -678,12 +739,22 @@ export default function TourDetail() {
                     <span className="text-sm font-medium text-slate-500">/group</span>
                   </p>
                   <p className="text-xs text-slate-500 mt-1">ทริปส่วนตัว เลือกวันเดินทางได้เอง</p>
-                  <Link
-                    to={`${bookingHref}?tier=private`}
-                    className="mt-5 inline-flex justify-center items-center gap-2 py-3 rounded-full bg-teal text-navy text-sm font-bold hover:opacity-90 transition-opacity"
-                  >
-                    Book Now <span aria-hidden>→</span>
-                  </Link>
+                  {canBook ? (
+                    <Link
+                      to={`${bookingHref}?tier=private`}
+                      className="mt-5 inline-flex justify-center items-center gap-2 py-3 rounded-full bg-teal text-navy text-sm font-bold hover:opacity-90 transition-opacity"
+                    >
+                      Book Now <span aria-hidden>→</span>
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      className="mt-5 inline-flex justify-center items-center gap-2 py-3 rounded-full bg-slate-300 text-slate-600 text-sm font-bold cursor-not-allowed"
+                    >
+                      {bookBlockedLabel}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -715,13 +786,23 @@ export default function TourDetail() {
       {/* ============ STICKY BOOKING BAR — mobile ============ */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur border-t border-slate-100">
         <div className="px-4 h-16 flex items-center gap-3">
-          <Link
-            to={bookingHref}
-            className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-teal text-navy font-bold text-sm hover:opacity-90 transition-opacity"
-          >
-            Book {bookingCode || 'this trip'} — {priceAud > 0 ? formatAUD(priceAud) : 'enquire'}{' '}
-            <span aria-hidden>→</span>
-          </Link>
+          {canBook ? (
+            <Link
+              to={bookingHref}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-teal text-navy font-bold text-sm hover:opacity-90 transition-opacity"
+            >
+              Book {bookingCode || 'this trip'} — {priceAud > 0 ? formatAUD(priceAud) : 'enquire'}{' '}
+              <span aria-hidden>→</span>
+            </Link>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-slate-300 text-slate-600 font-bold text-sm cursor-not-allowed"
+            >
+              {bookBlockedLabel}
+            </button>
+          )}
         </div>
       </div>
     </div>

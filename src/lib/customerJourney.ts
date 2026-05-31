@@ -5,7 +5,7 @@
 import { supabase } from './supabase';
 import { dispatchRetargetingNotification, dispatchTransactionNotification } from './notifications';
 import { buildSettlementForTour, syncSettlementToGoogleSheets, SettlementSyncPayload } from './googleSync';
-import { syncBookingToSheet } from './gsheetSync';
+import { syncBookingToSheet, syncSlotIncrementToSheet } from './gsheetSync';
 
 /**
  * error เฉพาะกรณี "วันนี้มีคนจองแล้ว" (ชน UNIQUE constraint บน trip_date).
@@ -16,6 +16,75 @@ export class DateFullyBookedError extends Error {
     super(message);
     this.name = 'DateFullyBookedError';
   }
+}
+
+/**
+ * error เฉพาะกรณี "ที่นั่งเต็ม" (slots_booked = slots_max) — เด้งมาจากฟังก์ชัน
+ * atomic claim_seat_and_book ('TRIP_FULL'). ใช้ให้ UI แสดง "เต็มแล้ว / Fully booked".
+ */
+export class TripFullError extends Error {
+  constructor(message = 'เต็มแล้ว / Fully booked') {
+    super(message);
+    this.name = 'TripFullError';
+  }
+}
+
+/**
+ * error เฉพาะกรณี "ยังไม่เปิดจอง" — ทริปยังไม่กำหนดวันออกเดินทาง (departure_start
+ * เป็น NULL) หรือไม่พบทริปใน DB. เด้งมาจาก claim_seat_and_book ('TRIP_NOT_OPEN').
+ * ใช้ให้ UI แสดง "ยังไม่เปิดจอง / Not open for booking".
+ */
+export class TripNotOpenError extends Error {
+  constructor(message = 'ยังไม่เปิดจอง / Not open for booking') {
+    super(message);
+    this.name = 'TripNotOpenError';
+  }
+}
+
+/** สถานะที่นั่ง/วันเดินทางของทริป (อ่านสด ๆ จาก DB เป็น source of truth). */
+export type TripAvailability = {
+  /** จองไปแล้วกี่ที่ (จำนวน booking) */
+  slotsBooked: number | null;
+  /** ความจุสูงสุด (NULL = ยังไม่กำหนด) */
+  slotsMax: number | null;
+  /** เหลือกี่ที่นั่ง (slots_max − slots_booked); null ถ้าไม่ทราบ */
+  seatsLeft: number | null;
+  /** วันออกเดินทางจริง (YYYY-MM-DD) หรือ null ถ้ายังไม่กำหนด */
+  departureStart: string | null;
+  departureEnd: string | null;
+  /** เปิดจองได้ไหม = มี departure_start และยังเหลือที่นั่ง */
+  isOpen: boolean;
+};
+
+/**
+ * อ่านสถานะที่นั่ง + วันเดินทางสด ๆ จากตาราง tours (คีย์ด้วย trip_code).
+ * เป็น "source of truth" สำหรับการแสดงผลและด่านจอง. คืน null ถ้าหาไม่เจอ/คอลัมน์
+ * ยังไม่ถูกสร้าง (ยังไม่ได้รัน migration 16) เพื่อให้ฝั่งหน้าเว็บ fall back ไป
+ * ใช้ค่าจาก sheet/tours.ts ได้ (ไม่บล็อกผู้ใช้ก่อนรัน SQL).
+ */
+export async function fetchTripAvailability(tourCode: string): Promise<TripAvailability | null> {
+  if (!tourCode) return null;
+  const tenantId = await resolveDefaultTenantId();
+  let q = supabase
+    .from('tours')
+    .select('slots_booked, slots_max, departure_start, departure_end')
+    .eq('trip_code', tourCode)
+    .limit(1);
+  if (tenantId) q = q.eq('tenant_id', tenantId);
+  const { data, error } = await q.maybeSingle();
+  if (error || !data) {
+    // คอลัมน์ยังไม่ถูกสร้าง หรือไม่พบทริป — ปล่อยให้ caller fall back
+    if (error) console.info('[Booking] availability lookup skipped:', error.message);
+    return null;
+  }
+  const slotsBooked = (data.slots_booked as number | null) ?? null;
+  const slotsMax = (data.slots_max as number | null) ?? null;
+  const seatsLeft =
+    slotsMax != null && slotsBooked != null ? Math.max(0, slotsMax - slotsBooked) : null;
+  const departureStart = (data.departure_start as string | null) || null;
+  const departureEnd = (data.departure_end as string | null) || null;
+  const isOpen = Boolean(departureStart) && (seatsLeft == null || seatsLeft > 0);
+  return { slotsBooked, slotsMax, seatsLeft, departureStart, departureEnd, isOpen };
 }
 
 /**
@@ -217,35 +286,44 @@ export async function runPhase2Book(input: {
     warnings.push('No tenant_id — CRM skipped');
   }
 
-  const bookingPayload: Record<string, unknown> = {
-    tour_id: input.tourId,
-    client_id: clientId ?? null,
-    amount_paid_aud: input.depositAud,
-    status: 'PENDING',
-    payment_method: 'PAYID',
-    reference_number: input.referenceNumber,
-    party_pax: input.partyPax,
-    trip_size_tier: input.tripSizeTier,
-    preferred_pickup: input.pickup,
-    journey_phase: 'book',
-    // วันเดินทาง — ใช้บังคับกฎ "หนึ่งทริปต่อหนึ่งวัน" ผ่าน UNIQUE constraint
-    trip_date: input.departureDate ?? null,
-  };
-  if (tenantId) bookingPayload.tenant_id = tenantId;
+  // จองที่นั่ง + สร้างแถว booking แบบ ATOMIC ผ่าน RPC claim_seat_and_book.
+  // ฟังก์ชันนี้ทำทั้งสองด่านในฐานข้อมูล (server-side) จึง bypass ผ่าน UI ไม่ได้:
+  //   ด่าน 1 (DATE GATE) : ทริปต้องมี departure_start → ไม่งั้น 'TRIP_NOT_OPEN'
+  //   ด่าน 2 (SEAT GATE) : เพิ่ม slots_booked แบบ atomic → ถ้าเต็มได้ 'TRIP_FULL'
+  // tour_id ที่ถูกต้องถูก resolve จาก trip_code ภายใน DB (กัน FK ผิดของ flow เดิม).
+  const { data: rpcBookingId, error: bookingErr } = await supabase.rpc('claim_seat_and_book', {
+    p_tenant_id: tenantId,
+    p_tour_code: input.tripCode,
+    p_client_id: clientId ?? null,
+    p_amount_paid_aud: input.depositAud,
+    p_reference_number: input.referenceNumber,
+    p_party_pax: input.partyPax,
+    p_trip_size_tier: input.tripSizeTier ?? null,
+    p_pickup: input.pickup ?? null,
+    p_payment_method: 'PAYID',
+    // วันเดินทางที่ลูกค้าเลือก — ใช้บังคับกฎ "หนึ่งทริปต่อหนึ่งวัน" (UNIQUE) เหมือนเดิม
+    p_trip_date: input.departureDate ?? null,
+  });
 
-  const { data: bookingRow, error: bookingErr } = await supabase
-    .from('tour_bookings')
-    .insert(bookingPayload)
-    .select('id')
-    .maybeSingle();
-
-  // 23505 = unique_violation → มีคนจองวันนี้ไปแล้ว (กฎหนึ่งทริปต่อวัน).
-  // โยน error เฉพาะเพื่อให้ UI แสดงข้อความไทย + รีเฟรช availability.
-  if (bookingErr && (bookingErr as { code?: string }).code === '23505') {
-    throw new DateFullyBookedError();
+  if (bookingErr) {
+    const code = (bookingErr as { code?: string }).code;
+    const msg = bookingErr.message || '';
+    // 23505 = unique_violation → มีคนจองวันนี้ไปแล้ว (กฎหนึ่งทริปต่อวัน).
+    if (code === '23505') {
+      throw new DateFullyBookedError();
+    }
+    // ด่านวันเดินทาง: ทริปยังไม่กำหนดวันออกเดินทาง / ไม่พบทริปใน DB.
+    if (msg.includes('TRIP_NOT_OPEN')) {
+      throw new TripNotOpenError();
+    }
+    // ด่านที่นั่ง: เต็มแล้ว (slots_booked = slots_max).
+    if (msg.includes('TRIP_FULL')) {
+      throw new TripFullError();
+    }
+    warnings.push(msg);
   }
 
-  if (bookingErr) warnings.push(bookingErr.message);
+  const bookingRow = rpcBookingId ? { id: rpcBookingId as string } : null;
 
   if (bookingRow?.id) {
     // เส้นทางเดียว (ใช้งานได้จริง): POST ตรงไปยัง GAS Web App → append หนึ่งแถว
@@ -271,6 +349,14 @@ export async function runPhase2Book(input: {
     });
     if (!sheetSync.success) {
       warnings.push(`GSheet sync: ${sheetSync.error ?? 'failed'}`);
+    }
+
+    // อัปเดต "Slots Booked" ในแท็บ 'Trip info' (กระจกเงาให้เจ้าของเห็น) — non-blocking.
+    // Supabase คือ source of truth ของที่นั่ง (slots_booked อัปเดต atomic ไปแล้ว);
+    // ชีตเป็นเพียง mirror, ความล้มเหลวตรงนี้ไม่ทำให้การจองพัง.
+    const slotSync = await syncSlotIncrementToSheet(input.tripCode, 1);
+    if (!slotSync.success) {
+      warnings.push(`GSheet slot sync: ${slotSync.error ?? 'failed'}`);
     }
   }
 

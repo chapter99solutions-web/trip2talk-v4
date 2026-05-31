@@ -34,7 +34,14 @@ export function formatDatePillLabel(startRaw?: string, endRaw?: string): string 
     `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
   if (start && end) return `${fmt(start)} - ${fmt(end)}`;
   if (start) return fmt(start);
-  return 'Flexible dates';
+  // ไม่มีวันออกเดินทางเลย = ทริปยัง "ยังไม่เปิดจอง" → แสดง "Dates coming soon"
+  // (เดิมคือ "Flexible dates" ซึ่งทำให้ดูเหมือนจองได้). คงการกัน Invalid Date ไว้.
+  return 'Dates coming soon';
+}
+
+/** ทริปเปิดจองได้ไหม = ต้องมีวันออกเดินทาง (departure_start) จริงเท่านั้น. */
+export function hasDepartureDate(startRaw?: string): boolean {
+  return Boolean(startRaw && parseFlexibleDate(startRaw));
 }
 
 export function countryFlagEmoji(countryTag: string): string {

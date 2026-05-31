@@ -71,7 +71,7 @@ function doGet(e) {
     }
     return json_({
       status: 'ok',
-      data: { status: 'Trip2Talk GAS running', version: '2.5' },
+      data: { status: 'Trip2Talk GAS running', version: '2.6' },
     });
   } catch (err) {
     return json_({ status: 'error', message: String(err) });
@@ -160,6 +160,10 @@ function doPost(e) {
     }
     if (body.action === 'addBooking') {
       return json_(appendBookingRow_(body));
+    }
+    // เพิ่มค่า "Slots Booked" ของทริปในแท็บ 'Trip info' (กระจกเงาให้เจ้าของ)
+    if (body.action === 'incrementSlot') {
+      return json_(incrementSlot_(body));
     }
     return json_({ status: 'error', message: 'Unknown sheet payload' });
   } catch (err) {
@@ -755,6 +759,50 @@ function appendBookingRow_(data) {
     nowIso,                                          // I Sync Date
   ]);
   return { status: 'ok', message: 'Booking row appended to ' + SETTLEMENTS_TAB };
+}
+
+/**
+ * เพิ่มค่า "Slots Booked" ของทริป (ตาม Tour Code) ในแท็บ 'Trip info'.
+ * (doPost action: 'incrementSlot', { tour_code, by }).
+ *
+ * Supabase คือ source of truth ของจำนวนที่นั่ง (อัปเดต atomic ผ่าน RPC แล้ว) —
+ * ฟังก์ชันนี้เป็นเพียงการ "mirror" ให้เจ้าของเห็นในชีต ไม่ใช่ตัวควบคุมการจอง.
+ * ถ้าไม่พบคอลัมน์/แถว จะตอบ error แบบ non-blocking (ฝั่งเว็บไม่ทำให้การจองพัง).
+ */
+function incrementSlot_(data) {
+  var d = data || {};
+  var tourCode = pick_(d, ['tour_code', 'Tour Code', 'tourCode']);
+  if (!tourCode) {
+    return { status: 'error', message: 'tour_code is required' };
+  }
+  var by = Number(pick_(d, ['by', 'amount'])) || 1;
+
+  var ss = SpreadsheetApp.openById(spreadsheetId_());
+  var sh = ss.getSheetByName(TRIPS_TAB);
+  if (!sh) {
+    return { status: 'error', message: 'Missing tab: ' + TRIPS_TAB };
+  }
+  var values = sh.getDataRange().getValues();
+  if (values.length < 2) {
+    return { status: 'error', message: 'No trips in ' + TRIPS_TAB };
+  }
+  var headers = values[0].map(function (h) {
+    return String(h || '').trim();
+  });
+  var codeCol = headerIndex_(headers, ['Tour Code', 'tourCode', 'tour_code']);
+  var bookedCol = headerIndex_(headers, ['Slots Booked', 'slotsBooked', 'Booked']);
+  if (codeCol < 0 || bookedCol < 0) {
+    return { status: 'error', message: 'Missing Tour Code / Slots Booked column' };
+  }
+  for (var r = 1; r < values.length; r++) {
+    if (String(values[r][codeCol] || '').trim().toLowerCase() === tourCode.toLowerCase()) {
+      var current = Number(values[r][bookedCol]) || 0;
+      var next = current + by;
+      sh.getRange(r + 1, bookedCol + 1).setValue(next);
+      return { status: 'ok', tourCode: tourCode, slotsBooked: next };
+    }
+  }
+  return { status: 'error', message: 'Tour Code not found in Trip info: ' + tourCode };
 }
 
 /** @deprecated — intake now updates Customer_Bookings via updateIntake_ */

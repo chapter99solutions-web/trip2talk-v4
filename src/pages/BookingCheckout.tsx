@@ -7,7 +7,15 @@ import { quoteTripTotal, resolveTripSizeTier } from '../lib/bookingPolicy';
 import TripSizeTierBadge from '../components/cyber/TripSizeTierBadge';
 import BookingPolicyPanel from '../components/policy/BookingPolicyPanel';
 import { generateBookingRef } from '../lib/bookingRef';
-import { runPhase2Book, isTripDateAvailable, DateFullyBookedError } from '../lib/customerJourney';
+import {
+  runPhase2Book,
+  isTripDateAvailable,
+  DateFullyBookedError,
+  TripFullError,
+  TripNotOpenError,
+  fetchTripAvailability,
+  type TripAvailability,
+} from '../lib/customerJourney';
 import { PORTFOLIO_TOURS } from '../lib/portfolioTours';
 import {
   shouldBlockSharedLowPaxNearDate,
@@ -76,6 +84,9 @@ export default function BookingCheckout() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [bookingRef, setBookingRef] = useState<string | null>(null);
 
+  // สถานะที่นั่ง/วันเดินทางสด ๆ จาก DB (source of truth) — ใช้คุมด่านจอง 2 ชั้น.
+  const [availability, setAvailability] = useState<TripAvailability | null>(null);
+
   const quote = useMemo(
     () => (trip ? quoteTripTotal(trip.price_aud, partyPax) : null),
     [trip, partyPax]
@@ -110,6 +121,24 @@ export default function BookingCheckout() {
       ],
     };
   }, [tourId, trip?.trip_code]);
+
+  // โหลดสถานะที่นั่ง/วันเดินทางจาก DB (source of truth). ถ้าคอลัมน์ยังไม่ถูกสร้าง
+  // (ยังไม่ได้รัน migration 16) จะได้ null → ปล่อยให้จองได้ตามเดิม (fail-open),
+  // เพราะ RPC + CHECK constraint ฝั่ง DB เป็นด่านสุดท้ายอยู่แล้ว.
+  const tripCodeForLookup = trip?.trip_code;
+  useEffect(() => {
+    let cancelled = false;
+    if (!tripCodeForLookup) return;
+    void fetchTripAvailability(tripCodeForLookup).then((a) => {
+      if (cancelled) return;
+      setAvailability(a);
+      // ถ้า DB มีวันออกเดินทางจริง ตั้งเป็นค่าเริ่มต้นของช่องวันที่ (ผูกกับวันจริง).
+      if (a?.departureStart) setSelectedDate(a.departureStart);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [tripCodeForLookup]);
 
   if (!trip) {
     return (
@@ -170,7 +199,19 @@ export default function BookingCheckout() {
   const fmtThaiDate = (d: Date) =>
     d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
 
-  const canProceedStep1 = Boolean(selectedDate) && quote?.valid && dateAvailable !== false;
+  // ───────── ด่านจอง 2 ชั้น (precedence: DATE GATE ก่อน → SEAT GATE) ─────────
+  // ใช้ข้อมูลสด ๆ จาก DB. ถ้า availability เป็น null (ยังไม่รัน migration / ไม่พบทริป)
+  // จะ "ไม่บล็อก" ฝั่ง UI (fail-open) — ฝั่ง DB (RPC) ยังเป็นด่านสุดท้ายเสมอ.
+  // ด่าน 1: ไม่มี departure_start = ยังไม่เปิดจอง.
+  const dateGateBlocked = Boolean(availability) && !availability?.departureStart;
+  // ด่าน 2: มีวันแล้วแต่ที่นั่งเต็ม (seatsLeft <= 0).
+  const seatGateFull =
+    !dateGateBlocked && availability?.seatsLeft != null && availability.seatsLeft <= 0;
+  const gateBlocked = dateGateBlocked || seatGateFull;
+  const seatsLeft = availability?.seatsLeft ?? null;
+
+  const canProceedStep1 =
+    Boolean(selectedDate) && quote?.valid && dateAvailable !== false && !gateBlocked;
 
   // ตรวจ availability ของวันที่เลือก (กฎหนึ่งทริปต่อวัน) ก่อนให้ไปต่อ
   const handleCheckAvailability = async () => {
@@ -246,6 +287,20 @@ export default function BookingCheckout() {
         setStep(1);
         return;
       }
+      // ด่านที่นั่งเต็ม (server-side) — รีเฟรช availability + แสดง "เต็มแล้ว".
+      if (err instanceof TripFullError) {
+        setSubmitError('เต็มแล้ว / Fully booked — ทริปนี้ที่นั่งเต็มแล้ว');
+        if (tripCodeForLookup) void fetchTripAvailability(tripCodeForLookup).then(setAvailability);
+        setStep(1);
+        return;
+      }
+      // ด่านวันเดินทาง (server-side) — ทริปยังไม่เปิดจอง.
+      if (err instanceof TripNotOpenError) {
+        setSubmitError('ยังไม่เปิดจอง / Not open for booking — ทริปนี้ยังไม่กำหนดวันออกเดินทาง');
+        if (tripCodeForLookup) void fetchTripAvailability(tripCodeForLookup).then(setAvailability);
+        setStep(1);
+        return;
+      }
       const msg = err instanceof Error ? err.message : 'Booking failed';
       setSubmitError(msg);
       console.error('[Trip2Talk] Phase 2 (book) failed:', err);
@@ -318,6 +373,31 @@ export default function BookingCheckout() {
       {submitError && (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {submitError}
+        </div>
+      )}
+
+      {/* ด่าน 1 (DATE GATE): ทริปยังไม่กำหนดวันออกเดินทาง = ยังไม่เปิดจอง */}
+      {dateGateBlocked && (
+        <div className="rounded-2xl border border-slate-300 bg-slate-50 p-4 text-sm text-slate-700 space-y-1">
+          <p className="font-semibold text-slate-900">🗓️ Dates coming soon / เปิดจองเร็ว ๆ นี้</p>
+          <p>ทริปนี้ยังไม่กำหนดวันออกเดินทาง — ยังไม่เปิดจอง กรุณาลงชื่อรอคิว (Join waitlist)</p>
+        </div>
+      )}
+
+      {/* ด่าน 2 (SEAT GATE): ที่นั่งเต็ม */}
+      {seatGateFull && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <span className="px-2 py-0.5 mr-2 rounded-full bg-red-600 text-white text-xs font-semibold">
+            เต็มแล้ว / Fully booked
+          </span>
+          ทริปนี้ที่นั่งเต็มแล้ว — กรุณาเลือกทริปอื่น
+        </div>
+      )}
+
+      {/* แสดง "เหลือกี่ที่นั่ง" สด ๆ จาก DB เมื่อทราบและยังเปิดจอง */}
+      {!gateBlocked && seatsLeft != null && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+          🔥 เหลือ {seatsLeft} ที่นั่ง (seats left)
         </div>
       )}
 
@@ -711,10 +791,16 @@ export default function BookingCheckout() {
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={!termsAccepted || submitting}
+            disabled={!termsAccepted || submitting || gateBlocked}
             className="w-full inline-flex justify-center items-center py-3 rounded-xl bg-teal text-navy font-semibold text-sm disabled:opacity-40"
           >
-            {submitting ? 'Confirming…' : 'Confirm Booking'}
+            {submitting
+              ? 'Confirming…'
+              : dateGateBlocked
+                ? 'ยังไม่เปิดจอง / Not open'
+                : seatGateFull
+                  ? 'เต็มแล้ว / Fully booked'
+                  : 'Confirm Booking'}
           </button>
 
           <div className="rounded-2xl bg-white border border-slate-100 p-4">

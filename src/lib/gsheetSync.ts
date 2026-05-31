@@ -139,6 +139,57 @@ export async function syncBookingToSheet(
 }
 
 /**
+ * เพิ่มค่า "Slots Booked" ของทริป (ตาม tour_code) ในแท็บ 'Trip info' ผ่าน GAS.
+ *
+ * ออกแบบให้ "ไม่บล็อก" เช่นเดียวกับ syncBookingToSheet — Supabase เป็น source of
+ * truth ของที่นั่ง (อัปเดต atomic ผ่าน RPC ไปแล้ว) ชีตเป็นเพียง mirror สำหรับเจ้าของ.
+ * ทุก error ถูก catch + log ภายในแล้ว resolve (ไม่ throw).
+ */
+export async function syncSlotIncrementToSheet(
+  tourCode: string,
+  by = 1
+): Promise<GSheetSyncResult> {
+  const url = resolveGSheetUrl();
+  const body = JSON.stringify({ action: 'incrementSlot', tour_code: tourCode, by });
+
+  console.log(`${LOG} incrementSlot →`, { url, tourCode, by });
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body,
+      redirect: 'follow',
+    });
+    const raw = await res.text();
+    let parsed: unknown = raw;
+    try {
+      parsed = raw ? JSON.parse(raw) : null;
+    } catch {
+      // GAS อาจตอบ HTML/ข้อความ — เก็บ raw text ไว้ log
+    }
+    if (!res.ok) {
+      console.error(`${LOG} incrementSlot HTTP error`, { status: res.status });
+      return { success: false, response: parsed, error: `HTTP ${res.status}` };
+    }
+    if (parsed && typeof parsed === 'object') {
+      const o = parsed as Record<string, unknown>;
+      if (o.status === 'error' || o.success === false) {
+        const msg = String(o.message ?? o.error ?? 'GAS returned an error');
+        console.error(`${LOG} incrementSlot GAS error`, { response: parsed });
+        return { success: false, response: parsed, error: msg };
+      }
+    }
+    console.log(`${LOG} incrementSlot success ✓`, { response: parsed });
+    return { success: true, response: parsed };
+  } catch (e) {
+    const error = e instanceof Error ? e.message : String(e);
+    console.error(`${LOG} incrementSlot failed (non-blocking)`, { error, tourCode });
+    return { success: false, error };
+  }
+}
+
+/**
  * ทดสอบ endpoint แบบแยกเดี่ยวจาก console ของเบราว์เซอร์.
  * เรียกได้ด้วย:  window.testGSheetSync()
  * จะส่ง payload จองทดสอบที่ติดป้ายชัดเจน (TEST-...) แล้ว log ผลเต็ม ๆ.
