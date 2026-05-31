@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react';
+import { Component, Suspense, lazy, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import InstallPrompt from './components/pwa/InstallPrompt';
 import OfflineBanner from './components/shared/OfflineBanner';
@@ -33,6 +33,34 @@ function PageFallback() {
       <div className="w-10 h-10 border-4 border-gold border-t-transparent rounded-full animate-spin" />
     </div>
   );
+}
+
+/** จับ runtime crash จาก lazy route — แทนที่จอดำเปล่า ๆ */
+class RouteErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-white text-slate-900 px-6 text-center">
+          <p className="text-lg font-semibold text-red-600">Something went wrong loading this page.</p>
+          <p className="mt-2 text-sm text-slate-600 max-w-md">{this.state.error.message}</p>
+          <button
+            type="button"
+            className="mt-6 px-5 py-2 rounded-full bg-navy text-white text-sm font-semibold"
+            onClick={() => window.location.assign('/')}
+          >
+            Back to home
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 function StaffDashboardRoute() {
@@ -86,8 +114,9 @@ export default function App() {
       <InstallPrompt />
       <BrowserRouter>
         <OfflineBanner />
-        <Suspense fallback={<PageFallback />}>
-          <Routes>
+        <RouteErrorBoundary>
+          <Suspense fallback={<PageFallback />}>
+            <Routes>
             {/* PUBLIC */}
             <Route path="/" element={<PublicPortfolio />} />
             <Route path="/portal" element={<ClientPortal />} />
@@ -124,8 +153,9 @@ export default function App() {
             <Route path="/cms/*" element={<CmsRoute />} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Suspense>
+            </Routes>
+          </Suspense>
+        </RouteErrorBoundary>
       </BrowserRouter>
     </>
   );

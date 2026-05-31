@@ -4,10 +4,13 @@ const PORTFOLIO_BUCKET = 'portfolio';
 
 export const TOUR_COVER_MAP: Record<string, { folder: string; file?: string }> = {
   'MEL-4D3N': { folder: 'Melbourne', file: '01.jpg' },
-  'ULU-4D3N': { folder: 'Ulruru', file: '1.jpg' },
+  'ULU-4D3N': { folder: 'Ulruru', file: '183586793_10225492427447732_8846903205565554038_n.jpg' },
   'NZ-6D5N': { folder: 'New Zealand/Spring', file: 'T2T-10.JPG' },
-  'TAS-3D2N': { folder: 'Tasmania', file: '596873932_1428638042594626_8987722411601397177_n.jpg' },
-  'TAS-LH-4D3N': { folder: 'Tasmania', file: '596371362_1428639202594510_8709278754225773992_n.jpg' },
+  'TAS-3D2N': { folder: 'Tasmania 02/Hobart', file: '1.jpg' },
+  'TAS-LH-4D3N': {
+    folder: 'Tasmania 02/Launceston',
+    file: '596811714_1428639069261190_2753284779604496226_n.jpg',
+  },
   'KIA-1DAY': { folder: 'One day trip SYD', file: '705320467_10242162489108855_3820285517745745334_n.jpg' },
   'CAN-2D1N': { folder: 'Cowra', file: '12 (1).jpg' },
   'SYD-1DAY': { folder: 'SYDNEY', file: '506861557_10236863821565478_6038697174671264606_n.jpg' },

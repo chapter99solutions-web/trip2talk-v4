@@ -57,6 +57,8 @@ export type TourFallback = {
   featured?: boolean;
   /** Hardcoded gallery photo URLs — consumed by TourDetail before any bucket lookup (first = hero). */
   galleryPhotos?: string[];
+  /** Optional hero background video (MP4). Poster/fallback = galleryPhotos[0] or cover URL. */
+  heroVideoUrl?: string;
   /** Portfolio bucket folder whose images auto-populate the gallery at runtime (overrides galleryPhotos for the strip; galleryPhotos[0] stays the hero/cover). รองรับโฟลเดอร์ซ้อน/มีช่องว่าง เช่น "Tasmania 02/Hobart" */
   galleryFolder?: string;
   /** Selectable sub-packages (different scope/price options). Renders a dedicated "Packages" section in TourDetail when present. */
@@ -199,7 +201,7 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
     excluded: ['ตั๋วเครื่องบินไป-กลับ', 'ค่าอาหารทุกมื้อ', 'ประกันการเดินทาง'],
     accommodation: 'Outback Lodge Dormitory — อัปเกรดห้องส่วนตัว +$350-$550/คืน',
     galleryPhotos: [
-      `${PORTFOLIO_BASE}/Ulruru/1.jpg`,
+      `${PORTFOLIO_BASE}/Ulruru/183586793_10225492427447732_8846903205565554038_n.jpg`,
       `${PORTFOLIO_BASE}/Ulruru/2.jpg`,
       `${PORTFOLIO_BASE}/Ulruru/3.jpg`,
       `${PORTFOLIO_BASE}/Ulruru/4.jpg`,
@@ -349,6 +351,7 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
     // รูปปกใช้ภาพจริงจากโฟลเดอร์ Hobart (1.jpg) แทนภาพโพสต์ FB เดิมที่มีกล่องค้นหา "#Trip 2 Talk" ติดมาในรูป
     // ส่ง path เต็มแบบเข้ารหัส %20 ครั้งเดียว (ห้าม double-encode) ให้ตรงรูปแบบเดียวกับ CAN-2D1N
     galleryPhotos: [`${PORTFOLIO_BASE}/Tasmania%2002/Hobart/1.jpg`],
+    heroVideoUrl: `${PORTFOLIO_BASE}/Tasmania%2002/VDO/tas01.mp4`,
     // ใช้กลไกแกลเลอรีเดียวกับ CAN-2D1N: ดึงรูปสดจากโฟลเดอร์ portfolio แบบ auto-populate
     galleryFolder: 'Tasmania 02/Hobart',
   },

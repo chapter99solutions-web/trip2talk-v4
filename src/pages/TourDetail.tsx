@@ -42,6 +42,7 @@ function formatTripDate(iso?: string): string {
 export default function TourDetail() {
   const { tourId } = useParams<{ tourId: string }>();
   const trip = tourId ? findTripById(tourId) : undefined;
+  const [heroVideoFailed, setHeroVideoFailed] = useState(false);
   const [saved, setSaved] = useState(false);
   const [photos, setPhotos] = useState<string[]>([]);
   const [sheetTrip, setSheetTrip] = useState<TripSheetRow | null>(null);
@@ -58,6 +59,10 @@ export default function TourDetail() {
   const slideRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   const staticFallback = tourId ? findTourFallbackByCode(tourId) : undefined;
+
+  useEffect(() => {
+    setHeroVideoFailed(false);
+  }, [tourId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -250,6 +255,8 @@ export default function TourDetail() {
 
   const heroImage =
     hardcodedPhotos?.[0] || resolvedSheet?.coverUrl || portfolio?.image || FALLBACK_HERO;
+  const heroVideoUrl = staticFallback?.heroVideoUrl;
+  const showHeroVideo = Boolean(heroVideoUrl) && !heroVideoFailed;
 
   const title =
     staticFallback?.tourName ||
@@ -367,9 +374,11 @@ export default function TourDetail() {
       {/* ============ HERO — full-screen, parallax, overlay ============ */}
       <section className="relative h-screen min-h-[560px] overflow-hidden bg-slate-900">
         <div className="absolute inset-0 overflow-hidden">
+          {/* รูปปกอยู่ชั้นล่างเสมอ — กัน hero เป็นจอดำขณะโหลด/ล้มเหลว video */}
           <img
             src={heroImage}
-            alt={title}
+            alt=""
+            aria-hidden
             className="absolute inset-0 w-full h-full object-cover"
             fetchPriority="high"
             decoding="async"
@@ -382,6 +391,24 @@ export default function TourDetail() {
               if (img.src !== FALLBACK_HERO) img.src = FALLBACK_HERO;
             }}
           />
+          {showHeroVideo && (
+            <video
+              src={heroVideoUrl}
+              poster={heroImage}
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="auto"
+              aria-hidden
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{
+                transform: `translate3d(0, ${heroParallax}px, 0) scale(1.18)`,
+                willChange: 'transform',
+              }}
+              onError={() => setHeroVideoFailed(true)}
+            />
+          )}
         </div>
 
         {/* Gradient: transparent at top → black/70 at bottom */}
