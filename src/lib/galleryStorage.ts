@@ -39,6 +39,9 @@ export async function listPortfolioFolder(folder: string, limit: number): Promis
 
   return data
     .filter((f) => isStorageFile(f.name, f.id, f.metadata as Record<string, unknown> | null))
+    // เรียงชื่อไฟล์แบบ natural sort เพื่อให้ได้ลำดับ 1,2,3,...,10,11 (ไม่ใช่ 1,10,11,2)
+    // localeCompare + { numeric: true } จัดการตัวเลขในชื่อไฟล์ได้ถูกต้อง
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
     .map((f) => {
       const path = `${folder}/${f.name}`;
       const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path);

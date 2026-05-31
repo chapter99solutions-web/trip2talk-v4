@@ -57,10 +57,8 @@ export type TourFallback = {
   featured?: boolean;
   /** Hardcoded gallery photo URLs — consumed by TourDetail before any bucket lookup (first = hero). */
   galleryPhotos?: string[];
-  /** Portfolio bucket folder whose images auto-populate the gallery at runtime (overrides galleryPhotos for the strip; galleryPhotos[0] stays the hero/cover). */
+  /** Portfolio bucket folder whose images auto-populate the gallery at runtime (overrides galleryPhotos for the strip; galleryPhotos[0] stays the hero/cover). รองรับโฟลเดอร์ซ้อน/มีช่องว่าง เช่น "Tasmania 02/Hobart" */
   galleryFolder?: string;
-  /** Nested portfolio folder (may contain spaces, e.g. "Tasmania 02/Hobart") rendered as a live auto-play TripSlideshow in the Gallery section. */
-  slideshowFolder?: string;
   /** Selectable sub-packages (different scope/price options). Renders a dedicated "Packages" section in TourDetail when present. */
   subPackages?: SubPackage[];
 };
@@ -348,10 +346,11 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
     excluded: ['ตั๋วเครื่องบิน', 'อาหารทุกมื้อ', 'ประกันการเดินทาง'],
     accommodation:
       'พักร่วมกันแบบ Dormitory/Design Airbnb อัปเกรดห้องส่วนตัวเพิ่ม $350-$550 AUD/คืน',
-    galleryPhotos: [
-      `${PORTFOLIO_BASE}/Tasmania/596873932_1428638042594626_8987722411601397177_n.jpg`,
-    ],
-    slideshowFolder: 'Tasmania 02/Hobart',
+    // รูปปกใช้ภาพจริงจากโฟลเดอร์ Hobart (1.jpg) แทนภาพโพสต์ FB เดิมที่มีกล่องค้นหา "#Trip 2 Talk" ติดมาในรูป
+    // ส่ง path เต็มแบบเข้ารหัส %20 ครั้งเดียว (ห้าม double-encode) ให้ตรงรูปแบบเดียวกับ CAN-2D1N
+    galleryPhotos: [`${PORTFOLIO_BASE}/Tasmania%2002/Hobart/1.jpg`],
+    // ใช้กลไกแกลเลอรีเดียวกับ CAN-2D1N: ดึงรูปสดจากโฟลเดอร์ portfolio แบบ auto-populate
+    galleryFolder: 'Tasmania 02/Hobart',
   },
   {
     tourCode: 'TAS-LH-4D3N',
