@@ -5,6 +5,8 @@ import App from './App';
 import './styles/cyberpunk.css';
 import './index.css';
 import { I18nProvider } from './lib/i18n';
+// side-effect import: แนบ window.testGSheetSync เพื่อทดสอบ booking → Sheets จาก console
+import './lib/gsheetSync';
 
 const updateSW = registerSW({
   onNeedRefresh() {

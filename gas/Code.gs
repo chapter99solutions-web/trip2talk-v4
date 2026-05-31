@@ -154,6 +154,9 @@ function doPost(e) {
     if (body.action === 'addExpense') {
       return json_(appendExpense_(body));
     }
+    if (body.action === 'addBooking') {
+      return json_(appendBookingRow_(body));
+    }
     return json_({ status: 'error', message: 'Unknown sheet payload' });
   } catch (err) {
     return json_({ status: 'error', message: String(err) });
@@ -697,6 +700,53 @@ function appendExpense_(data) {
     pick_(d, ['notes', 'Notes']),
   ]);
   return { status: 'ok', message: 'Expense saved' };
+}
+
+/**
+ * Public website booking sync (doPost action: 'addBooking').
+ * Appends a row to a simple 'Bookings' tab (auto-created with headers if missing).
+ * Source of truth is Supabase — this is a best-effort mirror for the team.
+ */
+function bookingsTabHeaders_() {
+  return [
+    'Timestamp',
+    'Booking Ref',
+    'Booking ID',
+    'Client',
+    'Email',
+    'Phone',
+    'Tour Code',
+    'Departure Date',
+    'Pax',
+    'Pickup',
+    'Amount',
+    'Status',
+    'Notes',
+  ];
+}
+
+function appendBookingRow_(data) {
+  var d = data || {};
+  var ss = SpreadsheetApp.openById(spreadsheetId_());
+  var sheet = getOrCreateSheet_(ss, 'Bookings', bookingsTabHeaders_());
+  var amount = Number(pick_(d, ['amount', 'Amount'])) || '';
+  var pax = Number(pick_(d, ['pax', 'Pax'])) || '';
+  sheet.appendRow([
+    pick_(d, ['created_at', 'Timestamp']) || new Date().toISOString(),
+    pick_(d, ['booking_ref', 'Booking Ref']),
+    pick_(d, ['booking_id', 'Booking ID']),
+    pick_(d, ['client_name', 'Client']),
+    pick_(d, ['email', 'Email']),
+    pick_(d, ['phone', 'Phone']),
+    pick_(d, ['tour_code', 'Tour Code']),
+    pick_(d, ['departure_date', 'Departure Date']),
+    pax,
+    pick_(d, ['pickup', 'Pickup']),
+    amount,
+    pick_(d, ['status', 'Status']),
+    pick_(d, ['notes', 'Notes']),
+  ]);
+  return { status: 'ok', message: 'Booking row appended to Bookings' };
 }
 
 /** @deprecated — intake now updates Customer_Bookings via updateIntake_ */

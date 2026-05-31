@@ -6,6 +6,7 @@ import { supabase } from './supabase';
 import { dispatchRetargetingNotification, dispatchTransactionNotification } from './notifications';
 import { buildSettlementForTour, syncSettlementToGoogleSheets, SettlementSyncPayload } from './googleSync';
 import { syncBookingToSheets } from './gasSync';
+import { syncBookingToSheet } from './gsheetSync';
 import type { Expense, Tour } from '../types/tour';
 import type { TourBooking } from './supabaseData';
 
@@ -112,6 +113,8 @@ export async function runPhase2Book(input: {
   partyPax: number;
   tripSizeTier?: string;
   pickup?: string;
+  /** วันเดินทางที่ลูกค้าเลือก (YYYY-MM-DD) — ใช้เป็น departure_date ในชีต */
+  departureDate?: string;
   sendSms?: boolean;
 }): Promise<{ clientId?: string; bookingId?: string; warnings: string[] }> {
   const warnings: string[] = [];
@@ -202,6 +205,7 @@ export async function runPhase2Book(input: {
   if (bookingErr) warnings.push(bookingErr.message);
 
   if (bookingRow?.id) {
+    // เส้นทางเดิม: ผ่าน Supabase Edge Function (เก็บไว้ — best-effort เท่านั้น)
     const sync = await syncBookingToSheets({
       booking_id: bookingRow.id,
       client_name: input.fullName,
@@ -209,11 +213,34 @@ export async function runPhase2Book(input: {
       phone: input.phone,
       pax_count: input.partyPax,
       pickup_type: input.pickup,
-      trip_date: new Date().toISOString().slice(0, 10),
+      trip_date: input.departureDate || new Date().toISOString().slice(0, 10),
       payment_status: 'PENDING',
       created_at: new Date().toISOString(),
     });
     if (!sync.success) warnings.push(sync.error ?? 'Sheets sync failed');
+
+    // เส้นทางใหม่ (ตัวที่ใช้งานได้จริง): POST ตรงไปยัง GAS Web App.
+    // await เพื่อให้ log เรียงลำดับ แต่ syncBookingToSheet จะ catch ภายในเสมอ
+    // (ไม่ throw) ดังนั้น sync ที่ fail จะไม่ทำให้การจองพัง — booking ถูกบันทึก
+    // ลง Supabase ไปแล้ว. failure จะถูก log ไว้ใน warnings + console.error.
+    const sheetSync = await syncBookingToSheet({
+      action: 'addBooking',
+      booking_ref: input.referenceNumber,
+      booking_id: bookingRow.id,
+      client_name: input.fullName,
+      email: input.email,
+      phone: input.phone,
+      tour_code: input.tripCode,
+      departure_date: input.departureDate || new Date().toISOString().slice(0, 10),
+      amount: input.depositAud,
+      pax: input.partyPax,
+      pickup: input.pickup,
+      status: 'PENDING',
+      created_at: new Date().toISOString(),
+    });
+    if (!sheetSync.success) {
+      warnings.push(`GSheet sync: ${sheetSync.error ?? 'failed'}`);
+    }
   }
 
   if (input.sendSms !== false) {

@@ -208,6 +208,7 @@ export default function BookingCheckout() {
         partyPax,
         tripSizeTier: resolveTripSizeTier(partyPax) ?? undefined,
         pickup: pickupLocation,
+        departureDate: selectedDate,
       });
 
       if (warnings.length > 0) {
