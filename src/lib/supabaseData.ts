@@ -110,8 +110,12 @@ export async function fetchCashierPOSData(): Promise<CashierPOSData> {
     throw new Error(firstError.message);
   }
 
-  const tours = ((toursRes.data ?? []) as Tour[]).filter((t) =>
-    ACTIVE_TOUR_STATUSES.includes(t.status)
+  // ROOT CAUSE ของ "No active trips": เดิมกรองด้วย status IN ('CONFIRMED','ACTIVE')
+  // แต่ tours.status ดีฟอลต์เป็น 'PLANNING' (01-schema) → ไม่มีแถวผ่านเกือบทั้งหมด.
+  // เปลี่ยนนิยามให้ตรงกับ "ทริปที่เปิดจองได้" เดียวกับด่านหน้าเว็บ (single source of
+  // truth = Supabase tours): ต้องตั้ง departure_start แล้ว และมี slots_max กำหนดไว้.
+  const tours = ((toursRes.data ?? []) as Tour[]).filter(
+    (t) => Boolean(t.departure_start) && t.slots_max != null
   );
 
   return {

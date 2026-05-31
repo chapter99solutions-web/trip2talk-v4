@@ -3,9 +3,12 @@
  *   ด่าน 1 (DATE GATE) : ทริปที่ไม่มี departure_start ต้องถูกปฏิเสธ ("TRIP_NOT_OPEN")
  *   ด่าน 2 (SEAT GATE) : ทริปที่เต็มต้องถูกปฏิเสธ ("TRIP_FULL")
  *   CONCURRENCY        : จองพร้อมกัน 2 ครั้งบน "ที่นั่งสุดท้าย" → สำเร็จได้แค่ 1 เท่านั้น
+ *   STAFF FILL         : พนักงานกด "+" รับ walk-in 5 คนในทริป 5 ที่นั่ง → คนที่ 6 โดน TRIP_FULL
+ *   STAFF×ONLINE RACE  : พนักงานกด "+" พร้อมลูกค้าจองออนไลน์บนที่นั่งสุดท้าย → สำเร็จได้แค่ 1
  *
- * ทดสอบฟังก์ชัน Postgres claim_seat_and_book จาก supabase/16-schema-seat-limit-date-gate.sql
- * (ต้องรัน migration 16 ใน Supabase SQL Editor ก่อน).
+ * ทดสอบฟังก์ชัน Postgres claim_seat_and_book (supabase/16-schema-seat-limit-date-gate.sql)
+ * และ staff_adjust_seat (supabase/17-schema-staff-seat-adjust.sql).
+ * (ต้องรัน migration 16 และ 17 ใน Supabase SQL Editor ก่อน).
  *
  * Usage: node scripts/test-seat-limit.mjs
  * ต้องมี VITE_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY ใน .env / .env.local / env.
@@ -14,6 +17,9 @@
  *   ✓ [DATE GATE] ทริปไม่มีวันออกเดินทาง ถูกปฏิเสธด้วย TRIP_NOT_OPEN
  *   ✓ [SEAT GATE] ทริปเต็ม ถูกปฏิเสธด้วย TRIP_FULL
  *   ✓ [CONCURRENCY] จองพร้อมกัน 2 ครั้งบนที่นั่งสุดท้าย → สำเร็จ 1 / ปฏิเสธ 1 (TRIP_FULL)
+ *   ✓ [INVARIANT] slots_booked (3) <= slots_max (3) — ไม่ overbook
+ *   ✓ [STAFF FILL] พนักงานเติม walk-in ครบ 5/5 และคนที่ 6 โดน TRIP_FULL
+ *   ✓ [STAFF×ONLINE] พนักงาน + ลูกค้าออนไลน์ชิงที่นั่งสุดท้าย → สำเร็จ 1 / ปฏิเสธ 1
  *   ALL GOOD ✓ seat-limit + date-gate enforced atomically
  */
 import { readFileSync, existsSync } from 'node:fs';
@@ -96,6 +102,16 @@ async function claim(tenantId, tourCode, tripDate) {
     p_trip_date: tripDate,
   });
   return { ok: !error, bookingId: data ?? null, error: error?.message ?? null };
+}
+
+/** เรียก RPC พนักงานปรับที่นั่ง (delta +1/−1) — คืน { ok, slotsBooked, error } */
+async function staffAdjust(tenantId, tourCode, delta) {
+  const { data, error } = await supabase.rpc('staff_adjust_seat', {
+    p_tenant_id: tenantId,
+    p_tour_code: tourCode,
+    p_delta: delta,
+  });
+  return { ok: !error, slotsBooked: data ?? null, error: error?.message ?? null };
 }
 
 async function cleanup(tourIds) {
@@ -183,6 +199,58 @@ async function main() {
     } else {
       allPass = false;
       console.error('FAIL [INVARIANT]: slots_booked เกิน slots_max!', finalTour);
+    }
+
+    // ───────── CASE D: STAFF FILL (พนักงานเติม walk-in จนเต็ม) ─────────
+    // ทริป 5 ที่นั่ง, เริ่ม 0 → พนักงานกด "+" 5 ครั้งต้องสำเร็จทั้งหมด (slots_booked = 5)
+    // ครั้งที่ 6 ต้องโดน TRIP_FULL. ใช้ staff_adjust_seat (RPC เดียวกับปุ่ม + ในจอ Co-Host).
+    const staffTour = await createTestTour(tenantId, {
+      slotsMax: 5,
+      slotsBooked: 0,
+      departureStart: '2099-07-07',
+    });
+    createdTourIds.push(staffTour.id);
+    let staffOk = 0;
+    for (let i = 0; i < 5; i++) {
+      const r = await staffAdjust(tenantId, staffTour.tourCode, 1);
+      if (r.ok) staffOk += 1;
+    }
+    const sixth = await staffAdjust(tenantId, staffTour.tourCode, 1);
+    if (staffOk === 5 && !sixth.ok && /TRIP_FULL/.test(sixth.error || '')) {
+      console.log('✓ [STAFF FILL] พนักงานเติม walk-in ครบ 5/5 และคนที่ 6 โดน TRIP_FULL');
+    } else {
+      allPass = false;
+      console.error('FAIL [STAFF FILL]: คาดว่าสำเร็จ 5 และคนที่ 6 TRIP_FULL แต่ได้:', {
+        staffOk,
+        sixth,
+      });
+    }
+
+    // ───────── CASE E: STAFF × ONLINE RACE (ชิงที่นั่งสุดท้าย) ─────────
+    // slots_max=3, slots_booked=2 → เหลือ 1. ยิงพร้อมกัน: พนักงาน "+" และลูกค้าออนไลน์ claim
+    // → ต้องสำเร็จแค่ 1 (อีกฝั่งโดน TRIP_FULL) เพราะใช้ slots_booked คอลัมน์เดียวกัน.
+    const raceTour = await createTestTour(tenantId, {
+      slotsMax: 3,
+      slotsBooked: 2,
+      departureStart: '2099-08-08',
+    });
+    createdTourIds.push(raceTour.id);
+    const [staffR, onlineR] = await Promise.all([
+      staffAdjust(tenantId, raceTour.tourCode, 1),
+      claim(tenantId, raceTour.tourCode, randomFutureDate(7)),
+    ]);
+    const raceSucc = [staffR.ok, onlineR.ok].filter(Boolean).length;
+    const raceFull =
+      (!staffR.ok && /TRIP_FULL/.test(staffR.error || '') ? 1 : 0) +
+      (!onlineR.ok && /TRIP_FULL/.test(onlineR.error || '') ? 1 : 0);
+    if (raceSucc === 1 && raceFull === 1) {
+      console.log('✓ [STAFF×ONLINE] พนักงาน + ลูกค้าออนไลน์ชิงที่นั่งสุดท้าย → สำเร็จ 1 / ปฏิเสธ 1');
+    } else {
+      allPass = false;
+      console.error('FAIL [STAFF×ONLINE]: คาดว่าสำเร็จ 1 / TRIP_FULL 1 แต่ได้:', {
+        staffR,
+        onlineR,
+      });
     }
   } finally {
     await cleanup(createdTourIds);

@@ -71,7 +71,7 @@ function doGet(e) {
     }
     return json_({
       status: 'ok',
-      data: { status: 'Trip2Talk GAS running', version: '2.6' },
+      data: { status: 'Trip2Talk GAS running', version: '2.7' },
     });
   } catch (err) {
     return json_({ status: 'error', message: String(err) });
@@ -797,7 +797,9 @@ function incrementSlot_(data) {
   for (var r = 1; r < values.length; r++) {
     if (String(values[r][codeCol] || '').trim().toLowerCase() === tourCode.toLowerCase()) {
       var current = Number(values[r][bookedCol]) || 0;
+      // รองรับทั้งเพิ่ม (+) และลด (−) ที่นั่ง; ไม่ให้กระจกเงาต่ำกว่า 0
       var next = current + by;
+      if (next < 0) next = 0;
       sh.getRange(r + 1, bookedCol + 1).setValue(next);
       return { status: 'ok', tourCode: tourCode, slotsBooked: next };
     }

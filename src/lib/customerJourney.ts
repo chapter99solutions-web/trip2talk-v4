@@ -88,6 +88,29 @@ export async function fetchTripAvailability(tourCode: string): Promise<TripAvail
 }
 
 /**
+ * พนักงาน (Co-Host) ปรับจำนวนที่นั่งของทริปแบบ ATOMIC ผ่าน RPC staff_adjust_seat.
+ *   delta = +1 → รับ walk-in ทันที (ห้ามเกิน slots_max → โยน TripFullError)
+ *   delta = -1 → คืนที่นั่ง (ไม่ต่ำกว่า 0)
+ * ใช้ slots_booked คอลัมน์เดียวกับ claim_seat_and_book (ฝั่งลูกค้าออนไลน์) จึงรวมกัน
+ * ไม่มีทางเกิน slots_max. คืนค่า slots_booked ใหม่หลังปรับ.
+ */
+export async function staffAdjustSeat(tourCode: string, delta: number): Promise<number> {
+  const tenantId = await resolveDefaultTenantId();
+  const { data, error } = await supabase.rpc('staff_adjust_seat', {
+    p_tenant_id: tenantId,
+    p_tour_code: tourCode,
+    p_delta: delta,
+  });
+  if (error) {
+    const msg = error.message || '';
+    if (msg.includes('TRIP_NOT_OPEN')) throw new TripNotOpenError();
+    if (msg.includes('TRIP_FULL')) throw new TripFullError();
+    throw new Error(msg || 'staff_adjust_seat failed');
+  }
+  return (data as number) ?? 0;
+}
+
+/**
  * ตรวจว่าวันเดินทาง (YYYY-MM-DD) ยังว่างหรือไม่ (กฎ "หนึ่งทริปต่อหนึ่งวัน").
  * คืน true = ว่าง (จองได้), false = เต็มแล้ว.
  * ถ้า query ผิดพลาด จะคืน true เพื่อไม่บล็อกผู้ใช้ (fail-open) — ตัว DB

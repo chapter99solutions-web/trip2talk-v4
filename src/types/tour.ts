@@ -19,6 +19,11 @@ export interface Tour {
   base_commission_rate: number;
   bonus_threshold_pax: number;
   bonus_amount_aud: number;
+  // ฟิลด์ seat-limit + date-gate (จาก supabase/16-...) — optional เพราะแถวเก่าอาจยังไม่มีค่า
+  slots_booked?: number | null;
+  slots_max?: number | null;
+  departure_start?: string | null;
+  departure_end?: string | null;
 }
 
 export interface CRMClient {

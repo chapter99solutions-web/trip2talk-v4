@@ -3,7 +3,15 @@ import { BookingStatus, CRMClient, Tour } from '../../types/tour';
 import { validateOSHC } from '../../lib/compliance';
 import { fetchCashierPOSData, CashierPOSData } from '../../lib/supabaseData';
 import { formatAUD } from '../../lib/payidCalc';
-import { runPhase4OnTrip } from '../../lib/customerJourney';
+import {
+  runPhase4OnTrip,
+  fetchTripAvailability,
+  staffAdjustSeat,
+  TripFullError,
+  TripNotOpenError,
+  type TripAvailability,
+} from '../../lib/customerJourney';
+import { syncSlotIncrementToSheet } from '../../lib/gsheetSync';
 import CyberViewport from '../layout/CyberViewport';
 import LiveClock from '../cyber/LiveClock';
 import AwaitingSync from '../cyber/AwaitingSync';
@@ -76,6 +84,11 @@ export default function CashierPOS({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [partyPax, setPartyPax] = useState(4);
 
+  // จัดการที่นั่งสด (walk-in) — อ่าน/เขียน slots_booked เดียวกับด่านหน้าเว็บ
+  const [availability, setAvailability] = useState<TripAvailability | null>(null);
+  const [seatBusy, setSeatBusy] = useState(false);
+  const [seatMsg, setSeatMsg] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -131,6 +144,50 @@ export default function CashierPOS({
     const q = quoteTripTotal(selectedTour.price_aud, partyPax);
     if (q.valid) setAmount(String(q.totalAud));
   }, [selectedTour?.id, selectedTour?.price_aud, partyPax]);
+
+  // อ่านที่นั่งสดจาก Supabase ทุกครั้งที่เปลี่ยนทริปที่เลือก
+  const tripCode = selectedTour?.trip_code ?? null;
+  const refreshSeats = useCallback(async () => {
+    if (!tripCode) {
+      setAvailability(null);
+      return;
+    }
+    const fresh = await fetchTripAvailability(tripCode).catch(() => null);
+    setAvailability(fresh);
+  }, [tripCode]);
+
+  useEffect(() => {
+    setSeatMsg(null);
+    refreshSeats();
+  }, [refreshSeats]);
+
+  // ปุ่ม +/− พนักงาน: ปรับ slots_booked แบบ atomic ผ่าน RPC แล้วอ่านค่าสดกลับมา
+  const handleSeatAdjust = async (delta: number) => {
+    if (!tripCode || seatBusy) return;
+    setSeatBusy(true);
+    setSeatMsg(null);
+    try {
+      await staffAdjustSeat(tripCode, delta);
+      // มิเรอร์ไปชีต 'Trip info' (ไม่บล็อก, ชีตไม่ใช่ตัวตัดสิน)
+      void syncSlotIncrementToSheet(tripCode, delta);
+    } catch (err) {
+      if (err instanceof TripFullError) setSeatMsg('เต็มแล้ว — รับเพิ่มไม่ได้');
+      else if (err instanceof TripNotOpenError) setSeatMsg('ยังไม่เปิดจอง (ยังไม่กำหนดวันออกเดินทาง)');
+      else setSeatMsg(err instanceof Error ? err.message : 'ปรับที่นั่งไม่สำเร็จ');
+    } finally {
+      // อ่านค่าสดกลับมาเสมอ ให้ตรงกับ DB (และหน้าเว็บสาธารณะ)
+      await refreshSeats();
+      setSeatBusy(false);
+    }
+  };
+
+  const slotsMax = availability?.slotsMax ?? null;
+  const slotsBooked = availability?.slotsBooked ?? null;
+  const seatsLeft = availability?.seatsLeft ?? null;
+  const seatDateOpen = Boolean(availability?.departureStart);
+  const seatFull = seatsLeft != null && seatsLeft <= 0;
+  const plusDisabled = seatBusy || !seatDateOpen || seatFull;
+  const minusDisabled = seatBusy || (slotsBooked != null && slotsBooked <= 0);
 
   const oshcWarning = useMemo(() => {
     if (!selectedClient) return null;
@@ -414,6 +471,74 @@ export default function CashierPOS({
                   </div>
                 )}
               </div>
+
+              {/* จัดการที่นั่งสด (walk-in) — ใช้ slots_booked เดียวกับหน้าเว็บสาธารณะ */}
+              {selectedTour && (
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="font-sans text-xs text-amber-400/90 tracking-wide uppercase">
+                      จัดการที่นั่ง (Walk-in)
+                    </p>
+                    {availability ? (
+                      <span
+                        className={`font-mono text-sm font-semibold ${
+                          seatFull ? 'text-red-400' : 'text-emerald-400'
+                        }`}
+                      >
+                        เหลือ {seatsLeft ?? '—'} / {slotsMax ?? '—'} ที่นั่ง
+                      </span>
+                    ) : (
+                      <span className="font-mono text-xs text-neutral-500">กำลังอ่านที่นั่ง…</span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-center gap-5">
+                    <button
+                      type="button"
+                      onClick={() => handleSeatAdjust(-1)}
+                      disabled={minusDisabled}
+                      aria-label="ลดผู้เดินทาง"
+                      className="w-12 h-12 rounded-xl border border-neutral-700 bg-neutral-900 text-2xl font-bold text-neutral-200 hover:border-amber-400/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      −
+                    </button>
+                    <div className="text-center min-w-[64px]">
+                      <span className="font-mono text-3xl font-semibold text-amber-400">
+                        {slotsBooked ?? '—'}
+                      </span>
+                      <p className="font-sans text-[10px] text-neutral-500 tracking-wide">
+                        ผู้เดินทางในทริป
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSeatAdjust(1)}
+                      disabled={plusDisabled}
+                      aria-label="เพิ่มผู้เดินทาง (walk-in)"
+                      className="w-12 h-12 rounded-xl border border-neutral-700 bg-neutral-900 text-2xl font-bold text-neutral-200 hover:border-amber-400/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  {!seatDateOpen && (
+                    <p className="font-sans text-xs text-orange-400 text-center">
+                      ยังไม่เปิดจอง — ยังไม่กำหนดวันออกเดินทาง
+                    </p>
+                  )}
+                  {seatDateOpen && seatFull && (
+                    <p className="font-sans text-xs text-red-400 text-center">
+                      เต็มแล้ว — รับเพิ่มไม่ได้
+                    </p>
+                  )}
+                  {seatMsg && (
+                    <p className="font-sans text-xs text-red-400 text-center">{seatMsg}</p>
+                  )}
+                  <p className="font-sans text-[10px] text-neutral-600 text-center">
+                    พนักงานกด “+” รับ walk-in ได้ทันที (ไม่ต้องชำระเงินก่อน) · ที่นั่งถูกหักจาก DB ทันที
+                  </p>
+                </div>
+              )}
 
               <BookingPolicyPanel
                 tour={selectedTour}
