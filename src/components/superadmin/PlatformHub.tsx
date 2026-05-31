@@ -3,7 +3,8 @@ import CyberViewport from '../layout/CyberViewport';
 import AwaitingSync from '../cyber/AwaitingSync';
 import OpsDashboardHeader from '../ops/OpsDashboardHeader';
 
-const MASTER_SHEET_ID = '1U1APoAcFz5zwwcqql1uVHm4CCOtll7bhCLbCELUBuP4';
+// ชีตหลักใหม่ (เจ้าของ trip2talksyd@gmail.com) — ใช้เป็นค่าเริ่มต้นของลิงก์/อินพุต
+const MASTER_SHEET_ID = '1L1VUu0qvL0-G0C1z9byscU11kKcuMCM0iajNLjxH9eE';
 const SHEET_ID_STORAGE_KEY = 'GAS_SPREADSHEET_ID';
 import { fetchOwnerDashboardData, OwnerDashboardData } from '../../lib/supabaseData';
 import { supabase } from '../../lib/supabase';
