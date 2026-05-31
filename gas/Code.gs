@@ -34,7 +34,9 @@ function json_(obj) {
 
 function doGet(e) {
   const action = (e && e.parameter && e.parameter.action) || '';
-  const sheet = (e && e.parameter && (e.parameter.sheet || e.parameter.tab)) || '';
+  const rawSheet = (e && e.parameter && (e.parameter.sheet || e.parameter.tab)) || '';
+  // Normalise legacy alias: ?sheet=Trips_Data → treated as the current "Trip info" tab
+  const sheet = rawSheet === 'Trips_Data' ? TRIPS_TAB : rawSheet;
 
   try {
     if (action === 'getTrips' || sheet === TRIPS_TAB) {
