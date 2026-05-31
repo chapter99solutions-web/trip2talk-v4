@@ -18,7 +18,7 @@
  * เพื่อให้แอปยังคุยกับ Apps Script backend ที่ deploy ไว้ได้.
  */
 const DEFAULT_GAS_WEBAPP_URL =
-  'https://script.google.com/macros/s/AKfycby_BjSu7zQnPqpBnoYpbELs8_nPFnj44VD-xNFNLVvN328hmfobwSp78wRxdeCtg9rNXg/exec';
+  'https://script.google.com/macros/s/AKfycbz_dy3rN_FrCaFT7f3x0g9rA5DgqzxW6OEwESPO9SbeId7hQpzkv37Exhe05xwORo41xg/exec';
 
 /**
  * ลำดับการเลือก URL (precedence):
