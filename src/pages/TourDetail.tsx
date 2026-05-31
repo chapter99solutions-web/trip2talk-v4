@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase';
 import { fetchShuffledMixedCover, listPortfolioFolder } from '../lib/galleryStorage';
 import { fetchTripByCodeFromSheet, TripSheetRow } from '../lib/tripsSheetApi';
 import { getPublicTripDisplay } from '../lib/publicTripDisplay';
+import TripSlideshow from '../components/gallery/TripSlideshow';
 
 const FALLBACK_HERO =
   'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1600&q=80';
@@ -91,6 +92,8 @@ export default function TourDetail() {
   const saveKey = useMemo(() => `t2t:savedTours:v1`, []);
   const hardcodedPhotos = staticFallback?.galleryPhotos;
   const galleryFolder = staticFallback?.galleryFolder;
+  // โฟลเดอร์สำหรับ TripSlideshow (เช่น TAS-3D2N → "Tasmania 02/Hobart")
+  const slideshowFolder = staticFallback?.slideshowFolder;
 
   useEffect(() => {
     try {
@@ -457,6 +460,14 @@ export default function TourDetail() {
           <h2 className="font-serif text-2xl font-semibold text-slate-900">Gallery</h2>
           <p className="text-xs text-slate-400">Swipe to explore →</p>
         </div>
+
+        {/* TripSlideshow แบบสดจากโฟลเดอร์ซ้อน — แสดงเฉพาะทัวร์ที่ตั้งค่า slideshowFolder
+            (เช่น TAS-3D2N) คอมโพเนนต์จะ return null เองถ้าโฟลเดอร์ว่าง จึงไม่กระทบทัวร์อื่น */}
+        {slideshowFolder && (
+          <div className="max-w-3xl mx-auto px-5 sm:px-8 mb-6">
+            <TripSlideshow bucket="portfolio" folder={slideshowFolder} />
+          </div>
+        )}
 
         <div className="relative">
           <div

@@ -59,6 +59,8 @@ export type TourFallback = {
   galleryPhotos?: string[];
   /** Portfolio bucket folder whose images auto-populate the gallery at runtime (overrides galleryPhotos for the strip; galleryPhotos[0] stays the hero/cover). */
   galleryFolder?: string;
+  /** Nested portfolio folder (may contain spaces, e.g. "Tasmania 02/Hobart") rendered as a live auto-play TripSlideshow in the Gallery section. */
+  slideshowFolder?: string;
   /** Selectable sub-packages (different scope/price options). Renders a dedicated "Packages" section in TourDetail when present. */
   subPackages?: SubPackage[];
 };
@@ -349,6 +351,7 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
     galleryPhotos: [
       `${PORTFOLIO_BASE}/Tasmania/596873932_1428638042594626_8987722411601397177_n.jpg`,
     ],
+    slideshowFolder: 'Tasmania 02/Hobart',
   },
   {
     tourCode: 'TAS-LH-4D3N',
