@@ -626,11 +626,10 @@ async function fetchTripsFromSheetUncached(): Promise<TripSheetRow[]> {
       const res = await fetchWithTimeout(u);
       const bodyText = await res.text();
       if (!res.ok) {
-        console.error('[GAS][Trips_Data] HTTP error', {
+        // ใช้ info ไม่ใช่ error เพื่อไม่ให้ console ดูเหมือนพัง (มี fallback อยู่แล้ว)
+        console.info('[Sheets] Trip info HTTP not ready', {
           label,
-          url: u,
           status: res.status,
-          bodyText: bodyText.slice(0, 2000),
         });
         throw new Error(`HTTP ${res.status}`);
       }
@@ -660,23 +659,29 @@ async function fetchTripsFromSheetUncached(): Promise<TripSheetRow[]> {
 
       throw new Error('No trip rows in response');
     } catch (e) {
-      console.error('[GAS][Trips_Data] fetch attempt failed', {
+      // non-scary: แต่ละ attempt ที่ไม่สำเร็จ log เป็น info (ยังมี attempt อื่น + fallback)
+      console.info('[Sheets] Trip info attempt not ready', {
         label,
-        url: u,
-        error: e instanceof Error ? { name: e.name, message: e.message } : e,
+        reason: e instanceof Error ? e.message : String(e),
       });
       lastErr = e;
     }
   }
 
   if (gasConfigError) {
-    console.warn('[GAS][Trips_Data] Using portfolio fallback — fix Apps Script SPREADSHEET_ID', gasConfigError);
+    console.info(
+      '[Sheets] Trip info not available, using portfolio images (check Apps Script SPREADSHEET_ID)',
+      gasConfigError
+    );
     return portfolioFallbackTrips();
   }
 
   const fallback = portfolioFallbackTrips();
   if (fallback.length > 0) {
-    console.warn('[GAS][Trips_Data] Using portfolio fallback after GAS failure', lastErr);
+    // ข้อความชัดเจน ไม่น่ากลัว — คาดไว้อยู่แล้วถ้ายังไม่ได้ใส่ข้อมูลในแท็บ "Trip info"
+    console.info(
+      '[Sheets] Trip info not available, using portfolio images (expected if tab not populated yet)'
+    );
     return fallback;
   }
 

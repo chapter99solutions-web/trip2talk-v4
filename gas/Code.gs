@@ -6,11 +6,15 @@
  *
  * Owner deploy steps: see docs/GAS_TRIPS_DATA.md
  */
-const TRIPS_TAB = 'Trips_Data';
+// ชื่อแท็บ (tab) ที่อ่านข้อมูลทริป — ใช้แท็บ "Trip info" ที่มีอยู่แล้วในชีตใหม่
+// (เดิมคือ 'Trips_Data'). เปลี่ยนมาอ่านจาก "Trip info" เพื่อไม่ต้องสร้างแท็บใหม่.
+const TRIPS_TAB = 'Trip info';
 const BOOKINGS_TAB = 'Customer_Bookings';
+// แท็บปลายทางสำหรับ append แถวการจอง + settlement (มีอยู่แล้วในชีตใหม่)
+const SETTLEMENTS_TAB = 'Tax_Year_2025_2026_Settlements';
 
-/** Trip2Talk master Google Sheet — https://docs.google.com/spreadsheets/d/1U1APoAcFz5zwwcqql1uVHm4CCOtll7bhCLbCELUBuP4/edit */
-const SPREADSHEET_ID = '1U1APoAcFz5zwwcqql1uVHm4CCOtll7bhCLbCELUBuP4';
+/** Trip2Talk master Google Sheet (เจ้าของ trip2talksyd@gmail.com) — https://docs.google.com/spreadsheets/d/1L1VUu0qvL0-G0C1z9byscU11kKcuMCM0iajNLjxH9eE/edit */
+const SPREADSHEET_ID = '1L1VUu0qvL0-G0C1z9byscU11kKcuMCM0iajNLjxH9eE';
 
 function spreadsheetId_() {
   const fromProps = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
@@ -703,50 +707,54 @@ function appendExpense_(data) {
 }
 
 /**
- * Public website booking sync (doPost action: 'addBooking').
- * Appends a row to a simple 'Bookings' tab (auto-created with headers if missing).
- * Source of truth is Supabase — this is a best-effort mirror for the team.
+ * Sync การจองจากเว็บไซต์ (doPost action: 'addBooking').
+ * Append "หนึ่งแถว" ลงแท็บ Tax_Year_2025_2026_Settlements โดย map ค่าให้ตรง
+ * คอลัมน์ A-I ตามที่ทีมใช้: Synced At | Tour Code | Revenue | Expenses |
+ * Commissions | Net Profit | GST Collected | GST Claimed | Sync Date.
+ * Supabase คือ source of truth — แถวนี้เป็นเพียง mirror สำหรับทีม.
+ *
+ * การ map การจอง → settlement:
+ *   Revenue     = amount (ยอดมัดจำ/ยอดที่จ่าย)
+ *   Expenses    = 0
+ *   Commissions = 0
+ *   Net Profit  = amount
+ *   GST Collected = amount / 11 (GST แบบรวมในราคาของออสเตรเลีย)
+ *   GST Claimed = 0
  */
-function bookingsTabHeaders_() {
+function settlementHeaders_() {
   return [
-    'Timestamp',
-    'Booking Ref',
-    'Booking ID',
-    'Client',
-    'Email',
-    'Phone',
+    'Synced At',
     'Tour Code',
-    'Departure Date',
-    'Pax',
-    'Pickup',
-    'Amount',
-    'Status',
-    'Notes',
+    'Revenue',
+    'Expenses',
+    'Commissions',
+    'Net Profit',
+    'GST Collected',
+    'GST Claimed',
+    'Sync Date',
   ];
 }
 
 function appendBookingRow_(data) {
   var d = data || {};
   var ss = SpreadsheetApp.openById(spreadsheetId_());
-  var sheet = getOrCreateSheet_(ss, 'Bookings', bookingsTabHeaders_());
-  var amount = Number(pick_(d, ['amount', 'Amount'])) || '';
-  var pax = Number(pick_(d, ['pax', 'Pax'])) || '';
+  // ใช้แท็บที่มีอยู่แล้ว ถ้าไม่มีจึงสร้างพร้อม header
+  var sheet = getOrCreateSheet_(ss, SETTLEMENTS_TAB, settlementHeaders_());
+  var amount = Number(pick_(d, ['amount', 'Amount', 'revenue', 'Revenue'])) || 0;
+  var nowIso = new Date().toISOString();
+  var gstCollected = amount > 0 ? Math.round((amount / 11) * 100) / 100 : 0;
   sheet.appendRow([
-    pick_(d, ['created_at', 'Timestamp']) || new Date().toISOString(),
-    pick_(d, ['booking_ref', 'Booking Ref']),
-    pick_(d, ['booking_id', 'Booking ID']),
-    pick_(d, ['client_name', 'Client']),
-    pick_(d, ['email', 'Email']),
-    pick_(d, ['phone', 'Phone']),
-    pick_(d, ['tour_code', 'Tour Code']),
-    pick_(d, ['departure_date', 'Departure Date']),
-    pax,
-    pick_(d, ['pickup', 'Pickup']),
-    amount,
-    pick_(d, ['status', 'Status']),
-    pick_(d, ['notes', 'Notes']),
+    pick_(d, ['created_at', 'Synced At']) || nowIso, // A Synced At
+    pick_(d, ['tour_code', 'Tour Code']),            // B Tour Code
+    amount,                                          // C Revenue
+    0,                                               // D Expenses
+    0,                                               // E Commissions
+    amount,                                          // F Net Profit
+    gstCollected,                                    // G GST Collected
+    0,                                               // H GST Claimed
+    nowIso,                                          // I Sync Date
   ]);
-  return { status: 'ok', message: 'Booking row appended to Bookings' };
+  return { status: 'ok', message: 'Booking row appended to ' + SETTLEMENTS_TAB };
 }
 
 /** @deprecated — intake now updates Customer_Bookings via updateIntake_ */

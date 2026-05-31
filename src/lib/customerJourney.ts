@@ -5,8 +5,43 @@
 import { supabase } from './supabase';
 import { dispatchRetargetingNotification, dispatchTransactionNotification } from './notifications';
 import { buildSettlementForTour, syncSettlementToGoogleSheets, SettlementSyncPayload } from './googleSync';
-import { syncBookingToSheets } from './gasSync';
 import { syncBookingToSheet } from './gsheetSync';
+
+/**
+ * error เฉพาะกรณี "วันนี้มีคนจองแล้ว" (ชน UNIQUE constraint บน trip_date).
+ * ใช้ให้ UI แยกแยะจาก error อื่น ๆ เพื่อแสดงข้อความไทยและรีเฟรช availability.
+ */
+export class DateFullyBookedError extends Error {
+  constructor(message = 'ขออภัย วันนี้มีคนจองแล้ว') {
+    super(message);
+    this.name = 'DateFullyBookedError';
+  }
+}
+
+/**
+ * ตรวจว่าวันเดินทาง (YYYY-MM-DD) ยังว่างหรือไม่ (กฎ "หนึ่งทริปต่อหนึ่งวัน").
+ * คืน true = ว่าง (จองได้), false = เต็มแล้ว.
+ * ถ้า query ผิดพลาด จะคืน true เพื่อไม่บล็อกผู้ใช้ (fail-open) — ตัว DB
+ * UNIQUE constraint จะเป็นด่านสุดท้ายกันการจองซ้ำอยู่แล้ว.
+ */
+export async function isTripDateAvailable(tripDate: string): Promise<boolean> {
+  if (!tripDate) return false;
+  const tenantId = await resolveDefaultTenantId();
+  let q = supabase
+    .from('tour_bookings')
+    .select('id')
+    .eq('trip_date', tripDate)
+    .neq('status', 'CANCELLED')
+    .limit(1);
+  if (tenantId) q = q.eq('tenant_id', tenantId);
+  const { data, error } = await q;
+  if (error) {
+    // เช่น คอลัมน์ trip_date ยังไม่ถูกสร้าง — อย่าบล็อกผู้ใช้
+    console.info('[Booking] availability check skipped:', error.message);
+    return true;
+  }
+  return (data?.length ?? 0) === 0;
+}
 import type { Expense, Tour } from '../types/tour';
 import type { TourBooking } from './supabaseData';
 
@@ -193,6 +228,8 @@ export async function runPhase2Book(input: {
     trip_size_tier: input.tripSizeTier,
     preferred_pickup: input.pickup,
     journey_phase: 'book',
+    // วันเดินทาง — ใช้บังคับกฎ "หนึ่งทริปต่อหนึ่งวัน" ผ่าน UNIQUE constraint
+    trip_date: input.departureDate ?? null,
   };
   if (tenantId) bookingPayload.tenant_id = tenantId;
 
@@ -202,27 +239,21 @@ export async function runPhase2Book(input: {
     .select('id')
     .maybeSingle();
 
+  // 23505 = unique_violation → มีคนจองวันนี้ไปแล้ว (กฎหนึ่งทริปต่อวัน).
+  // โยน error เฉพาะเพื่อให้ UI แสดงข้อความไทย + รีเฟรช availability.
+  if (bookingErr && (bookingErr as { code?: string }).code === '23505') {
+    throw new DateFullyBookedError();
+  }
+
   if (bookingErr) warnings.push(bookingErr.message);
 
   if (bookingRow?.id) {
-    // เส้นทางเดิม: ผ่าน Supabase Edge Function (เก็บไว้ — best-effort เท่านั้น)
-    const sync = await syncBookingToSheets({
-      booking_id: bookingRow.id,
-      client_name: input.fullName,
-      email: input.email,
-      phone: input.phone,
-      pax_count: input.partyPax,
-      pickup_type: input.pickup,
-      trip_date: input.departureDate || new Date().toISOString().slice(0, 10),
-      payment_status: 'PENDING',
-      created_at: new Date().toISOString(),
-    });
-    if (!sync.success) warnings.push(sync.error ?? 'Sheets sync failed');
-
-    // เส้นทางใหม่ (ตัวที่ใช้งานได้จริง): POST ตรงไปยัง GAS Web App.
+    // เส้นทางเดียว (ใช้งานได้จริง): POST ตรงไปยัง GAS Web App → append หนึ่งแถว
+    // ลงแท็บ Tax_Year_2025_2026_Settlements. (ลบเส้นทางเดิมที่ผ่าน Edge Function
+    // 'appendBookingRow' ออก เพราะ GAS ไม่รู้จัก action นั้น — ล้มเหลวเสมอ และ
+    // ถ้าเรียกทั้งสองทางจะได้แถวซ้ำ.)
     // await เพื่อให้ log เรียงลำดับ แต่ syncBookingToSheet จะ catch ภายในเสมอ
-    // (ไม่ throw) ดังนั้น sync ที่ fail จะไม่ทำให้การจองพัง — booking ถูกบันทึก
-    // ลง Supabase ไปแล้ว. failure จะถูก log ไว้ใน warnings + console.error.
+    // (ไม่ throw) — sync ที่ fail จะไม่ทำให้การจองพัง เพราะ Supabase บันทึกไปแล้ว.
     const sheetSync = await syncBookingToSheet({
       action: 'addBooking',
       booking_ref: input.referenceNumber,

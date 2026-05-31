@@ -7,7 +7,7 @@ import { quoteTripTotal, resolveTripSizeTier } from '../lib/bookingPolicy';
 import TripSizeTierBadge from '../components/cyber/TripSizeTierBadge';
 import BookingPolicyPanel from '../components/policy/BookingPolicyPanel';
 import { generateBookingRef } from '../lib/bookingRef';
-import { runPhase2Book } from '../lib/customerJourney';
+import { runPhase2Book, isTripDateAvailable, DateFullyBookedError } from '../lib/customerJourney';
 import { PORTFOLIO_TOURS } from '../lib/portfolioTours';
 import {
   shouldBlockSharedLowPaxNearDate,
@@ -53,6 +53,9 @@ export default function BookingCheckout() {
   const [selectedDate, setSelectedDate] = useState<string>(() => toISODateInputValue(new Date()));
   const [partyPax, setPartyPax] = useState(initialPax);
   const [availabilityChecked, setAvailabilityChecked] = useState(false);
+  // กฎ "หนึ่งทริปต่อหนึ่งวัน": null = ยังไม่ตรวจ, true = ว่าง, false = เต็มแล้ว
+  const [dateAvailable, setDateAvailable] = useState<boolean | null>(null);
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
 
   const [pkg, setPkg] = useState<PackageId>('STANDARD');
 
@@ -167,7 +170,24 @@ export default function BookingCheckout() {
   const fmtThaiDate = (d: Date) =>
     d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
 
-  const canProceedStep1 = Boolean(selectedDate) && quote?.valid;
+  const canProceedStep1 = Boolean(selectedDate) && quote?.valid && dateAvailable !== false;
+
+  // ตรวจ availability ของวันที่เลือก (กฎหนึ่งทริปต่อวัน) ก่อนให้ไปต่อ
+  const handleCheckAvailability = async () => {
+    if (!selectedDate) return;
+    setCheckingAvailability(true);
+    setSubmitError(null);
+    try {
+      const available = await isTripDateAvailable(selectedDate);
+      setDateAvailable(available);
+    } catch {
+      // fail-open: ถ้าตรวจไม่ได้ ปล่อยให้จองต่อ (DB constraint กันซ้ำอยู่แล้ว)
+      setDateAvailable(true);
+    } finally {
+      setAvailabilityChecked(true);
+      setCheckingAvailability(false);
+    }
+  };
   const pickupRequiresSuburb =
     pickupConfig.kind === 'day' && pickupLocation === 'route_waypoint';
 
@@ -217,6 +237,15 @@ export default function BookingCheckout() {
 
       setBookingRef(reference_number);
     } catch (err) {
+      // กรณีวันเต็ม (ชน UNIQUE constraint) — แสดงข้อความไทย, รีเฟรช availability,
+      // และ "ไม่" แสดงหน้าจอจองสำเร็จ (ไม่ setBookingRef).
+      if (err instanceof DateFullyBookedError) {
+        setSubmitError(err.message);
+        setDateAvailable(false);
+        setAvailabilityChecked(true);
+        setStep(1);
+        return;
+      }
       const msg = err instanceof Error ? err.message : 'Booking failed';
       setSubmitError(msg);
       console.error('[Trip2Talk] Phase 2 (book) failed:', err);
@@ -306,6 +335,7 @@ export default function BookingCheckout() {
                 onChange={(e) => {
                   setSelectedDate(e.target.value);
                   setAvailabilityChecked(false);
+                  setDateAvailable(null);
                 }}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-teal/30"
               />
@@ -344,23 +374,32 @@ export default function BookingCheckout() {
 
           <button
             type="button"
-            onClick={() => setAvailabilityChecked(true)}
-            disabled={!canProceedStep1}
+            onClick={handleCheckAvailability}
+            disabled={!selectedDate || !quote?.valid || checkingAvailability}
             className="w-full inline-flex justify-center items-center gap-2 py-3 rounded-full bg-navy text-white text-sm font-semibold hover:bg-navy-dark transition-colors disabled:opacity-40"
           >
-            Check Availability <span aria-hidden>→</span>
+            {checkingAvailability ? 'Checking…' : 'Check Availability'} <span aria-hidden>→</span>
           </button>
 
-          {availabilityChecked && (
+          {availabilityChecked && dateAvailable === true && (
             <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 text-sm text-slate-700">
               ✅ Available — continue to choose a package.
+            </div>
+          )}
+
+          {availabilityChecked && dateAvailable === false && (
+            <div className="rounded-2xl bg-red-50 border border-red-200 p-4 text-sm text-red-700 flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-full bg-red-600 text-white text-xs font-semibold">
+                เต็มแล้ว (Fully booked)
+              </span>
+              <span>วันนี้มีคนจองแล้ว — กรุณาเลือกวันอื่น</span>
             </div>
           )}
 
           <div className="flex justify-end">
             <button
               type="button"
-              disabled={!availabilityChecked}
+              disabled={!availabilityChecked || dateAvailable === false}
               onClick={() => setStep(2)}
               className="px-5 py-2.5 rounded-full bg-teal text-navy font-semibold text-sm disabled:opacity-40"
             >
