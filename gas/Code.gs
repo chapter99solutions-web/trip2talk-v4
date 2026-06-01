@@ -34,15 +34,24 @@ function json_(obj) {
 
 function doGet(e) {
   const action = (e && e.parameter && e.parameter.action) || '';
+  const actionNorm = String(action).trim().toLowerCase();
   const rawSheet = (e && e.parameter && (e.parameter.sheet || e.parameter.tab)) || '';
   // Normalise legacy alias: ?sheet=Trips_Data → treated as the current "Trip info" tab
   const sheet = rawSheet === 'Trips_Data' ? TRIPS_TAB : rawSheet;
+  const sheetNorm = String(sheet).trim().toLowerCase();
+  const tripsTabNorm = TRIPS_TAB.toLowerCase();
 
   try {
-    if (action === 'getTrips' || sheet === TRIPS_TAB) {
+    if (
+      actionNorm === 'gettrips' ||
+      actionNorm === 'readtrips' ||
+      actionNorm === 'gettripinfo' ||
+      sheetNorm === tripsTabNorm ||
+      sheetNorm === 'trips_data'
+    ) {
       return json_(readTrips_());
     }
-    if (action === 'list' && sheet === TRIPS_TAB) {
+    if (actionNorm === 'list' && (sheetNorm === tripsTabNorm || sheetNorm === 'trips_data')) {
       return json_(readTrips_());
     }
     if (action === 'seedTrips' || action === 'seedMasterTrips') {
@@ -72,8 +81,9 @@ function doGet(e) {
       return json_(getPendingIntakes_());
     }
     return json_({
+      ok: true,
       status: 'ok',
-      data: { status: 'Trip2Talk GAS running', version: '2.7' },
+      data: { status: 'Trip2Talk GAS running', version: '2.8', hint: 'Use ?action=getTrips to read Trip info tab' },
     });
   } catch (err) {
     return json_({ status: 'error', message: String(err) });
@@ -88,7 +98,7 @@ function readTrips_() {
   }
   const values = sh.getDataRange().getValues();
   if (values.length < 2) {
-    return { status: 'ok', trips: [] };
+    return { ok: true, status: 'ok', trips: [], data: [] };
   }
   const headers = values[0].map(function (h) {
     return String(h || '').trim();
@@ -108,12 +118,16 @@ function readTrips_() {
     }
     trips.push(normalizeTripRow_(obj));
   }
-  return { status: 'ok', trips: trips, data: trips };
+  return { ok: true, status: 'ok', trips: trips, data: trips };
 }
 
 function doPost(e) {
   try {
     const body = e.postData && e.postData.contents ? JSON.parse(e.postData.contents) : {};
+    const actionNorm = String(body.action || '').trim().toLowerCase();
+    if (actionNorm === 'gettrips' || actionNorm === 'readtrips' || actionNorm === 'gettripinfo') {
+      return json_(readTrips_());
+    }
     if (body.action === 'getBookings') {
       return json_(readBookings_());
     }

@@ -240,6 +240,7 @@ export default function BookingCheckout() {
     (visaType !== 'student' || oshc.trim());
 
   const handleConfirm = async () => {
+    console.log('SUBMIT FIRED');
     console.log('[Trip2Talk] handleConfirm fired', {
       termsAccepted,
       quoteValid: quote?.valid,
@@ -265,6 +266,14 @@ export default function BookingCheckout() {
       setSubmitError(
         'ทริปนี้ยังไม่ถึงจำนวนขั้นต่ำ และใกล้วันเดินทางเกินไป — กรุณาอัปเกรดเป็น Private Luxury Trip'
       );
+      return;
+    }
+    if (dateGateBlocked) {
+      setSubmitError('ยังไม่มีวันเดินทาง กรุณาติดต่อเจ้าหน้าที่');
+      return;
+    }
+    if (seatGateFull) {
+      setSubmitError('ที่นั่งเต็มแล้ว');
       return;
     }
 
@@ -842,7 +851,7 @@ export default function BookingCheckout() {
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={!termsAccepted || submitting || gateBlocked}
+            disabled={!termsAccepted || submitting}
             className="w-full inline-flex justify-center items-center py-3 rounded-xl bg-teal text-navy font-semibold text-sm disabled:opacity-40"
           >
             {submitting

@@ -9,7 +9,10 @@ import type { TripSeason, TripType } from './masterTrips';
  * `.env` file) so the app still talks to the deployed Apps Script backend.
  */
 const DEFAULT_GAS_WEBAPP_URL =
-  'https://script.google.com/macros/s/AKfycbz_dy3rN_FrCaFT7f3x0g9rA5DgqzxW6OEwESPO9SbeId7hQpzkv37Exhe05xwORo41xg/exec';
+  'https://script.google.com/macros/s/AKfycbz1-baiSD26danlbokyUAScHtpFK5BiKpNBTvY6B30hxyfwT3_jgzQeXoCSjjNRyHSYhQ/exec';
+
+/** Tab name in spreadsheet 1L1VUu0qvL0-G0C1z9byscU11kKcuMCM0iajNLjxH9eE (must match gas/Code.gs TRIPS_TAB). */
+const TRIPS_SHEET_TAB = 'Trip info';
 
 /**
  * Resolution precedence:
@@ -28,13 +31,17 @@ function requireGasUrl(): string {
 function parseGasError(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') return null;
   const o = payload as Record<string, unknown>;
-  if (o.status === 'error') {
-    return asString(o.message || o.error).trim() || 'GAS returned an error';
-  }
-  if (o.ok === false) {
+  if (o.status === 'error' || o.ok === false) {
     return asString(o.message || o.error).trim() || 'GAS returned an error';
   }
   return null;
+}
+
+/** Legacy/stub deployments that connect but return no rows (data: []). */
+function isGasEmptyDataArray(payload: unknown): boolean {
+  if (!payload || typeof payload !== 'object') return false;
+  const o = payload as Record<string, unknown>;
+  return o.ok === true && Array.isArray(o.data) && o.data.length === 0 && !Array.isArray(o.trips);
 }
 
 /** GAS health ping when sheet param is ignored — not trip rows. */
@@ -405,6 +412,8 @@ function extractTrips(payload: unknown): unknown[] {
   if (!payload || typeof payload !== 'object') return [];
   const obj = payload as Record<string, unknown>;
 
+  // Code.gs readTrips_(): { ok: true, status: 'ok', trips: [...], data: [...] }
+  // Legacy stub: { ok: true, data: [...] }
   const direct = [obj.trips, obj.rows, obj.items, obj.result];
   const directArr = direct.find(Array.isArray);
   if (Array.isArray(directArr)) return directArr as unknown[];
@@ -414,11 +423,15 @@ function extractTrips(payload: unknown): unknown[] {
     if (data.length > 0 && Array.isArray(data[0])) {
       return rowsFromHeaderTable(data as unknown[][]);
     }
+    // data[] of trip objects (legacy ok:true or mirrored trips array)
+    if (data.length > 0 && data[0] && typeof data[0] === 'object') {
+      return data as unknown[];
+    }
     return data as unknown[];
   }
   if (data && typeof data === 'object') {
     const inner = data as Record<string, unknown>;
-    if (Array.isArray(inner.trips)) return inner.trips as unknown[];
+    if (Array.isArray(inner.trips) && inner.trips.length > 0) return inner.trips as unknown[];
     if (Array.isArray(inner.rows)) {
       const rows = inner.rows as unknown[];
       if (rows.length > 0 && Array.isArray(rows[0])) {
@@ -608,37 +621,65 @@ export async function fetchTripsFromSheet(): Promise<TripSheetRow[]> {
   return tripsInflight;
 }
 
+/** POST JSON to GAS (some deployments only handle doPost). */
+async function postGasJson(payload: Record<string, unknown>): Promise<unknown> {
+  const url = requireGasUrl();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), GAS_ATTEMPT_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+      signal: ctrl.signal,
+    });
+    const bodyText = await res.text();
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return bodyText ? (JSON.parse(bodyText) as unknown) : null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchTripsFromSheetUncached(): Promise<TripSheetRow[]> {
   const url = requireGasUrl();
 
-  const attempts: { url: string; label: string }[] = [
+  const tab = encodeURIComponent(TRIPS_SHEET_TAB);
+  const attempts: { url: string; label: string; post?: Record<string, unknown> }[] = [
     { url: `${url}?action=getTrips`, label: 'action=getTrips' },
+    { url: `${url}?action=getTrips&sheet=${tab}`, label: 'action=getTrips&sheet=Trip info' },
+    { url: `${url}?sheet=${tab}`, label: 'sheet=Trip info' },
+    // Legacy alias normalised in Code.gs doGet → "Trip info"
     { url: `${url}?action=getTrips&sheet=Trips_Data`, label: 'action=getTrips&sheet=Trips_Data' },
-    { url: `${url}?action=list&sheet=Trips_Data`, label: 'action=list&sheet=Trips_Data' },
-    { url: `${url}?sheet=Trips_Data`, label: 'sheet=Trips_Data' },
+    { url: `${url}?action=list&sheet=${tab}`, label: 'action=list&sheet=Trip info' },
+    { url, label: 'POST action=getTrips', post: { action: 'getTrips' } },
   ];
 
   let lastErr: unknown = null;
   let gasConfigError: string | null = null;
 
-  for (const { url: u, label } of attempts) {
+  for (const { url: u, label, post } of attempts) {
     try {
-      const res = await fetchWithTimeout(u);
-      const bodyText = await res.text();
-      if (!res.ok) {
-        // ใช้ info ไม่ใช่ error เพื่อไม่ให้ console ดูเหมือนพัง (มี fallback อยู่แล้ว)
-        console.info('[Sheets] Trip info HTTP not ready', {
-          label,
-          status: res.status,
-        });
-        throw new Error(`HTTP ${res.status}`);
-      }
-
       let json: unknown;
-      try {
-        json = bodyText ? (JSON.parse(bodyText) as unknown) : null;
-      } catch {
-        throw new Error('GAS returned non-JSON');
+      if (post) {
+        json = await postGasJson(post);
+      } else {
+        const res = await fetchWithTimeout(u);
+        const bodyText = await res.text();
+        if (!res.ok) {
+          // ใช้ info ไม่ใช่ error เพื่อไม่ให้ console ดูเหมือนพัง (มี fallback อยู่แล้ว)
+          console.info('[Sheets] Trip info HTTP not ready', {
+            label,
+            status: res.status,
+          });
+          throw new Error(`HTTP ${res.status}`);
+        }
+        try {
+          json = bodyText ? (JSON.parse(bodyText) as unknown) : null;
+        } catch {
+          throw new Error('GAS returned non-JSON');
+        }
       }
 
       const gasErr = parseGasError(json);
@@ -651,6 +692,12 @@ async function fetchTripsFromSheetUncached(): Promise<TripSheetRow[]> {
 
       if (isGasHealthPing(json)) {
         throw new Error('GAS health check only (sheet not read)');
+      }
+
+      if (isGasEmptyDataArray(json)) {
+        throw new Error(
+          'GAS returned empty data[] — redeploy gas/Code.gs and add rows to the "Trip info" tab'
+        );
       }
 
       const rows = extractTrips(json);
