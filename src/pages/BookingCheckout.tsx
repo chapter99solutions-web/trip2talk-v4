@@ -305,6 +305,29 @@ export default function BookingCheckout() {
         return;
       }
 
+      // Task 3: Resend confirmation email (best-effort; do not block booking UI)
+      try {
+        const departureDate = availability?.departureStart || selectedDate;
+        await fetch('/api/send-confirmation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            bookingId,
+            bookingRef: reference_number,
+            customerName: fullName,
+            customerEmail: email,
+            tripCode: trip.trip_code,
+            tripName: tourName,
+            departureDate,
+            pax: partyPax,
+            totalAud,
+            payId: PAYID,
+          }),
+        });
+      } catch (e) {
+        console.warn('[Trip2Talk] send-confirmation failed:', e);
+      }
+
       setBookingRef(reference_number);
     } catch (err) {
       // กรณีวันเต็ม (ชน UNIQUE constraint) — แสดงข้อความไทย, รีเฟรช availability,
