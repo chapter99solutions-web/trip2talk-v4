@@ -318,14 +318,14 @@ export default function BookingCheckout() {
       }
       // ด่านที่นั่งเต็ม (server-side) — รีเฟรช availability + แสดง "เต็มแล้ว".
       if (err instanceof TripFullError) {
-        setSubmitError('เต็มแล้ว / Fully booked — ทริปนี้ที่นั่งเต็มแล้ว');
+        setSubmitError('ที่นั่งเต็มแล้ว');
         if (tripCodeForLookup) void fetchTripAvailability(tripCodeForLookup).then(setAvailability);
         setStep(1);
         return;
       }
       // ด่านวันเดินทาง (server-side) — ทริปยังไม่เปิดจอง.
       if (err instanceof TripNotOpenError) {
-        setSubmitError('ยังไม่เปิดจอง / Not open for booking — ทริปนี้ยังไม่กำหนดวันออกเดินทาง');
+        setSubmitError('ยังไม่มีวันเดินทาง กรุณาติดต่อเจ้าหน้าที่');
         if (tripCodeForLookup) void fetchTripAvailability(tripCodeForLookup).then(setAvailability);
         setStep(1);
         return;
@@ -408,7 +408,7 @@ export default function BookingCheckout() {
       {dateGateBlocked && (
         <div className="rounded-2xl border border-slate-300 bg-slate-50 p-4 text-sm text-slate-700 space-y-1">
           <p className="font-semibold text-slate-900">🗓️ Dates coming soon / เปิดจองเร็ว ๆ นี้</p>
-          <p>ทริปนี้ยังไม่กำหนดวันออกเดินทาง — ยังไม่เปิดจอง กรุณาลงชื่อรอคิว (Join waitlist)</p>
+          <p>ยังไม่มีวันเดินทาง กรุณาติดต่อเจ้าหน้าที่</p>
         </div>
       )}
 
@@ -416,9 +416,9 @@ export default function BookingCheckout() {
       {seatGateFull && (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <span className="px-2 py-0.5 mr-2 rounded-full bg-red-600 text-white text-xs font-semibold">
-            เต็มแล้ว / Fully booked
+            ที่นั่งเต็มแล้ว
           </span>
-          ทริปนี้ที่นั่งเต็มแล้ว — กรุณาเลือกทริปอื่น
+          กรุณาเลือกทริปอื่น
         </div>
       )}
 
@@ -827,7 +827,7 @@ export default function BookingCheckout() {
               : dateGateBlocked
                 ? 'ยังไม่เปิดจอง / Not open'
                 : seatGateFull
-                  ? 'เต็มแล้ว / Fully booked'
+                  ? 'ที่นั่งเต็มแล้ว'
                   : 'Confirm Booking'}
           </button>
 
