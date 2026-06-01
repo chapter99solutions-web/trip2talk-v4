@@ -59,6 +59,19 @@ function isGasHealthPing(payload: unknown): boolean {
   );
 }
 
+/** Legacy undeployed stub: always `{ ok: true, data: [] }` with no `version` or `trips`. */
+function isGasLegacyEmptyStub(payload: unknown): boolean {
+  if (!payload || typeof payload !== 'object') return false;
+  const o = payload as Record<string, unknown>;
+  return (
+    o.ok === true &&
+    o.version == null &&
+    Array.isArray(o.data) &&
+    o.data.length === 0 &&
+    !Array.isArray(o.trips)
+  );
+}
+
 function rowsFromHeaderTable(rows: unknown[][]): Record<string, unknown>[] {
   if (rows.length < 2) return [];
   const headers = rows[0].map((h) => asString(h).trim());
@@ -648,7 +661,9 @@ async function fetchTripsFromSheetUncached(): Promise<TripSheetRow[]> {
 
   const tab = encodeURIComponent(TRIPS_SHEET_TAB);
   const attempts: { url: string; label: string; post?: Record<string, unknown> }[] = [
+    { url: `${url}?action=getTrips&debug=1`, label: 'action=getTrips&debug=1' },
     { url: `${url}?action=getTrips`, label: 'action=getTrips' },
+    { url: `${url}?action=listTrips&debug=1`, label: 'action=listTrips' },
     { url: `${url}?action=getTrips&sheet=${tab}`, label: 'action=getTrips&sheet=Trip info' },
     { url: `${url}?sheet=${tab}`, label: 'sheet=Trip info' },
     // Legacy alias normalised in Code.gs doGet → "Trip info"
@@ -691,14 +706,25 @@ async function fetchTripsFromSheetUncached(): Promise<TripSheetRow[]> {
         throw new Error(gasErr);
       }
 
+      if (isGasLegacyEmptyStub(json)) {
+        throw new Error(
+          'GAS legacy stub ({ ok: true, data: [] }) — paste gas/Code.gs v2.9+ and redeploy New version → Anyone'
+        );
+      }
+
       if (isGasHealthPing(json)) {
         throw new Error('GAS health check only (sheet not read)');
       }
 
       if (isGasEmptyDataArray(json)) {
         throw new Error(
-          'GAS returned empty data[] — redeploy gas/Code.gs and add rows to the "Trip info" tab'
+          'GAS returned empty data[] — redeploy gas/Code.gs v2.9+ and add rows to the "Trip info" tab'
         );
+      }
+
+      const gasVersion = json && typeof json === 'object' ? (json as Record<string, unknown>).version : null;
+      if (gasVersion) {
+        console.info('[Sheets] GAS version', gasVersion, json);
       }
 
       const rows = extractTrips(json);

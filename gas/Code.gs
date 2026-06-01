@@ -8,13 +8,42 @@
  */
 // ชื่อแท็บ (tab) ที่อ่านข้อมูลทริป — ใช้แท็บ "Trip info" ที่มีอยู่แล้วในชีตใหม่
 // (เดิมคือ 'Trips_Data'). เปลี่ยนมาอ่านจาก "Trip info" เพื่อไม่ต้องสร้างแท็บใหม่.
+const GAS_VERSION = '2.9';
 const TRIPS_TAB = 'Trip info';
 const BOOKINGS_TAB = 'Customer_Bookings';
 // แท็บปลายทางสำหรับ append แถวการจอง + settlement (มีอยู่แล้วในชีตใหม่)
 const SETTLEMENTS_TAB = 'Tax_Year_2025_2026_Settlements';
 
-/** Trip2Talk master Google Sheet (เจ้าของ trip2talksyd@gmail.com) — https://docs.google.com/spreadsheets/d/1L1VUu0qvL0-G0C1z9byscU11kKcuMCM0iajNLjxH9eE/edit */
+/** Trip2Talk master Google Sheet — https://docs.google.com/spreadsheets/d/1L1VUu0qvL0-G0C1z9byscU11kKcuMCM0iajNLjxH9eE/edit */
 const SPREADSHEET_ID = '1L1VUu0qvL0-G0C1z9byscU11kKcuMCM0iajNLjxH9eE';
+
+/** Prefer container-bound spreadsheet when IDs match; else openById. */
+function ss_() {
+  var id = spreadsheetId_();
+  try {
+    var active = SpreadsheetApp.getActiveSpreadsheet();
+    if (active && active.getId() === id) {
+      Logger.log('[Trip2Talk] ss_ container-bound spreadsheet ' + id);
+      return active;
+    }
+  } catch (err) {
+    Logger.log('[Trip2Talk] ss_ no active spreadsheet: ' + err);
+  }
+  Logger.log('[Trip2Talk] ss_ openById ' + id);
+  return SpreadsheetApp.openById(id);
+}
+
+function tripsReadMeta_(spreadsheetId, sheetNames, totalRows, tripCount, headers, debug) {
+  if (!debug) return undefined;
+  return {
+    spreadsheetId: spreadsheetId,
+    tab: TRIPS_TAB,
+    sheetNames: sheetNames,
+    totalRowsIncludingHeader: totalRows,
+    tripCount: tripCount,
+    headers: headers,
+  };
+}
 
 function spreadsheetId_() {
   const fromProps = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
@@ -40,19 +69,24 @@ function doGet(e) {
   const sheet = rawSheet === 'Trips_Data' ? TRIPS_TAB : rawSheet;
   const sheetNorm = String(sheet).trim().toLowerCase();
   const tripsTabNorm = TRIPS_TAB.toLowerCase();
+  const debug =
+    e &&
+    e.parameter &&
+    (e.parameter.debug === '1' || String(e.parameter.debug).toLowerCase() === 'true');
 
   try {
     if (
       actionNorm === 'gettrips' ||
       actionNorm === 'readtrips' ||
+      actionNorm === 'listtrips' ||
       actionNorm === 'gettripinfo' ||
       sheetNorm === tripsTabNorm ||
       sheetNorm === 'trips_data'
     ) {
-      return json_(readTrips_());
+      return json_(readTrips_({ debug: debug }));
     }
     if (actionNorm === 'list' && (sheetNorm === tripsTabNorm || sheetNorm === 'trips_data')) {
-      return json_(readTrips_());
+      return json_(readTrips_({ debug: debug }));
     }
     if (action === 'seedTrips' || action === 'seedMasterTrips') {
       return json_(seedMasterTrips_());
@@ -83,50 +117,123 @@ function doGet(e) {
     return json_({
       ok: true,
       status: 'ok',
-      data: { status: 'Trip2Talk GAS running', version: '2.8', hint: 'Use ?action=getTrips to read Trip info tab' },
+      version: GAS_VERSION,
+      trips: [],
+      data: [],
+      hint: 'Use ?action=getTrips or ?action=listTrips to read the Trip info tab',
+      spreadsheetId: spreadsheetId_(),
+      tab: TRIPS_TAB,
     });
   } catch (err) {
     return json_({ status: 'error', message: String(err) });
   }
 }
 
-function readTrips_() {
-  const ss = SpreadsheetApp.openById(spreadsheetId_());
-  const sh = ss.getSheetByName(TRIPS_TAB);
+function readTrips_(options) {
+  options = options || {};
+  var debug = options.debug === true;
+  var spreadsheetId = spreadsheetId_();
+
+  Logger.log(
+    '[Trip2Talk] readTrips_ v' +
+      GAS_VERSION +
+      ' spreadsheetId=' +
+      spreadsheetId +
+      ' tab="' +
+      TRIPS_TAB +
+      '"'
+  );
+
+  var ss = ss_();
+  var sheetNames = ss.getSheets().map(function (s) {
+    return s.getName();
+  });
+  Logger.log('[Trip2Talk] available tabs: ' + sheetNames.join(', '));
+
+  var sh = ss.getSheetByName(TRIPS_TAB);
   if (!sh) {
-    throw new Error('Missing tab: ' + TRIPS_TAB);
+    var missingMsg =
+      'Missing tab: "' + TRIPS_TAB + '" (found: ' + sheetNames.join(', ') + ')';
+    Logger.log('[Trip2Talk] ERROR ' + missingMsg);
+    throw new Error(missingMsg);
   }
-  const values = sh.getDataRange().getValues();
-  if (values.length < 2) {
-    return { ok: true, status: 'ok', trips: [], data: [] };
+
+  var values = sh.getDataRange().getValues();
+  var totalRows = values.length;
+  Logger.log('[Trip2Talk] rows in "' + TRIPS_TAB + '" (incl. header): ' + totalRows);
+
+  if (totalRows < 2) {
+    Logger.log('[Trip2Talk] no data rows — header only or empty tab');
+    return {
+      ok: true,
+      status: 'ok',
+      version: GAS_VERSION,
+      trips: [],
+      data: [],
+      read: tripsReadMeta_(spreadsheetId, sheetNames, totalRows, 0, [], debug),
+    };
   }
-  const headers = values[0].map(function (h) {
+
+  var headers = values[0].map(function (h) {
     return String(h || '').trim();
   });
-  const trips = [];
+  Logger.log('[Trip2Talk] header row: ' + headers.join(' | '));
+
+  var trips = [];
   for (var r = 1; r < values.length; r++) {
-    const row = values[r];
-    if (!row.some(function (c) {
-      return String(c || '').trim() !== '';
-    })) {
+    var row = values[r];
+    if (
+      !row.some(function (c) {
+        return String(c || '').trim() !== '';
+      })
+    ) {
+      Logger.log('[Trip2Talk] skip empty row ' + (r + 1));
       continue;
     }
-    const obj = {};
+    var obj = {};
     for (var c = 0; c < headers.length; c++) {
       if (!headers[c]) continue;
       obj[headers[c]] = row[c];
     }
-    trips.push(normalizeTripRow_(obj));
+    var normalized = normalizeTripRow_(obj);
+    Logger.log(
+      '[Trip2Talk] row ' +
+        (r + 1) +
+        ' tourCode=' +
+        (normalized.tourCode || '(missing)') +
+        ' tourName=' +
+        (normalized.tourName || '')
+    );
+    if (!normalized.tourCode) {
+      Logger.log('[Trip2Talk] WARN row ' + (r + 1) + ' has no Tour Code — skipped');
+      continue;
+    }
+    trips.push(normalized);
   }
-  return { ok: true, status: 'ok', trips: trips, data: trips };
+
+  Logger.log('[Trip2Talk] parsed trip count: ' + trips.length);
+
+  return {
+    ok: true,
+    status: 'ok',
+    version: GAS_VERSION,
+    trips: trips,
+    data: trips,
+    read: tripsReadMeta_(spreadsheetId, sheetNames, totalRows, trips.length, headers, debug),
+  };
 }
 
 function doPost(e) {
   try {
     const body = e.postData && e.postData.contents ? JSON.parse(e.postData.contents) : {};
     const actionNorm = String(body.action || '').trim().toLowerCase();
-    if (actionNorm === 'gettrips' || actionNorm === 'readtrips' || actionNorm === 'gettripinfo') {
-      return json_(readTrips_());
+    if (
+      actionNorm === 'gettrips' ||
+      actionNorm === 'readtrips' ||
+      actionNorm === 'listtrips' ||
+      actionNorm === 'gettripinfo'
+    ) {
+      return json_(readTrips_({ debug: body.debug === true || body.debug === '1' }));
     }
     if (body.action === 'getBookings') {
       return json_(readBookings_());

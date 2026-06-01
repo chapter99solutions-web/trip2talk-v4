@@ -1,53 +1,82 @@
-# Trips_Data — Google Apps Script setup
+# Trip info — Google Apps Script setup
 
-The public homepage loads trips via `VITE_GAS_WEBAPP_URL` → `?action=getTrips`.
+The public homepage loads trips via `VITE_GAS_WEBAPP_URL` → `?action=getTrips` (or `?action=listTrips`).
 
-**Production web app (May 2026):**
+**Web app URL (repo default):**
 
-`https://script.google.com/macros/s/AKfycbwCrRqndZzgqnVBi28O-nJq3MT3T8tI0ZffgqIV_eEkjSLp6wR6w_dzucwoOEpl0MYV/exec`
+`https://script.google.com/macros/s/AKfycbwR0VylDEfZZUdk49p_6TQeHggQp0U7gNRexJGpFkMvxCNM3KRrw-gXz2FRWVXhA6CVvg/exec`
 
 ## Spreadsheet ID (production)
 
 | Property | Value |
 |----------|--------|
-| **SPREADSHEET_ID** | `1U1APoAcFz5zwwcqql1uVHm4CCOtll7bhCLbCELUBuP4` |
-| **Sheet URL** | https://docs.google.com/spreadsheets/d/1U1APoAcFz5zwwcqql1uVHm4CCOtll7bhCLbCELUBuP4/edit |
+| **SPREADSHEET_ID** | `1L1VUu0qvL0-G0C1z9byscU11kKcuMCM0iajNLjxH9eE` |
+| **Sheet URL** | https://docs.google.com/spreadsheets/d/1L1VUu0qvL0-G0C1z9byscU11kKcuMCM0iajNLjxH9eE/edit |
 
-This ID is the default in [`gas/Code.gs`](../gas/Code.gs). You may override it in Apps Script **Script properties** if you clone the sheet.
+This ID is the default in [`gas/Code.gs`](../gas/Code.gs). Override via Apps Script **Project settings → Script properties** → `SPREADSHEET_ID` only if you use a copy of the sheet.
+
+## Sheet tab (required)
+
+- Tab name must be exactly **`Trip info`** (case-sensitive, including the space).
+- **Not** `Trips_Data` — the code maps that legacy name to `Trip info` in query params only.
+- Row 1 = headers; row 2+ = trip data.
+- Each data row needs **`Tour Code`** (or `tourCode`).
 
 ## Owner: deploy Apps Script (manual — Google login required)
 
-1. Open [Google Apps Script](https://script.google.com) for the Trip2Talk web app project (same project as your `/exec` deployment).
-2. Replace **Code.gs** with the contents of [`gas/Code.gs`](../gas/Code.gs) from this repo (or merge the `SPREADSHEET_ID` constant + `spreadsheetId_()` logic).
-3. Optional: **Project Settings → Script properties** → add `SPREADSHEET_ID` = `1U1APoAcFz5zwwcqql1uVHm4CCOtll7bhCLbCELUBuP4` (only needed if you change the constant in code).
-4. **Deploy → Manage deployments → Edit (pencil) → New version → Deploy**  
-   - Execute as: **Me**  
+1. Open the spreadsheet → **Extensions → Apps Script** (container-bound), **or** script.google.com for the standalone web app project tied to this `/exec` URL.
+2. Replace **Code.gs** with [`gas/Code.gs`](../gas/Code.gs) from this repo (**v2.9+**).
+3. Optional: **Project settings → Script properties** → `SPREADSHEET_ID` = `1L1VUu0qvL0-G0C1z9byscU11kKcuMCM0iajNLjxH9eE`.
+4. **Deploy → Manage deployments → Edit (pencil) → New version → Deploy**
+   - Execute as: **Me**
    - Who has access: **Anyone**
-5. Confirm the `/exec` URL matches `VITE_GAS_WEBAPP_URL` in Vercel and `.env.local`.
+5. Set `VITE_GAS_WEBAPP_URL` / `GAS_WEBAPP_URL` to the **same** `/exec` URL you just deployed.
 
-## Sheet tab
+### How to tell the old stub is still live
 
-- Tab name must be exactly **`Trips_Data`** (case-sensitive).
-- Row 1 = headers; row 2+ = trip data.
-- Each data row needs **`Tour Code`** or **`tourCode`**.
-- Extended columns (v2.1): `Trip Type`, `Season`, `Max Pax`, `Highlights`, `Pickup Type`.
+| Response | Meaning |
+|----------|---------|
+| `{"ok":true,"data":[]}` only | **Old stub** — ignores `?action=getTrips`. Redeploy required. |
+| `{"ok":true,"version":"2.9","trips":[...],"data":[...]}` | **Correct** — reading Trip info. |
+| `{"ok":true,"version":"2.9","trips":[],"data":[]}` | Deployed OK but tab empty or no Tour Code column. |
+
+## Verify after deploy
+
+```text
+GET {VITE_GAS_WEBAPP_URL}?action=getTrips&debug=1
+```
+
+Expected shape (v2.9+):
+
+```json
+{
+  "ok": true,
+  "status": "ok",
+  "version": "2.9",
+  "trips": [ { "tourCode": "MEL-4D3N", "tourName": "...", ... } ],
+  "data": [ ... ],
+  "read": {
+    "spreadsheetId": "1L1VUu0qvL0-G0C1z9byscU11kKcuMCM0iajNLjxH9eE",
+    "tab": "Trip info",
+    "sheetNames": ["Trip info", "Customer_Bookings", ...],
+    "totalRowsIncludingHeader": 9,
+    "tripCount": 8,
+    "headers": ["Tour Code", "Tour Name", ...]
+  }
+}
+```
+
+View execution logs: Apps Script → **Executions** (Logger output from `readTrips_`).
 
 ## Seed all 8 master trips
-
-After deploying [`gas/Code.gs`](../gas/Code.gs) v2.1+:
 
 ```text
 GET {VITE_GAS_WEBAPP_URL}?action=seedMasterTrips
 ```
 
-Or from this repo (with `VITE_GAS_WEBAPP_URL` in `.env.local`):
+Or: `npm run seed:trips`
 
-```bash
-npm run seed:trips
-```
-
-Master trip codes: `MEL-4D3N`, `ULU-4D3N`, `NZ-6D5N`, `TAS-3D2N`, `TAS-LH-4D3N`, `KIA-1DAY`, `CAN-2D1N`, `SYD-1DAY`.
-Source of truth in app: [`src/lib/masterTrips.ts`](../src/lib/masterTrips.ts).
+Master tour codes: `MEL-4D3N`, `ULU-4D3N`, `NZ-6D5N`, `TAS-3D2N`, `TAS-LH-4D3N`, `KIA-1DAY`, `CAN-2D1N`, `SYD-1DAY`.
 
 ## Customer_Bookings (portal login)
 
@@ -55,38 +84,4 @@ Source of truth in app: [`src/lib/masterTrips.ts`](../src/lib/masterTrips.ts).
 GET {VITE_GAS_WEBAPP_URL}?action=getBookings
 ```
 
-Expected:
-
-```json
-{"status":"ok","bookings":[{"bookingId":"BK-001","customerName":"Saen Test","tourCode":"SYD-1DAY", ...}],"data":[...]}
-```
-
-Seed three test bookings (after deploy v2.3+):
-
-```text
-GET {VITE_GAS_WEBAPP_URL}?action=seedTestBookings
-```
-
-Or: `npm run seed:booking`
-
-Test IDs: **BK-001** (KIA-1DAY), **BK-002** (CAN-2D1N), **BK-003** (NZ-6D5N).
-
-Portal fallback (offline GAS): [`src/lib/mockBookings.ts`](../src/lib/mockBookings.ts).
-
-## Verify after deploy
-
-```text
-GET {VITE_GAS_WEBAPP_URL}?action=getTrips
-```
-
-Expected:
-
-```json
-{"status":"ok","trips":[{"tourCode":"SYD-1DAY", ...}]}
-```
-
-If you still see `YOUR_SPREADSHEET_ID` in the error, the live deployment was not updated — repeat step 4 (new version).
-
-## Vercel
-
-`VITE_GAS_WEBAPP_URL` is baked at build time. After changing it, run a new production deploy.
+Seed test bookings: `?action=seedTestBookings` or `npm run seed:booking`.
