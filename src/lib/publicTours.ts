@@ -1,4 +1,5 @@
 import { findTourFallbackByCode } from '../data/tours';
+import { isRealTourCode } from './realTourCodes';
 import { Tour } from '../types/tour';
 import { PORTFOLIO_TOURS, PortfolioTour } from './portfolioTours';
 
@@ -19,38 +20,6 @@ function portfolioToTour(p: PortfolioTour): Tour {
   };
 }
 
-/** Demo trips for public pages until Supabase seed is wired. */
-export const DEMO_TRIPS: Tour[] = [
-  {
-    id: 'nz-aut-2026',
-    trip_code: 'NZ-AUT-2026',
-    destination: 'New Zealand',
-    start_date: '2026-06-15',
-    end_date: '2026-06-22',
-    price_aud: 1850,
-    max_pax: 6,
-    current_pax: 4,
-    status: 'CONFIRMED',
-    base_commission_rate: 50,
-    bonus_threshold_pax: 5,
-    bonus_amount_aud: 200,
-  },
-  {
-    id: 'gc-surf-2026',
-    trip_code: 'GC-SURF-2026',
-    destination: 'Gold Coast',
-    start_date: '2026-07-01',
-    end_date: '2026-07-05',
-    price_aud: 890,
-    max_pax: 6,
-    current_pax: 3,
-    status: 'CONFIRMED',
-    base_commission_rate: 40,
-    bonus_threshold_pax: 5,
-    bonus_amount_aud: 150,
-  },
-];
-
 function fallbackToTour(code: string): Tour {
   const fb = findTourFallbackByCode(code)!;
   return {
@@ -70,10 +39,7 @@ function fallbackToTour(code: string): Tour {
 }
 
 export function findTripById(id: string): Tour | undefined {
-  const fromDemo = DEMO_TRIPS.find(
-    (t) => t.id === id || t.trip_code.toLowerCase() === id.toLowerCase()
-  );
-  if (fromDemo) return fromDemo;
+  if (!isRealTourCode(id)) return undefined;
   const p = PORTFOLIO_TOURS.find((t) => t.id === id || t.tripCode.toLowerCase() === id.toLowerCase());
   if (p) return portfolioToTour(p);
   const fb = findTourFallbackByCode(id);
@@ -81,7 +47,5 @@ export function findTripById(id: string): Tour | undefined {
 }
 
 export function findTripByRef(ref: string): Tour | undefined {
-  return DEMO_TRIPS.find(
-    (t) => t.trip_code.toLowerCase() === ref.toLowerCase() || t.id === ref.toLowerCase()
-  );
+  return findTripById(ref);
 }

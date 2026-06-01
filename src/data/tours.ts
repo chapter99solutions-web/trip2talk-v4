@@ -1,4 +1,5 @@
 import { MASTER_TRIP_SEEDS } from '../lib/masterTrips';
+import { isRealTourCode } from '../lib/realTourCodes';
 import {
   PORTFOLIO_PUBLIC_BASE,
   TAS_3D2N_COVER_URL,
@@ -306,8 +307,8 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
   },
   {
     tourCode: 'TAS-3D2N',
-    anonymizedTitle: 'The Aurora Edge',
-    tourName: 'The Aurora Edge (3D2N)',
+    anonymizedTitle: 'Tasmania Hobart (3D2N)',
+    tourName: 'Tasmania Mini Aurora Hunt (3D2N)',
     nameTh:
       'ทริปพร้อมช่างภาพ สัมผัสประวัติศาสตร์ ศิลปะ และตามล่าแสงใต้เมือง Hobart (Tasmania Mini Aurora Hunt)',
     location: 'AU · AUSTRALIA · TASMANIA',
@@ -362,7 +363,7 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
   },
   {
     tourCode: 'TAS-LH-4D3N',
-    anonymizedTitle: 'Lavender & Aurora Trail',
+    anonymizedTitle: 'Tasmania Launceston – Hobart (4D3N)',
     tourName: 'Tasmania Summer: Launceston – Hobart (4D3N)',
     nameTh:
       'ทริปพร้อมช่างภาพ สัมผัสประวัติศาสตร์ ศิลปะ และตามล่าแสงใต้ (Tasmania Summer: Launceston - Hobart)',
@@ -592,7 +593,7 @@ export function tourFallbackToSheetRow(fallback: TourFallback): TripSheetRow {
 
   return {
     tourCode: fallback.tourCode,
-    tourName: fallback.anonymizedTitle,
+    tourName: (fallback.tourName ?? fallback.anonymizedTitle).trim(),
     countryTag: master?.countryTag ?? 'AU',
     weather: master?.weather ?? '',
     messengerUrl: 'https://m.me/trip2talk.chapter99',
@@ -638,7 +639,7 @@ export function mergeTripsWithFallback(sheetRows: TripSheetRow[]): TripSheetRow[
     byCode.set(row.tourCode.toUpperCase(), row);
   }
   for (const row of sheetRows) {
-    if (row.tourCode?.trim()) {
+    if (isRealTourCode(row.tourCode)) {
       byCode.set(row.tourCode.trim().toUpperCase(), row);
     }
   }

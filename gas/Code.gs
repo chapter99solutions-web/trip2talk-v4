@@ -929,7 +929,7 @@ function masterTripsSeed_() {
     },
     {
       tourCode: 'TAS-3D2N',
-      tourName: 'The Aurora Edge (3D2N)',
+      tourName: 'Tasmania Mini Aurora Hunt (3D2N)',
       countryTag: 'AU-TAS',
       weather: 'Winter 6-12°C',
       standardPrice: 1350,
@@ -945,7 +945,7 @@ function masterTripsSeed_() {
     },
     {
       tourCode: 'TAS-LH-4D3N',
-      tourName: 'Lavender & Aurora Trail (4D3N)',
+      tourName: 'Tasmania Summer: Launceston – Hobart (4D3N)',
       countryTag: 'AU-TAS',
       weather: 'Summer 16-22°C',
       standardPrice: 1650,

@@ -1,4 +1,5 @@
 import { MOCK_CUSTOMER_BOOKINGS } from './mockBookings';
+import { isRealTourCode } from './realTourCodes';
 import { forwardSheetPayload } from './syncPipeline';
 import type { TripSeason, TripType } from './masterTrips';
 
@@ -332,7 +333,7 @@ function normalizeTripRow(raw: unknown): TripSheetRow | null {
 
   const tourCode =
     asString(r.tourCode || r.tour_code || r.tripCode || r.trip_code || r['Tour Code'] || r['tour_code']).trim();
-  if (!tourCode) return null;
+  if (!tourCode || !isRealTourCode(tourCode)) return null;
 
   const spotsRaw = (r.spots ?? r.Spots ?? []) as unknown;
   const spotsArr = Array.isArray(spotsRaw) ? spotsRaw : [];
@@ -701,7 +702,9 @@ async function fetchTripsFromSheetUncached(): Promise<TripSheetRow[]> {
       }
 
       const rows = extractTrips(json);
-      const normalized = rows.map(normalizeTripRow).filter((x): x is TripSheetRow => Boolean(x));
+      const normalized = rows
+        .map(normalizeTripRow)
+        .filter((x): x is TripSheetRow => x != null && isRealTourCode(x.tourCode));
       if (normalized.length > 0) return normalized;
 
       throw new Error('No trip rows in response');
