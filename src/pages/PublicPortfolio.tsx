@@ -10,6 +10,7 @@ import PortfolioGallery from '../components/public/PortfolioGallery';
 import LanguageToggle from '../components/i18n/LanguageToggle';
 import { usePublicStrings } from '../lib/publicI18n';
 import { filterTripsByCategory, TripFilterId } from '../lib/tripFilters';
+import SeasonPrepSection from '../components/public/SeasonPrepSection';
 import HeroSlideshowBackground from '../components/public/HeroSlideshowBackground';
 import TargetAudienceSection from '../components/public/TargetAudienceSection';
 import TourCard from '../components/public/TourCard';
@@ -50,10 +51,9 @@ const FEATURES = [
 
 const TRIP_FILTERS: { id: TripFilterId; labelKey: keyof ReturnType<typeof usePublicStrings> }[] = [
   { id: 'all', labelKey: 'filter_all' },
-  { id: 'portrait', labelKey: 'filter_portrait_trip' },
-  { id: 'landscape', labelKey: 'filter_landscape_trip' },
+  { id: 'one_day', labelKey: 'filter_one_day' },
   { id: 'overnight', labelKey: 'filter_overnight' },
-  { id: 'wedding', labelKey: 'filter_wedding' },
+  { id: 'by_season', labelKey: 'filter_by_season' },
 ];
 
 export default function PublicPortfolio() {
@@ -101,6 +101,8 @@ export default function PublicPortfolio() {
       return fb - fa;
     });
   }, [trips, tripFilter]);
+
+  const showSeasonPrep = tripFilter === 'by_season';
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans antialiased pb-20">
       {/* Sticky nav */}
@@ -243,6 +245,8 @@ export default function PublicPortfolio() {
             <p className="text-slate-700 font-semibold">No trips available right now.</p>
             <p className="text-sm text-slate-500 mt-2">Please check again soon.</p>
           </div>
+        ) : showSeasonPrep ? (
+          <SeasonPrepSection />
         ) : filteredTrips.length === 0 ? (
           <div className="max-w-xl mx-auto text-center py-12">
             <p className="text-slate-700 font-semibold">No trips match this filter.</p>
