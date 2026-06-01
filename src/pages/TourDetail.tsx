@@ -10,6 +10,7 @@ import { fetchTripByCodeFromSheet, TripSheetRow } from '../lib/tripsSheetApi';
 import { getPublicTripDisplay } from '../lib/publicTripDisplay';
 import { fetchTripAvailability, type TripAvailability } from '../lib/customerJourney';
 import { hasDepartureDate } from '../lib/tripDisplay';
+import HobartTripSlideshow from '../components/gallery/HobartTripSlideshow';
 
 const FALLBACK_HERO =
   'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1600&q=80';
@@ -339,6 +340,7 @@ export default function TourDetail() {
 
   const galleryPhotos = photos.length ? photos : hardcodedPhotos ?? [heroImage];
   const heroParallax = Math.min(scrollY * 0.4, 80);
+  const isHobartGallery = staticFallback?.galleryFolder === 'Tasmania 02/Hobart';
 
   const toggleSave = () => {
     try {
@@ -535,44 +537,50 @@ export default function TourDetail() {
         </div>
 
         <div className="relative">
-          <div
-            ref={galleryRef}
-            onScroll={handleGalleryScroll}
-            onMouseEnter={() => setGalleryPaused(true)}
-            onMouseLeave={() => setGalleryPaused(false)}
-            onTouchStart={() => setGalleryPaused(true)}
-            className="flex gap-4 overflow-x-auto px-5 sm:px-8 pb-4 scrollbar-none"
-            style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}
-          >
-            {galleryPhotos.map((src, idx) => {
-              const isActive = idx === activeSlide;
-              return (
-                <div
-                  key={`${src}-${idx}`}
-                  ref={(el) => (slideRefs.current[idx] = el)}
-                  className="relative flex-shrink-0 w-[80vw] max-w-[680px] h-[60vh] max-h-[520px] rounded-2xl overflow-hidden shadow-xl shadow-black/10"
-                  style={{ scrollSnapAlign: 'center' }}
-                >
-                  <img
-                    src={src}
-                    alt=""
-                    loading={idx < 2 ? 'eager' : 'lazy'}
-                    className="absolute inset-0 w-full h-full object-cover transition-transform ease-out"
-                    style={{
-                      transform: isActive ? 'scale(1.12)' : 'scale(1)',
-                      transitionDuration: '5000ms',
-                    }}
-                  />
-                  {isActive && (
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          {isHobartGallery ? (
+            <div className="max-w-3xl mx-auto px-5 sm:px-8">
+              <HobartTripSlideshow images={galleryPhotos} />
+            </div>
+          ) : (
+            <div
+              ref={galleryRef}
+              onScroll={handleGalleryScroll}
+              onMouseEnter={() => setGalleryPaused(true)}
+              onMouseLeave={() => setGalleryPaused(false)}
+              onTouchStart={() => setGalleryPaused(true)}
+              className="flex gap-4 overflow-x-auto px-5 sm:px-8 pb-4 scrollbar-none"
+              style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}
+            >
+              {galleryPhotos.map((src, idx) => {
+                const isActive = idx === activeSlide;
+                return (
+                  <div
+                    key={`${src}-${idx}`}
+                    ref={(el) => (slideRefs.current[idx] = el)}
+                    className="relative flex-shrink-0 w-[80vw] max-w-[680px] h-[60vh] max-h-[520px] rounded-2xl overflow-hidden shadow-xl shadow-black/10"
+                    style={{ scrollSnapAlign: 'center' }}
+                  >
+                    <img
+                      src={src}
+                      alt=""
+                      loading={idx < 2 ? 'eager' : 'lazy'}
+                      className="absolute inset-0 w-full h-full object-cover transition-transform ease-out"
+                      style={{
+                        transform: isActive ? 'scale(1.12)' : 'scale(1)',
+                        transitionDuration: '5000ms',
+                      }}
+                    />
+                    {isActive && (
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Slide counter */}
-          {galleryPhotos.length > 1 && (
+          {!isHobartGallery && galleryPhotos.length > 1 && (
             <div className="max-w-3xl mx-auto px-5 sm:px-8 -mt-1">
               <div className="flex justify-end">
                 <span className="px-3 py-1 rounded-full bg-slate-900/85 text-white text-xs font-semibold tracking-wide">
