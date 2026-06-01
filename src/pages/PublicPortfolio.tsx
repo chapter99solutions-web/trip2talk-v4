@@ -197,8 +197,6 @@ export default function PublicPortfolio() {
         </div>
       </section>
 
-      <TargetAudienceSection />
-
       <PortfolioGallery title={t.portfolio_gallery} />
 
       {/* Trips */}
@@ -268,6 +266,8 @@ export default function PublicPortfolio() {
           </div>
         )}
       </section>
+
+      <TargetAudienceSection />
 
       {/* Features */}
       <section className="bg-slate-50 border-y border-slate-100 py-20">
