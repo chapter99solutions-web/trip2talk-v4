@@ -79,6 +79,18 @@ function isBirthdayOnTrip(dob: string, tripDateIso: string): boolean {
   return d.getUTCMonth() === t.getUTCMonth() && d.getUTCDate() === t.getUTCDate();
 }
 
+function isTodayIso(dateStr: string): boolean {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  if (!Number.isFinite(d.getTime())) return false;
+  const today = new Date();
+  return (
+    d.getFullYear() === today.getFullYear() &&
+    d.getMonth() === today.getMonth() &&
+    d.getDate() === today.getDate()
+  );
+}
+
 function printableHtml(title: string, rows: IntakeBooking[]) {
   const escape = (s: string) =>
     (s || '')
@@ -303,6 +315,21 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
     return rows;
   }, [bookings, assignedTourCode, assignedTripDate]);
 
+  const todaysTrips = useMemo(() => {
+    const todayRows = bookings.filter((b) => isTodayIso(b.tourDate));
+    const groups = new Map<string, IntakeBooking[]>();
+    for (const b of todayRows) {
+      const key = `${b.tourCode}|${(b.tourDate || '').slice(0, 10)}`;
+      const list = groups.get(key) ?? [];
+      list.push(b);
+      groups.set(key, list);
+    }
+    return Array.from(groups.entries()).map(([key, clients]) => {
+      const [tourCode, date] = key.split('|');
+      return { tourCode, date, clients };
+    });
+  }, [bookings]);
+
   const critical = useMemo(() => {
     return scoped.filter((b) => Boolean(b.medicalCondition.trim()) || isSeafoodAllergy(b.dietaryReq));
   }, [scoped]);
@@ -385,6 +412,73 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
             {staffToast.msg}
           </div>
         )}
+
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold tracking-wide" style={{ color: GOLD }}>
+            {lang === 'TH' ? 'ทริปวันนี้ + โน้ตสุขภาพลูกค้า' : "Today's trips + client health notes"}
+          </h2>
+          {todaysTrips.length === 0 ? (
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70">
+              {lang === 'TH' ? 'ไม่มีทริปที่ออกเดินทางวันนี้' : 'No departures scheduled for today'}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {todaysTrips.map((trip) => (
+                <div key={`${trip.tourCode}-${trip.date}`} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <p className="font-semibold text-white">
+                    {trip.tourCode}{' '}
+                    <span className="text-xs font-mono text-white/50">{trip.date}</span>
+                  </p>
+                  <ul className="mt-3 space-y-2">
+                    {trip.clients.map((b) => {
+                      const healthNotes = [
+                        b.medicalCondition.trim() ? `Medical: ${b.medicalCondition}` : null,
+                        b.dietaryReq.trim() ? `Dietary: ${b.dietaryReq}` : null,
+                        b.motionSickness.trim() ? `Motion: ${b.motionSickness}` : null,
+                      ].filter(Boolean);
+                      return (
+                        <li key={b.bookingId} className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm">
+                          <p className="font-semibold text-white/90">
+                            {b.fullNamePassport || b.customerName}{' '}
+                            <span className="text-xs font-mono text-white/50">({b.bookingId})</span>
+                          </p>
+                          {healthNotes.length > 0 ? (
+                            <ul className="mt-1 text-white/75 text-xs space-y-0.5">
+                              {healthNotes.map((note) => (
+                                <li key={note}>{note}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="mt-1 text-xs text-emerald-200/90">
+                              {lang === 'TH' ? 'ไม่มีโน้ตสุขภาพพิเศษ' : 'No special health notes'}
+                            </p>
+                          )}
+                          <button
+                            type="button"
+                            disabled={checkedIn.has(b.bookingId) || checkingId === b.bookingId}
+                            onClick={() => void handleCheckIn(b)}
+                            className="mt-2 px-3 py-1.5 rounded-full text-xs font-semibold border disabled:opacity-50"
+                            style={{ borderColor: TEAL, color: NAVY, background: checkedIn.has(b.bookingId) ? 'rgba(77,216,160,0.35)' : TEAL }}
+                          >
+                            {checkedIn.has(b.bookingId)
+                              ? lang === 'TH'
+                                ? 'เช็คอินแล้ว'
+                                : 'Checked in'
+                              : checkingId === b.bookingId
+                                ? '…'
+                                : lang === 'TH'
+                                  ? 'เช็คอิน'
+                                  : 'Check-in'}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         {/* Quick expense drop */}
         <section className="space-y-3">

@@ -479,6 +479,8 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
     return total;
   }, [bookings, now]);
 
+  const monthExpenses = useMemo(() => Math.max(0, monthRevenue - monthNetMargin), [monthRevenue, monthNetMargin]);
+
   const pendingIntakesCount = useMemo(() => {
     return bookings.filter((b) => (b.intakeStatus || '').trim() === 'Pending').length;
   }, [bookings]);
@@ -732,11 +734,18 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
               ))}
             </div>
           ) : (
+            <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 <p className="text-xs text-white/60">{lang === 'TH' ? 'รายได้เดือนนี้' : 'Revenue this month'}</p>
                 <p className="text-2xl font-semibold mt-1" style={{ color: TEAL }}>
                   {formatAud(monthRevenue)}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs text-white/60">{lang === 'TH' ? 'ค่าใช้จ่ายเดือนนี้ (ประมาณ)' : 'Expenses this month (est.)'}</p>
+                <p className="text-2xl font-semibold mt-1 text-red-300">
+                  {formatAud(monthExpenses)}
                 </p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -749,11 +758,14 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
                 <p className="text-xs text-white/60">{lang === 'TH' ? 'จำนวนการจองเดือนนี้' : 'Total bookings this month'}</p>
                 <p className="text-2xl font-semibold mt-1">{monthBookingsCount}</p>
               </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 <p className="text-xs text-white/60">{lang === 'TH' ? 'ค้างกรอกอินเทค' : 'Pending intakes'}</p>
                 <p className="text-2xl font-semibold mt-1">{pendingIntakesCount}</p>
               </div>
             </div>
+            </>
           )}
 
           {error && <p className="text-sm text-red-200">{error}</p>}

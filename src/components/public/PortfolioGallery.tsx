@@ -1,34 +1,25 @@
 import { useState } from 'react';
-import { useI18n } from '../../lib/i18n';
-import { SEASON_PREP_CARDS } from '../../lib/seasonPrepGuide';
+import { usePublicStrings } from '../../lib/publicI18n';
 import PortraitGalleryGrid from './PortraitGalleryGrid';
 import LandscapeGalleryGrid from './LandscapeGalleryGrid';
-import SeasonVideoHero from './SeasonVideoHero';
-import SeasonPrepInfoCard from './SeasonPrepInfoCard';
+import FashionGalleryGrid from './FashionGalleryGrid';
 
-type GalleryTab = 'portrait' | 'landscape' | 'season';
-type SeasonTab = 'autumn' | 'winter' | 'spring' | 'summer';
+type GalleryTab = 'portrait' | 'landscape' | 'fashion';
 
-const STYLE_TABS: { id: GalleryTab; label: string }[] = [
-  { id: 'portrait', label: 'Portrait' },
-  { id: 'landscape', label: 'Landscape' },
-  { id: 'season', label: 'By Season' },
-];
-
-const SEASON_TABS: { id: SeasonTab; label: string; emoji: string }[] = [
-  { id: 'autumn', label: 'Autumn', emoji: '🍂' },
-  { id: 'winter', label: 'Winter', emoji: '❄️' },
-  { id: 'spring', label: 'Spring', emoji: '🌸' },
-  { id: 'summer', label: 'Summer', emoji: '☀️' },
+const STYLE_TABS: { id: GalleryTab; labelKey: 'Portrait' | 'Landscape' | 'gallery_fashion' }[] = [
+  { id: 'portrait', labelKey: 'Portrait' },
+  { id: 'landscape', labelKey: 'Landscape' },
+  { id: 'fashion', labelKey: 'gallery_fashion' },
 ];
 
 export default function PortfolioGallery({ title }: { title: string }) {
-  const { lang } = useI18n();
-  const isTh = lang === 'TH';
+  const t = usePublicStrings();
   const [tab, setTab] = useState<GalleryTab>('portrait');
-  const [seasonTab, setSeasonTab] = useState<SeasonTab>('autumn');
 
-  const activeSeason = SEASON_PREP_CARDS.find((c) => c.id === seasonTab);
+  const tabLabel = (id: GalleryTab, labelKey: (typeof STYLE_TABS)[number]['labelKey']) => {
+    if (labelKey === 'gallery_fashion') return t.gallery_fashion;
+    return labelKey;
+  };
 
   return (
     <section id="portfolio" className="max-w-6xl mx-auto px-4 py-14 border-t border-slate-100">
@@ -38,47 +29,26 @@ export default function PortfolioGallery({ title }: { title: string }) {
       </div>
 
       <div className="flex flex-wrap justify-center gap-2 mb-4">
-        {STYLE_TABS.map((t) => (
+        {STYLE_TABS.map((st) => (
           <button
-            key={t.id}
+            key={st.id}
             type="button"
-            onClick={() => setTab(t.id)}
+            onClick={() => setTab(st.id)}
             className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
-              tab === t.id ? 'bg-neutral-950 text-white' : 'bg-slate-100 text-slate-700 border border-slate-200'
+              tab === st.id ? 'bg-neutral-950 text-white' : 'bg-slate-100 text-slate-700 border border-slate-200'
             }`}
           >
-            {t.id === 'season' ? (isTh ? 'เตรียมตัวตามฤดู' : 'By Season') : t.label}
+            {tabLabel(st.id, st.labelKey)}
           </button>
         ))}
       </div>
-
-      {tab === 'season' && <SeasonVideoHero />}
-
-      {tab === 'season' && (
-        <div className="flex flex-wrap justify-center gap-2 mb-6">
-          {SEASON_TABS.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setSeasonTab(s.id)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-                seasonTab === s.id
-                  ? 'bg-emerald-700 text-white'
-                  : 'bg-white text-slate-600 border border-slate-200'
-              }`}
-            >
-              {s.emoji} {s.label}
-            </button>
-          ))}
-        </div>
-      )}
 
       {tab === 'portrait' ? (
         <PortraitGalleryGrid />
       ) : tab === 'landscape' ? (
         <LandscapeGalleryGrid />
       ) : (
-        <>{activeSeason ? <SeasonPrepInfoCard card={activeSeason} /> : null}</>
+        <FashionGalleryGrid />
       )}
     </section>
   );

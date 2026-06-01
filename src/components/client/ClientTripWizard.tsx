@@ -8,6 +8,7 @@ import { runPhase3Prepare } from '../../lib/customerJourney';
 import { saveWaiverLocally } from '../../lib/waiverDb';
 import { toStoredWaiver } from '../../lib/waiverApi';
 import SignaturePad, { SignaturePadHandle } from '../waiver/SignaturePad';
+import { generateBookingRef } from '../../lib/bookingRef';
 
 type Step = 1 | 2 | 3 | 4 | 5;
 type VisaType = 'student' | 'other';
@@ -24,11 +25,6 @@ interface ClientTripWizardProps {
     hotel_name?: string | null;
     preferred_pickup?: string | null;
   } | null;
-}
-
-function generateBookingRef(): string {
-  const n = Math.floor(1000 + Math.random() * 9000);
-  return `BK-T2T-${n}`;
 }
 
 export default function ClientTripWizard({ trip, tripRef, booking }: ClientTripWizardProps) {

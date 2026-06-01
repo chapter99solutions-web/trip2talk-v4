@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import WeatherPill from '../components/shared/WeatherPill';
 import PhotoDeliveryTracker from '../components/shared/PhotoDeliveryTracker';
+import ClientVIPWaiverPanel from '../components/client/ClientVIPWaiverPanel';
 import LanguageToggle from '../components/i18n/LanguageToggle';
 import { pickupShortLabel } from '../lib/pickup-options';
 import { fetchAlbumByBookingRef, type AlbumStatus } from '../lib/albumDelivery';
@@ -129,6 +130,7 @@ export default function ClientVIPHubPage() {
   const [liveWeather, setLiveWeather] = useState<{ tempC: number; condition: 'sunny' | 'cloudy' | 'rainy'; city: string } | null>(
     null
   );
+  const [waiverDone, setWaiverDone] = useState(false);
 
   const messengerUrl =
     trip?.messengerUrl?.trim() || 'https://m.me/trip2talk.chapter99';
@@ -344,6 +346,15 @@ export default function ClientVIPHubPage() {
                 </div>
               </div>
             </SoftCard>
+
+            {!waiverDone && booking && (
+              <ClientVIPWaiverPanel
+                bookingId={booking.bookingId}
+                customerName={booking.customerName}
+                tourCode={booking.tourCode}
+                onComplete={() => setWaiverDone(true)}
+              />
+            )}
 
             {(trip?.durationDays ?? 1) > 1 && (trip?.itinerary?.length ?? 0) > 0 && (
               <>

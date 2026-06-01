@@ -10,8 +10,8 @@ import PortfolioGallery from '../components/public/PortfolioGallery';
 import LanguageToggle from '../components/i18n/LanguageToggle';
 import { usePublicStrings } from '../lib/publicI18n';
 import { filterTripsByCategory, TripFilterId } from '../lib/tripFilters';
-import SeasonPrepSection from '../components/public/SeasonPrepSection';
 import HeroSlideshowBackground from '../components/public/HeroSlideshowBackground';
+import TargetAudienceSection from '../components/public/TargetAudienceSection';
 import TourCard from '../components/public/TourCard';
 import { useSavedTrips } from '../hooks/useSavedTrips';
 
@@ -50,9 +50,10 @@ const FEATURES = [
 
 const TRIP_FILTERS: { id: TripFilterId; labelKey: keyof ReturnType<typeof usePublicStrings> }[] = [
   { id: 'all', labelKey: 'filter_all' },
-  { id: 'one_day', labelKey: 'filter_one_day' },
+  { id: 'portrait', labelKey: 'filter_portrait_trip' },
+  { id: 'landscape', labelKey: 'filter_landscape_trip' },
   { id: 'overnight', labelKey: 'filter_overnight' },
-  { id: 'by_season', labelKey: 'filter_by_season' },
+  { id: 'wedding', labelKey: 'filter_wedding' },
 ];
 
 export default function PublicPortfolio() {
@@ -100,8 +101,6 @@ export default function PublicPortfolio() {
       return fb - fa;
     });
   }, [trips, tripFilter]);
-  const showSeasonPrep = tripFilter === 'by_season';
-
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans antialiased pb-20">
       {/* Sticky nav */}
@@ -154,17 +153,16 @@ export default function PublicPortfolio() {
             </span>
             <span className="text-emerald-300 italic font-medium">Now booking Summer 2025</span>
           </p>
-          <h1 className="font-serif text-4xl md:text-6xl lg:text-7xl font-semibold leading-tight tracking-tight">
-            Capture the World,
-            <br />
-            <span className="text-emerald-300 italic font-medium">One Journey</span>
+          <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold leading-snug tracking-tight max-w-3xl mx-auto">
+            ทริปถ่ายภาพ premium สำหรับครอบครัวไทยในออสเตรเลีย — guide ภาษาไทย ภาพสวยกลับบ้าน
           </h1>
-          <div className="mt-6 max-w-xl mx-auto text-center">
-            <p className="font-light text-lg text-white">
-              Small group. Real light. Photos you'll actually keep.
+          <div className="mt-5 max-w-2xl mx-auto text-center space-y-3">
+            <p className="font-light text-base md:text-lg text-emerald-100/95 leading-relaxed">
+              พ่อแม่บินมาจากไทย? พาเที่ยวออสอย่างมั่นใจ มี guide ภาษาไทยดูแลตลอดทริป กลับบ้านพร้อมรูประดับ
+              professional
             </p>
-            <p className="font-light text-base text-gray-300 mt-2">
-              ออกทริป · เก็บแสง · กลับมาพร้อมรูประดับ Premium
+            <p className="font-light text-lg text-white">
+              Small group. Real light. Photos you&apos;ll actually keep.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
@@ -183,6 +181,9 @@ export default function PublicPortfolio() {
               {t.read_reviews}
             </button>
           </div>
+          <p className="mt-6 text-xs md:text-sm text-white/75 max-w-2xl mx-auto leading-relaxed">
+            ช่างภาพ professional 10+ ปี · คนไทยในออสที่รู้จักทุกมุมแสง · กลุ่มสูงสุด 8 คน
+          </p>
           <div className="mt-12 grid grid-cols-3 gap-6 max-w-lg mx-auto border-t border-white/20 pt-8">
             {STATS.map((s) => (
               <div key={s.label}>
@@ -193,6 +194,8 @@ export default function PublicPortfolio() {
           </div>
         </div>
       </section>
+
+      <TargetAudienceSection />
 
       <PortfolioGallery title={t.portfolio_gallery} />
 
@@ -240,8 +243,6 @@ export default function PublicPortfolio() {
             <p className="text-slate-700 font-semibold">No trips available right now.</p>
             <p className="text-sm text-slate-500 mt-2">Please check again soon.</p>
           </div>
-        ) : showSeasonPrep ? (
-          <SeasonPrepSection />
         ) : filteredTrips.length === 0 ? (
           <div className="max-w-xl mx-auto text-center py-12">
             <p className="text-slate-700 font-semibold">No trips match this filter.</p>

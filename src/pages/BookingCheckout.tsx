@@ -140,6 +140,16 @@ export default function BookingCheckout() {
     };
   }, [tripCodeForLookup]);
 
+  // If the currently-selected pickup is not valid for the active tour type
+  // (e.g. tour code changed, or stale state), reset to the first option so the
+  // form never submits a stale/invalid value.
+  useEffect(() => {
+    const values = pickupConfig.options.map((o) => o.value);
+    if (!values.includes(pickupLocation)) {
+      setPickupLocation(pickupConfig.options[0]?.value ?? '');
+    }
+  }, [pickupConfig, pickupLocation]);
+
   if (!trip) {
     return (
       <div className="max-w-lg mx-auto px-4 py-16 text-center text-red-600">
@@ -154,16 +164,6 @@ export default function BookingCheckout() {
   const portfolio = PORTFOLIO_TOURS.find((t) => t.id === trip.id);
   const isSharedGroup = pkg === 'STANDARD';
   const blockedByBuffer = shouldBlockSharedLowPaxNearDate(isSharedGroup, partyPax, selectedDate);
-
-  // If the currently-selected pickup is not valid for the active tour type
-  // (e.g. tour code changed, or stale state), reset to the first option so the
-  // form never submits a stale/invalid value.
-  useEffect(() => {
-    const values = pickupConfig.options.map((o) => o.value);
-    if (!values.includes(pickupLocation)) {
-      setPickupLocation(pickupConfig.options[0]?.value ?? '');
-    }
-  }, [pickupConfig, pickupLocation]);
 
   const tourPhoto =
     portfolio?.image ??
@@ -240,11 +240,33 @@ export default function BookingCheckout() {
     (visaType !== 'student' || oshc.trim());
 
   const handleConfirm = async () => {
+    console.log('[Trip2Talk] handleConfirm fired', {
+      termsAccepted,
+      quoteValid: quote?.valid,
+      canProceedStep3,
+      blockedByBuffer,
+      gateBlocked,
+    });
+
     if (submitting) return;
-    if (!termsAccepted) return;
-    if (!quote?.valid) return;
-    if (!canProceedStep3) return;
-    if (blockedByBuffer) return;
+    if (!termsAccepted) {
+      setSubmitError('กรุณายอมรับเงื่อนไขการใช้บริการก่อนยืนยันการจอง');
+      return;
+    }
+    if (!quote?.valid) {
+      setSubmitError('จำนวนผู้เดินทางไม่ถูกต้อง — กรุณากลับไปเลือกจำนวนคนใหม่');
+      return;
+    }
+    if (!canProceedStep3) {
+      setSubmitError('กรุณากรอกข้อมูลให้ครบ (ชื่อ, เบอร์, อีเมล, OSHC สำหรับวีซ่านักเรียน)');
+      return;
+    }
+    if (blockedByBuffer) {
+      setSubmitError(
+        'ทริปนี้ยังไม่ถึงจำนวนขั้นต่ำ และใกล้วันเดินทางเกินไป — กรุณาอัปเกรดเป็น Private Luxury Trip'
+      );
+      return;
+    }
 
     const validPickupValues = pickupConfig.options.map((o) => o.value);
     if (!validPickupValues.includes(pickupLocation)) {
@@ -258,7 +280,7 @@ export default function BookingCheckout() {
     const reference_number = generateBookingRef();
 
     try {
-      const { warnings } = await runPhase2Book({
+      const { bookingId, warnings } = await runPhase2Book({
         tourId: trip.id,
         tripCode: trip.trip_code,
         fullName,
@@ -274,6 +296,13 @@ export default function BookingCheckout() {
 
       if (warnings.length > 0) {
         console.warn('[Trip2Talk] Phase 2 (book) warnings:', warnings);
+      }
+
+      if (!bookingId) {
+        const detail = warnings.length > 0 ? warnings.join('; ') : 'Booking was not saved to the database';
+        setSubmitError(detail);
+        console.error('[Trip2Talk] Phase 2 (book) completed without bookingId:', warnings);
+        return;
       }
 
       setBookingRef(reference_number);
@@ -304,7 +333,6 @@ export default function BookingCheckout() {
       const msg = err instanceof Error ? err.message : 'Booking failed';
       setSubmitError(msg);
       console.error('[Trip2Talk] Phase 2 (book) failed:', err);
-      setBookingRef(reference_number);
     } finally {
       setSubmitting(false);
     }

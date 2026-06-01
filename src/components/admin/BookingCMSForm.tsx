@@ -5,14 +5,14 @@ import {
   type PendingIntakeRow,
 } from '../../lib/tripsSheetApi';
 import { portalLinkForBooking } from '../../lib/siteUrl';
+import { generateBookingRef } from '../../lib/bookingRef';
 
 type Props = {
   tourCodes: string[];
 };
 
 function genBookingId(): string {
-  const n = Math.floor(100000 + Math.random() * 900000);
-  return `BK-${n}`;
+  return generateBookingRef();
 }
 
 function messengerCopyMessage(customerName: string, bookingId: string, link: string): string {
@@ -136,7 +136,7 @@ export default function BookingCMSForm({ tourCodes }: Props) {
               className="cyber-input flex-1"
               value={bookingId}
               onChange={(e) => setBookingId(e.target.value)}
-              placeholder="BK-123456"
+              placeholder="BK-20260601-047"
             />
             <button
               type="button"

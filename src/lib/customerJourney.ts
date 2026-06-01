@@ -343,10 +343,14 @@ export async function runPhase2Book(input: {
     if (msg.includes('TRIP_FULL')) {
       throw new TripFullError();
     }
-    warnings.push(msg);
+    throw new Error(msg || 'claim_seat_and_book failed');
   }
 
   const bookingRow = rpcBookingId ? { id: rpcBookingId as string } : null;
+
+  if (!bookingRow?.id) {
+    throw new Error('Booking was not created — no booking id returned from database');
+  }
 
   if (bookingRow?.id) {
     // เส้นทางเดียว (ใช้งานได้จริง): POST ตรงไปยัง GAS Web App → append หนึ่งแถว

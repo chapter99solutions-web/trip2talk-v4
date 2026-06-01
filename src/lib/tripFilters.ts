@@ -1,6 +1,6 @@
 import type { TripSheetRow } from './tripsSheetApi';
 
-export type TripFilterId = 'all' | 'portrait' | 'landscape' | 'one_day' | 'overnight' | 'by_season';
+export type TripFilterId = 'all' | 'portrait' | 'landscape' | 'overnight' | 'wedding';
 
 const ONE_DAY_CODES = new Set(['KIA-1DAY', 'SYD-1DAY']);
 
@@ -11,19 +11,27 @@ export function isOneDayTrip(trip: TripSheetRow): boolean {
   return (trip.durationDays ?? 1) <= 1;
 }
 
+export function isOvernightTrip(trip: TripSheetRow): boolean {
+  return !isOneDayTrip(trip);
+}
+
 export function classifyTripFilters(trip: TripSheetRow): TripFilterId[] {
   const tags: TripFilterId[] = [];
-  if (isOneDayTrip(trip)) tags.push('one_day');
-  else tags.push('overnight');
-
   const hay = `${trip.tourName} ${trip.highlights} ${trip.tourCode}`.toLowerCase();
-  if (hay.includes('portrait') || hay.includes('model')) tags.push('portrait');
+
+  if (isOvernightTrip(trip)) tags.push('overnight');
+  if (hay.includes('wedding') || hay.includes('vow') || hay.includes('-wed') || hay.includes('bridal')) {
+    tags.push('wedding');
+  }
+  if (hay.includes('portrait') || hay.includes('model') || hay.includes('fashion')) tags.push('portrait');
   if (hay.includes('landscape') || hay.includes('milky') || hay.includes('aurora')) tags.push('landscape');
-  if (!tags.includes('portrait') && !tags.includes('landscape')) tags.push('portrait');
+  if (!tags.includes('portrait') && !tags.includes('landscape') && !tags.includes('wedding')) {
+    tags.push('portrait');
+  }
   return tags;
 }
 
 export function filterTripsByCategory(trips: TripSheetRow[], filter: TripFilterId): TripSheetRow[] {
-  if (filter === 'all' || filter === 'by_season') return trips;
+  if (filter === 'all') return trips;
   return trips.filter((t) => classifyTripFilters(t).includes(filter));
 }
