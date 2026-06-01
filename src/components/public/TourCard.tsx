@@ -39,6 +39,10 @@ export default function TourCard({ tour, saved, onToggleSave, large }: Props) {
         <TourCardCover
           tourCode={tour.tourCode}
           alt={display.title}
+          fallbackUrls={[
+            tour.coverUrl,
+            findTourFallbackByCode(tour.tourCode)?.galleryPhotos?.[0],
+          ]}
           aspectClassName={featured ? 'aspect-[16/7] min-h-[320px]' : big ? 'aspect-[21/9]' : 'aspect-video'}
           imgClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
         />

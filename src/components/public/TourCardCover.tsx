@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
-import { getTourCoverUrl } from '../../utils/supabaseImages';
+import { useEffect, useMemo, useState } from 'react';
+import { buildTourCoverCandidates } from '../../utils/supabaseImages';
 
-const coverUrlCache = new Map<string, string | null>();
+const coverCandidatesCache = new Map<string, string[]>();
 
 type Props = {
   tourCode: string;
   alt: string;
+  /** Sheet / fallback URLs tried after the portfolio map URL (e.g. Trip info Cover column). */
+  fallbackUrls?: Array<string | null | undefined>;
   imgClassName?: string;
   aspectClassName?: string;
 };
@@ -13,46 +15,47 @@ type Props = {
 export default function TourCardCover({
   tourCode,
   alt,
+  fallbackUrls = [],
   imgClassName = 'w-full h-full object-cover',
   aspectClassName = 'aspect-video',
 }: Props) {
   const code = tourCode.trim().toUpperCase();
-  const [url, setUrl] = useState<string | null>(() => coverUrlCache.get(code) ?? null);
-  const [loading, setLoading] = useState(() => !coverUrlCache.has(code));
-  const [imgError, setImgError] = useState(false);
+  const candidates = useMemo(
+    () => buildTourCoverCandidates(code, fallbackUrls),
+    [code, fallbackUrls],
+  );
+
+  const cacheKey = `${code}|${candidates.join('|')}`;
+  const [candidateIndex, setCandidateIndex] = useState(0);
+  const [ready, setReady] = useState(() => coverCandidatesCache.has(cacheKey));
+
+  const activeUrl = candidates[candidateIndex] ?? null;
 
   useEffect(() => {
-    if (coverUrlCache.has(code)) {
-      setUrl(coverUrlCache.get(code) ?? null);
-      setLoading(false);
-      setImgError(false);
+    const cached = coverCandidatesCache.get(cacheKey);
+    if (cached?.length) {
+      setCandidateIndex(0);
+      setReady(true);
       return;
     }
 
-    let cancelled = false;
-    setLoading(true);
-    setImgError(false);
+    if (!candidates.length) {
+      setCandidateIndex(0);
+      setReady(true);
+      return;
+    }
 
-    void getTourCoverUrl(code).then((resolved) => {
-      if (cancelled) return;
-      coverUrlCache.set(code, resolved);
-      setUrl(resolved);
-      setLoading(false);
-    });
+    setCandidateIndex(0);
+    setReady(true);
+    coverCandidatesCache.set(cacheKey, candidates);
+  }, [cacheKey, candidates]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [code]);
-
-  const showGradient = !loading && (imgError || !url);
-  const showImage = Boolean(url) && !imgError && !loading;
+  const showGradient = ready && (!activeUrl || candidateIndex >= candidates.length);
+  const showImage = ready && activeUrl && candidateIndex < candidates.length;
 
   return (
     <div className={`relative overflow-hidden bg-[#0d1b2a] ${aspectClassName}`}>
-      {loading ? (
-        <div className="absolute inset-0 bg-slate-200 animate-pulse" aria-hidden />
-      ) : null}
+      {!ready ? <div className="absolute inset-0 bg-slate-200 animate-pulse" aria-hidden /> : null}
 
       {showGradient ? (
         <div
@@ -63,12 +66,27 @@ export default function TourCardCover({
 
       {showImage ? (
         <img
-          src={url!}
+          key={`${activeUrl}-${candidateIndex}`}
+          src={activeUrl}
           alt={alt}
           className={imgClassName}
           loading="lazy"
           decoding="async"
-          onError={() => setImgError(true)}
+          onError={() => {
+            setCandidateIndex((i) => {
+              const next = i + 1;
+              if (next < candidates.length) {
+                console.warn('[TourCard] cover load failed, trying fallback', {
+                  tourCode: code,
+                  failed: activeUrl,
+                  next: candidates[next],
+                });
+              } else {
+                console.warn('[TourCard] all cover candidates failed', { tourCode: code, candidates });
+              }
+              return next;
+            });
+          }}
         />
       ) : null}
     </div>

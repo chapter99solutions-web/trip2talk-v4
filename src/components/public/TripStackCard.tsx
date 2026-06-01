@@ -3,6 +3,7 @@ import { Bookmark } from 'lucide-react';
 import type { TripSheetRow } from '../../lib/tripsSheetApi';
 import { tripDurationBadge, tripMaxPaxLabel, tripPriceFromLabel, tripSeasonBadge } from '../../lib/tripDisplay';
 import { getPublicTripDisplay } from '../../lib/publicTripDisplay';
+import { findTourFallbackByCode } from '../../data/tours';
 import TourCardCover from './TourCardCover';
 
 type Props = {
@@ -53,6 +54,10 @@ export default function TripStackCard({
             <TourCardCover
               tourCode={tour.tourCode}
               alt={display.title}
+              fallbackUrls={[
+                tour.coverUrl,
+                findTourFallbackByCode(tour.tourCode)?.galleryPhotos?.[0],
+              ]}
               aspectClassName="h-full w-full"
               imgClassName="absolute inset-0 w-full h-full object-cover"
             />

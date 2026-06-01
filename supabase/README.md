@@ -50,7 +50,10 @@ npx supabase db query --linked -f supabase/01-schema-tours-staff.sql
 npx supabase db query --linked -f supabase/02-schema-crm-safety.sql
 npx supabase db query --linked -f supabase/03-schema-saas-mrr.sql
 npx supabase db query --linked -f supabase/10-schema-sync-pipeline.sql
+npx supabase db query --linked -f supabase/18-schema-portfolio-storage.sql
 ```
+
+**Portfolio bucket:** Trip covers and galleries use Storage bucket `portfolio` with **public** objects (`/object/public/portfolio/...`). Run `18-schema-portfolio-storage.sql` so `anon` can **list** folders (required for `TourCard` + gallery). If Tasmania card images stay blank, open Dashboard → Storage → `portfolio` and confirm objects exist under `Tasmania 02/Launceston/` (404 = file missing, not a private bucket).
 
 **Fallback:** Dashboard → **SQL Editor** → paste each file in the same order.
 

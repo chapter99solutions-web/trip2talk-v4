@@ -1,4 +1,10 @@
 import { MASTER_TRIP_SEEDS } from '../lib/masterTrips';
+import {
+  PORTFOLIO_PUBLIC_BASE,
+  TAS_3D2N_COVER_URL,
+  TAS_3D2N_HERO_POSTER_URL,
+  TAS_LH_4D3N_COVER_URL,
+} from '../lib/portfolioUrls';
 import type { TripSeason, TripType } from '../lib/masterTrips';
 import type { TripSheetRow } from '../lib/tripsSheetApi';
 
@@ -65,8 +71,7 @@ export type TourFallback = {
   subPackages?: SubPackage[];
 };
 
-const PORTFOLIO_BASE =
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio';
+const PORTFOLIO_BASE = PORTFOLIO_PUBLIC_BASE;
 
 export const TOUR_FALLBACK_DATA: TourFallback[] = [
   {
@@ -350,7 +355,7 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
       'พักร่วมกันแบบ Dormitory/Design Airbnb อัปเกรดห้องส่วนตัวเพิ่ม $350-$550 AUD/คืน',
     // รูปปกใช้ภาพจริงจากโฟลเดอร์ Hobart (1.jpg) แทนภาพโพสต์ FB เดิมที่มีกล่องค้นหา "#Trip 2 Talk" ติดมาในรูป
     // ส่ง path เต็มแบบเข้ารหัส %20 ครั้งเดียว (ห้าม double-encode) ให้ตรงรูปแบบเดียวกับ CAN-2D1N
-    galleryPhotos: [`${PORTFOLIO_BASE}/Tasmania%2002/Hobart/1.jpg`],
+    galleryPhotos: [TAS_3D2N_COVER_URL, TAS_3D2N_HERO_POSTER_URL],
     heroVideoUrl: `${PORTFOLIO_BASE}/Tasmania%2002/VDO/tas01.mp4`,
     // ใช้กลไกแกลเลอรีเดียวกับ CAN-2D1N: ดึงรูปสดจากโฟลเดอร์ portfolio แบบ auto-populate
     galleryFolder: 'Tasmania 02/Hobart',
@@ -409,11 +414,8 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
     ],
     excluded: ['ตั๋วเครื่องบิน', 'อาหารทุกมื้อ', 'ประกันการเดินทาง'],
     accommodation: 'Dormitory/Hostel/Motel อัปเกรดห้องเดี่ยวเพิ่ม $250-$550 AUD/คืน',
-    galleryPhotos: [
-      `${PORTFOLIO_BASE}/Tasmania/596371362_1428639202594510_8709278754225773992_n.jpg`,
-      `${PORTFOLIO_BASE}/Tasmania/CT99-201.JPG`,
-      `${PORTFOLIO_BASE}/Tasmania/CT99-446.JPG`,
-    ],
+    galleryPhotos: [TAS_LH_4D3N_COVER_URL],
+    galleryFolder: 'Tasmania 02/Launceston',
   },
   {
     tourCode: 'KIA-1DAY',
@@ -594,7 +596,7 @@ export function tourFallbackToSheetRow(fallback: TourFallback): TripSheetRow {
     countryTag: master?.countryTag ?? 'AU',
     weather: master?.weather ?? '',
     messengerUrl: 'https://m.me/trip2talk.chapter99',
-    coverUrl: master?.coverUrl ?? '',
+    coverUrl: fallback.galleryPhotos?.[0] ?? master?.coverUrl ?? '',
     spots: fallback.highlights.map((name) => ({
       spotName: name,
       proTip: '',

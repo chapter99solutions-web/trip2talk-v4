@@ -1,4 +1,5 @@
 import type { TripSheetRow } from './tripsSheetApi';
+import { TAS_3D2N_COVER_URL, TAS_LH_4D3N_COVER_URL } from './portfolioUrls';
 
 export type TripSeason = 'autumn' | 'winter' | 'spring' | 'summer' | 'all';
 export type TripType = 'one_day' | 'overnight';
@@ -78,7 +79,7 @@ export const MASTER_TRIP_SEEDS: MasterTripSeed[] = [
     maxPax: 6,
     highlights: 'Mt Wellington Aurora Hunt, Bruny Island, MONA',
     pickupType: 'airport_terminal',
-    coverUrl: 'https://images.unsplash.com/photo-1483347756197-71ef7742304b?w=1200&q=80',
+    coverUrl: TAS_3D2N_COVER_URL,
   },
   {
     tourCode: 'TAS-LH-4D3N',
@@ -93,7 +94,7 @@ export const MASTER_TRIP_SEEDS: MasterTripSeed[] = [
     maxPax: 6,
     highlights: 'Bridestowe Lavender, Cradle Mountain, MONA',
     pickupType: 'airport_terminal',
-    coverUrl: 'https://images.unsplash.com/photo-1499002238440-d264edd596ec?w=1200&q=80',
+    coverUrl: TAS_LH_4D3N_COVER_URL,
   },
   {
     tourCode: 'KIA-1DAY',

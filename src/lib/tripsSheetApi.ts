@@ -1,4 +1,3 @@
-import { masterTripsAsSheetRows } from './masterTrips';
 import { MOCK_CUSTOMER_BOOKINGS } from './mockBookings';
 import { forwardSheetPayload } from './syncPipeline';
 import type { TripSeason, TripType } from './masterTrips';
@@ -444,8 +443,9 @@ function extractTrips(payload: unknown): unknown[] {
   return [];
 }
 
+/** When GAS/sheet is empty, callers should merge with TOUR_FALLBACK_SHEET_ROWS (see tours.ts). */
 function portfolioFallbackTrips(): TripSheetRow[] {
-  return masterTripsAsSheetRows();
+  return [];
 }
 
 function extractBookings(payload: unknown): unknown[] {
