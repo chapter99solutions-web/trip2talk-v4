@@ -9,7 +9,7 @@ import type { TripSeason, TripType } from './masterTrips';
  * `.env` file) so the app still talks to the deployed Apps Script backend.
  */
 const DEFAULT_GAS_WEBAPP_URL =
-  'https://script.google.com/macros/s/AKfycbz1-baiSD26danlbokyUAScHtpFK5BiKpNBTvY6B30hxyfwT3_jgzQeXoCSjjNRyHSYhQ/exec';
+  'https://script.google.com/macros/s/AKfycbwR0VylDEfZZUdk49p_6TQeHggQp0U7gNRexJGpFkMvxCNM3KRrw-gXz2FRWVXhA6CVvg/exec';
 
 /** Tab name in spreadsheet 1L1VUu0qvL0-G0C1z9byscU11kKcuMCM0iajNLjxH9eE (must match gas/Code.gs TRIPS_TAB). */
 const TRIPS_SHEET_TAB = 'Trip info';

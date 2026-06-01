@@ -18,7 +18,7 @@
  * เพื่อให้แอปยังคุยกับ Apps Script backend ที่ deploy ไว้ได้.
  */
 const DEFAULT_GAS_WEBAPP_URL =
-  'https://script.google.com/macros/s/AKfycbz1-baiSD26danlbokyUAScHtpFK5BiKpNBTvY6B30hxyfwT3_jgzQeXoCSjjNRyHSYhQ/exec';
+  'https://script.google.com/macros/s/AKfycbwR0VylDEfZZUdk49p_6TQeHggQp0U7gNRexJGpFkMvxCNM3KRrw-gXz2FRWVXhA6CVvg/exec';
 
 /**
  * ลำดับการเลือก URL (precedence):
@@ -74,8 +74,104 @@ export type GSheetSyncResult = {
   error?: string;
 };
 
+/** GAS appendBookingRow_ success — not the legacy { ok: true, data: [] } health stub. */
+function isSettlementAppendOk(payload: unknown): boolean {
+  if (!payload || typeof payload !== 'object') return false;
+  const o = payload as Record<string, unknown>;
+  if (o.status === 'error' || o.ok === false) return false;
+  const msg = String(o.message ?? '').toLowerCase();
+  if (msg.includes('appended') && msg.includes('settlements')) return true;
+  if (o.status === 'ok' && msg.includes('booking row appended')) return true;
+  return false;
+}
+
+function parseGasError(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const o = payload as Record<string, unknown>;
+  if (o.status === 'error' || o.ok === false) {
+    return String(o.message ?? o.error).trim() || 'GAS returned an error';
+  }
+  return null;
+}
+
+function buildSettlementPayload(payload: BookingSheetPayload): Record<string, unknown> {
+  const amount = Number(payload.amount ?? 0) || 0;
+  return {
+    ...payload,
+    action: 'addBooking',
+    tour_code: payload.tour_code,
+    amount,
+    revenue: amount,
+    created_at: payload.created_at ?? new Date().toISOString(),
+  };
+}
+
+async function postSettlementViaApi(payload: Record<string, unknown>): Promise<GSheetSyncResult> {
+  try {
+    const res = await fetch('/api/booking/sync-settlement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const parsed = (await res.json()) as GSheetSyncResult & { response?: unknown };
+    if (!res.ok || !parsed.success) {
+      const err = parsed.error ?? `API HTTP ${res.status}`;
+      console.error(`${LOG} API proxy failed`, { status: res.status, parsed });
+      return { success: false, response: parsed.response, error: err };
+    }
+    console.log(`${LOG} API proxy success ✓`, { response: parsed.response });
+    return { success: true, response: parsed.response };
+  } catch (e) {
+    const error = e instanceof Error ? e.message : String(e);
+    return { success: false, error };
+  }
+}
+
+async function postSettlementDirectGas(url: string, body: string): Promise<GSheetSyncResult> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body,
+    redirect: 'follow',
+  });
+
+  const raw = await res.text();
+  let parsed: unknown = raw;
+  try {
+    parsed = raw ? JSON.parse(raw) : null;
+  } catch {
+    // GAS may return HTML — keep raw text for logs
+  }
+
+  if (!res.ok) {
+    console.error(`${LOG} HTTP error`, { status: res.status, body: raw.slice(0, 1000) });
+    return { success: false, response: parsed, error: `HTTP ${res.status}` };
+  }
+
+  const gasErr = parseGasError(parsed);
+  if (gasErr) {
+    console.error(`${LOG} GAS error response`, { response: parsed });
+    return { success: false, response: parsed, error: gasErr };
+  }
+
+  if (!isSettlementAppendOk(parsed)) {
+    console.error(`${LOG} GAS did not append settlement row (stub or wrong deployment?)`, {
+      response: parsed,
+    });
+    return {
+      success: false,
+      response: parsed,
+      error:
+        'GAS did not append to Tax_Year_2025_2026_Settlements — redeploy container-bound Code.gs v2.8',
+    };
+  }
+
+  console.log(`${LOG} direct GAS success ✓`, { response: parsed });
+  return { success: true, response: parsed };
+}
+
 /**
- * ส่งข้อมูลการจองไป append ลงชีต 'Bookings' ผ่าน GAS Web App.
+ * ส่งข้อมูลการจองไป append ลงชีต Tax_Year_2025_2026_Settlements ผ่าน GAS Web App.
  *
  * ออกแบบให้ "ไม่บล็อก" ผู้ใช้: ทุก error จะถูก catch + log ภายในแล้ว resolve
  * (ไม่ throw ออกไปทำให้ flow การจองพัง) — เพราะ Supabase เป็น source of truth
@@ -86,52 +182,19 @@ export async function syncBookingToSheet(
   payload: BookingSheetPayload
 ): Promise<GSheetSyncResult> {
   const url = resolveGSheetUrl();
-  // ผูก action: 'addBooking' เสมอ เผื่อ caller ไม่ได้ส่งมา
-  const body = JSON.stringify({ action: 'addBooking', ...payload });
+  const settlementPayload = buildSettlementPayload(payload);
+  const body = JSON.stringify(settlementPayload);
 
   console.log(`${LOG} start →`, { url, payload });
 
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      // สำคัญ: ต้องเป็น text/plain — ไม่ใช่ application/json
-      // เพราะ application/json จะ trigger CORS preflight (OPTIONS) ที่ Apps Script
-      // ไม่รองรับ ทำให้ล้มเหลวเงียบ ๆ. doPost จะอ่าน e.postData.contents เอง.
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body,
-      // สำคัญ: Apps Script ตอบ 302 redirect ไป script.googleusercontent.com
-      // ต้อง follow ไม่งั้นจะอ่าน response ไม่ได้.
-      redirect: 'follow',
-    });
+    // Prefer Vercel API proxy (reliable Content-Length + no CORS preflight).
+    const viaApi = await postSettlementViaApi(settlementPayload);
+    if (viaApi.success) return viaApi;
 
-    // พยายาม parse เป็น JSON ก่อน ถ้าไม่ได้ก็เก็บเป็น text ดิบ
-    const raw = await res.text();
-    let parsed: unknown = raw;
-    try {
-      parsed = raw ? JSON.parse(raw) : null;
-    } catch {
-      // GAS อาจตอบ HTML/ข้อความ — เก็บ raw text ไว้ log
-    }
-
-    if (!res.ok) {
-      console.error(`${LOG} HTTP error`, { status: res.status, body: raw.slice(0, 1000) });
-      return { success: false, response: parsed, error: `HTTP ${res.status}` };
-    }
-
-    // ตรวจ error ที่ GAS ส่งกลับมาในรูป { status: 'error', message }
-    if (parsed && typeof parsed === 'object') {
-      const o = parsed as Record<string, unknown>;
-      if (o.status === 'error' || o.success === false) {
-        const msg = String(o.message ?? o.error ?? 'GAS returned an error');
-        console.error(`${LOG} GAS error response`, { response: parsed });
-        return { success: false, response: parsed, error: msg };
-      }
-    }
-
-    console.log(`${LOG} success ✓`, { response: parsed });
-    return { success: true, response: parsed };
+    console.warn(`${LOG} API proxy unavailable, trying direct GAS`, { error: viaApi.error });
+    return await postSettlementDirectGas(url, body);
   } catch (e) {
-    // network error / abort / ฯลฯ — log แต่ไม่ throw
     const error = e instanceof Error ? e.message : String(e);
     console.error(`${LOG} failed (non-blocking)`, { error, payload });
     return { success: false, error };

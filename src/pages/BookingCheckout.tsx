@@ -83,6 +83,14 @@ export default function BookingCheckout() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [bookingRef, setBookingRef] = useState<string | null>(null);
+  /** Snapshot at submit time — success screen must not rely on form state that can clear. */
+  const [bookingConfirmation, setBookingConfirmation] = useState<{
+    ref: string;
+    customerName: string;
+    customerEmail: string;
+    tourName: string;
+    tripCode: string;
+  } | null>(null);
 
   // สถานะที่นั่ง/วันเดินทางสด ๆ จาก DB (source of truth) — ใช้คุมด่านจอง 2 ชั้น.
   const [availability, setAvailability] = useState<TripAvailability | null>(null);
@@ -337,6 +345,13 @@ export default function BookingCheckout() {
         console.warn('[Trip2Talk] send-confirmation failed:', e);
       }
 
+      setBookingConfirmation({
+        ref: reference_number,
+        customerName: fullName.trim(),
+        customerEmail: email.trim(),
+        tourName,
+        tripCode: trip.trip_code,
+      });
       setBookingRef(reference_number);
     } catch (err) {
       // กรณีวันเต็ม (ชน UNIQUE constraint) — แสดงข้อความไทย, รีเฟรช availability,
@@ -370,16 +385,29 @@ export default function BookingCheckout() {
     }
   };
 
-  if (bookingRef) {
+  if (bookingRef && bookingConfirmation) {
+    const { customerName, customerEmail, tourName: confirmedTourName, tripCode, ref } =
+      bookingConfirmation;
     return (
       <div className="max-w-lg mx-auto px-4 py-16 text-center space-y-4">
         <div className="text-4xl text-teal">✓</div>
         <h1 className="font-serif text-xl text-slate-900">Booking request received</h1>
         <p className="text-sm text-slate-600">
-          We will confirm your Private Photo Journey and send PayID details to {email || 'your email'}.
+          We will confirm your Private Photo Journey for{' '}
+          <span className="font-semibold text-slate-900">{confirmedTourName}</span>
+          <span className="font-mono text-slate-500"> ({tripCode})</span> and email PayID payment
+          details to{' '}
+          <span className="font-semibold text-slate-900">{customerName || 'you'}</span>
+          {customerEmail ? (
+            <>
+              {' '}
+              at <span className="font-semibold text-slate-900">{customerEmail}</span>
+            </>
+          ) : null}
+          .
         </p>
         <p className="text-xs text-slate-500">
-          Reference: <span className="font-mono font-semibold text-navy">{bookingRef}</span>
+          Reference: <span className="font-mono font-semibold text-navy">{ref}</span>
         </p>
         <Link
           to={`/trip/${trip.trip_code}`}

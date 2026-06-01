@@ -10,7 +10,7 @@ export const TAX_RECEIPTS_TABLE = 'tax_receipts';
  * missing build-time env var still reaches the deployed Apps Script backend.
  */
 const DEFAULT_GAS_WEBAPP_URL =
-  'https://script.google.com/macros/s/AKfycbz1-baiSD26danlbokyUAScHtpFK5BiKpNBTvY6B30hxyfwT3_jgzQeXoCSjjNRyHSYhQ/exec';
+  'https://script.google.com/macros/s/AKfycbwR0VylDEfZZUdk49p_6TQeHggQp0U7gNRexJGpFkMvxCNM3KRrw-gXz2FRWVXhA6CVvg/exec';
 
 function gasWebappUrl(): string {
   return (import.meta.env.VITE_GAS_WEBAPP_URL as string | undefined)?.trim() || DEFAULT_GAS_WEBAPP_URL;
