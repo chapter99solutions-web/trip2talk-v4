@@ -129,6 +129,9 @@ export default function App() {
             <Route element={<PublicShell />}>
               <Route path="/tours/:tourId" element={<TourDetail />} />
               <Route path="/trips" element={<PublicPortfolio />} />
+              {/* Legacy / marketing URLs (e.g. /trips/NZ-6D5N) — same pages as /tours & /book */}
+              <Route path="/trips/:tourId" element={<TourDetail />} />
+              <Route path="/trips/:tourId/book" element={<BookingCheckout />} />
               <Route path="/book/:tourId" element={<BookingCheckout />} />
               <Route path="/trip/:bookingRef" element={<ClientVIPHub />} />
               <Route path="/pass/:bookingId" element={<ClientVIPHub />} />
