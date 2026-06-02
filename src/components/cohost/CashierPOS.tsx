@@ -6,7 +6,7 @@ import { formatAUD } from '../../lib/payidCalc';
 import {
   runPhase4OnTrip,
   fetchTripAvailability,
-  staffAdjustSeat,
+  incrementSlot,
   TripFullError,
   TripNotOpenError,
   type TripAvailability,
@@ -88,6 +88,12 @@ export default function CashierPOS({
   const [availability, setAvailability] = useState<TripAvailability | null>(null);
   const [seatBusy, setSeatBusy] = useState(false);
   const [seatMsg, setSeatMsg] = useState<string | null>(null);
+  const [seatToast, setSeatToast] = useState<{ tone: 'ok' | 'err'; msg: string } | null>(null);
+
+  const showSeatToast = useCallback((tone: 'ok' | 'err', msg: string, ms = 3200) => {
+    setSeatToast({ tone, msg });
+    window.setTimeout(() => setSeatToast(null), ms);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -146,7 +152,7 @@ export default function CashierPOS({
   }, [selectedTour?.id, selectedTour?.price_aud, partyPax]);
 
   // อ่านที่นั่งสดจาก Supabase ทุกครั้งที่เปลี่ยนทริปที่เลือก
-  const tripCode = selectedTour?.trip_code ?? null;
+  const tripCode = selectedTour?.trip_code?.trim().toUpperCase() ?? null;
   const refreshSeats = useCallback(async () => {
     if (!tripCode) {
       setAvailability(null);
@@ -167,15 +173,41 @@ export default function CashierPOS({
     setSeatBusy(true);
     setSeatMsg(null);
     try {
-      await staffAdjustSeat(tripCode, delta);
-      // มิเรอร์ไปชีต 'Trip info' (ไม่บล็อก, ชีตไม่ใช่ตัวตัดสิน)
+      const newBooked = await incrementSlot(tripCode, delta);
+      const max = availability?.slotsMax ?? null;
+      const left = max != null ? Math.max(0, max - newBooked) : null;
+      setAvailability((prev) =>
+        prev
+          ? {
+              ...prev,
+              slotsBooked: newBooked,
+              seatsLeft: left,
+              isOpen: left == null || left > 0,
+            }
+          : prev
+      );
       void syncSlotIncrementToSheet(tripCode, delta);
+      showSeatToast(
+        'ok',
+        delta > 0
+          ? `Walk-in +1 · ${tripCode} (${newBooked}${max != null ? ` / ${max}` : ''})`
+          : `${tripCode} · ${newBooked} ผู้เดินทาง`
+      );
     } catch (err) {
-      if (err instanceof TripFullError) setSeatMsg('เต็มแล้ว — รับเพิ่มไม่ได้');
-      else if (err instanceof TripNotOpenError) setSeatMsg('ยังไม่เปิดจอง (ยังไม่กำหนดวันออกเดินทาง)');
-      else setSeatMsg(err instanceof Error ? err.message : 'ปรับที่นั่งไม่สำเร็จ');
+      if (err instanceof TripFullError) {
+        const msg = 'เต็มแล้ว — ไม่สามารถเพิ่มได้ (ถึง slots_max แล้ว)';
+        setSeatMsg(msg);
+        showSeatToast('err', msg);
+      } else if (err instanceof TripNotOpenError) {
+        const msg = `ไม่พบทริป ${tripCode} ใน Supabase — รัน seed SQL ก่อน`;
+        setSeatMsg(msg);
+        showSeatToast('err', msg);
+      } else {
+        const msg = err instanceof Error ? err.message : 'ปรับที่นั่งไม่สำเร็จ';
+        setSeatMsg(msg);
+        showSeatToast('err', msg);
+      }
     } finally {
-      // อ่านค่าสดกลับมาเสมอ ให้ตรงกับ DB (และหน้าเว็บสาธารณะ)
       await refreshSeats();
       setSeatBusy(false);
     }
@@ -184,10 +216,10 @@ export default function CashierPOS({
   const slotsMax = availability?.slotsMax ?? null;
   const slotsBooked = availability?.slotsBooked ?? null;
   const seatsLeft = availability?.seatsLeft ?? null;
-  const seatDateOpen = Boolean(availability?.departureStart);
-  const seatFull = seatsLeft != null && seatsLeft <= 0;
-  const plusDisabled = seatBusy || !seatDateOpen || seatFull;
-  const minusDisabled = seatBusy || (slotsBooked != null && slotsBooked <= 0);
+  const seatFull =
+    slotsMax != null && slotsBooked != null ? slotsBooked >= slotsMax : seatsLeft != null && seatsLeft <= 0;
+  const plusDisabled = seatBusy || !tripCode || seatFull;
+  const minusDisabled = seatBusy || !tripCode || (slotsBooked != null && slotsBooked <= 0);
 
   const oshcWarning = useMemo(() => {
     if (!selectedClient) return null;
@@ -287,6 +319,18 @@ export default function CashierPOS({
 
   return (
     <CyberViewport className="p-6">
+      {seatToast && (
+        <div
+          className={`fixed bottom-6 left-1/2 z-50 -translate-x-1/2 max-w-md w-[min(100%,24rem)] rounded-xl border px-4 py-3 text-sm font-sans shadow-lg ${
+            seatToast.tone === 'ok'
+              ? 'border-emerald-400/40 bg-emerald-950/95 text-emerald-200'
+              : 'border-red-400/40 bg-red-950/95 text-red-200'
+          }`}
+          role="status"
+        >
+          {seatToast.msg}
+        </div>
+      )}
       <div className="max-w-6xl mx-auto space-y-6">
         <header className="flex flex-wrap justify-between items-start gap-4">
           <div>
@@ -492,41 +536,36 @@ export default function CashierPOS({
                     )}
                   </div>
 
-                  <div className="flex items-center justify-center gap-5">
+                  <div className="flex items-center justify-center gap-4 flex-wrap">
                     <button
                       type="button"
-                      onClick={() => handleSeatAdjust(-1)}
+                      onClick={() => void handleSeatAdjust(-1)}
                       disabled={minusDisabled}
-                      aria-label="ลดผู้เดินทาง"
-                      className="w-12 h-12 rounded-xl border border-neutral-700 bg-neutral-900 text-2xl font-bold text-neutral-200 hover:border-amber-400/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                      aria-label="ลด walk-in 1 ที่นั่ง"
+                      className="min-w-[5.5rem] px-3 h-12 rounded-xl border border-neutral-700 bg-neutral-900 text-sm font-bold text-neutral-200 hover:border-amber-400/50 disabled:opacity-30 disabled:cursor-not-allowed"
                     >
-                      −
+                      −1
                     </button>
                     <div className="text-center min-w-[64px]">
                       <span className="font-mono text-3xl font-semibold text-amber-400">
                         {slotsBooked ?? '—'}
                       </span>
                       <p className="font-sans text-[10px] text-neutral-500 tracking-wide">
-                        ผู้เดินทางในทริป
+                        slots_booked
                       </p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => handleSeatAdjust(1)}
+                      onClick={() => void handleSeatAdjust(1)}
                       disabled={plusDisabled}
-                      aria-label="เพิ่มผู้เดินทาง (walk-in)"
-                      className="w-12 h-12 rounded-xl border border-neutral-700 bg-neutral-900 text-2xl font-bold text-neutral-200 hover:border-amber-400/50 disabled:opacity-30 disabled:cursor-not-allowed"
+                      aria-label="Walk-in เพิ่ม 1 ที่นั่ง"
+                      className="min-w-[5.5rem] px-3 h-12 rounded-xl border border-amber-500/40 bg-amber-500/10 text-sm font-bold text-amber-300 hover:bg-amber-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
                     >
-                      +
+                      Walk-in +1
                     </button>
                   </div>
 
-                  {!seatDateOpen && (
-                    <p className="font-sans text-xs text-orange-400 text-center">
-                      ยังไม่เปิดจอง — ยังไม่กำหนดวันออกเดินทาง
-                    </p>
-                  )}
-                  {seatDateOpen && seatFull && (
+                  {seatFull && (
                     <p className="font-sans text-xs text-red-400 text-center">
                       เต็มแล้ว — รับเพิ่มไม่ได้
                     </p>

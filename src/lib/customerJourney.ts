@@ -94,20 +94,44 @@ export async function fetchTripAvailability(tourCode: string): Promise<TripAvail
  * ใช้ slots_booked คอลัมน์เดียวกับ claim_seat_and_book (ฝั่งลูกค้าออนไลน์) จึงรวมกัน
  * ไม่มีทางเกิน slots_max. คืนค่า slots_booked ใหม่หลังปรับ.
  */
+function parseSeatRpcError(error: { message?: string } | null): never {
+  const msg = error?.message || '';
+  if (msg.includes('TRIP_FULL')) throw new TripFullError();
+  if (msg.includes('TRIP_NOT_OPEN')) throw new TripNotOpenError();
+  throw new Error(msg || 'seat adjust failed');
+}
+
+/** Co-Host walk-in: atomic slots_booked +/- via Supabase (staff_adjust_seat RPC). */
 export async function staffAdjustSeat(tourCode: string, delta: number): Promise<number> {
+  const code = tourCode.trim().toUpperCase();
+  if (!code || delta === 0) throw new Error('Invalid trip code or delta');
+
   const tenantId = await resolveDefaultTenantId();
   const { data, error } = await supabase.rpc('staff_adjust_seat', {
     p_tenant_id: tenantId,
-    p_tour_code: tourCode,
+    p_tour_code: code,
     p_delta: delta,
   });
-  if (error) {
-    const msg = error.message || '';
-    if (msg.includes('TRIP_NOT_OPEN')) throw new TripNotOpenError();
-    if (msg.includes('TRIP_FULL')) throw new TripFullError();
-    throw new Error(msg || 'staff_adjust_seat failed');
-  }
+  if (error) parseSeatRpcError(error);
   return (data as number) ?? 0;
+}
+
+/** Supabase increment_slot — same seat pool as staff_adjust_seat (p_by may be -1). */
+export async function incrementSlot(tourCode: string, by = 1): Promise<number> {
+  const code = tourCode.trim().toUpperCase();
+  if (!code) throw new Error('tour_code required');
+
+  const { data, error } = await supabase.rpc('increment_slot', {
+    p_tour_code: code,
+    p_by: by,
+  });
+  if (!error) return (data as number) ?? 0;
+
+  // Fallback when increment_slot not deployed yet (older DB).
+  if (error.message?.includes('increment_slot') || error.code === 'PGRST202') {
+    return staffAdjustSeat(code, by);
+  }
+  parseSeatRpcError(error);
 }
 
 /**
