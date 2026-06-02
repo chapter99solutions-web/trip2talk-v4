@@ -4,6 +4,7 @@ import { SEASON_PREP_CARDS } from '../../lib/seasonPrepGuide';
 import PortraitGalleryGrid from './PortraitGalleryGrid';
 import LandscapeGalleryGrid from './LandscapeGalleryGrid';
 import SeasonVideoHero from './SeasonVideoHero';
+import SeasonGalleryGrid from './SeasonGalleryGrid';
 import SeasonPrepInfoCard from './SeasonPrepInfoCard';
 
 type GalleryTab = 'portrait' | 'landscape' | 'season';
@@ -78,7 +79,10 @@ export default function PortfolioGallery({ title }: { title: string }) {
       ) : tab === 'landscape' ? (
         <LandscapeGalleryGrid />
       ) : (
-        <>{activeSeason ? <SeasonPrepInfoCard card={activeSeason} /> : null}</>
+        <>
+          <SeasonGalleryGrid />
+          {activeSeason ? <SeasonPrepInfoCard card={activeSeason} /> : null}
+        </>
       )}
     </section>
   );
