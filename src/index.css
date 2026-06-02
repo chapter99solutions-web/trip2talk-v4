@@ -88,3 +88,24 @@ body {
   animation: termsPhotoStripScroll 30s linear infinite;
   will-change: transform;
 }
+
+@keyframes galleryShimmerSweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.gallery-shimmer-sweep {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.04) 35%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.04) 65%,
+    transparent 100%
+  );
+  animation: galleryShimmerSweep 1.5s ease-in-out infinite;
+}

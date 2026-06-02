@@ -3,7 +3,22 @@ import { splitIntoColumnPools } from '../../lib/galleryStorage';
 
 const SLIDE_MS = 3000;
 const FADE_MS = 800;
+const IMAGE_LOAD_FADE_MS = 300;
 const COL_DELAYS_MS = [0, 1000, 2000];
+
+function ShimmerPlaceholder({ className = '' }: { className?: string }) {
+  return (
+    <div
+      className={`relative overflow-hidden bg-[#1a1a1a] ${className}`}
+      aria-hidden
+    >
+      <div className="gallery-shimmer-sweep absolute inset-0" />
+      <span className="absolute inset-0 flex items-center justify-center text-[10px] text-white/20 select-none">
+        ⟳
+      </span>
+    </div>
+  );
+}
 
 type SlideCellProps = {
   url: string;
@@ -13,14 +28,21 @@ type SlideCellProps = {
 };
 
 function SlideCell({ url, active, eager, onBroken }: SlideCellProps) {
+  const [imgLoaded, setImgLoaded] = useState(false);
+
+  useEffect(() => {
+    setImgLoaded(false);
+  }, [url]);
+
   if (!url) {
     return (
-      <div className="aspect-[4/5] rounded-2xl overflow-hidden border border-slate-100 shadow-sm relative bg-slate-200" />
+      <ShimmerPlaceholder className="aspect-[4/5] rounded-2xl border border-slate-800/50 shadow-sm" />
     );
   }
 
   return (
-    <div className="aspect-[4/5] rounded-2xl overflow-hidden border border-slate-100 shadow-sm relative bg-slate-100">
+    <div className="aspect-[4/5] rounded-2xl overflow-hidden border border-slate-100 shadow-sm relative bg-[#1a1a1a]">
+      {!imgLoaded && <ShimmerPlaceholder className="absolute inset-0 z-[3] rounded-none border-0" />}
       <div
         className="absolute inset-0 overflow-hidden"
         style={{
@@ -37,10 +59,14 @@ function SlideCell({ url, active, eager, onBroken }: SlideCellProps) {
           className="absolute inset-0 w-full h-full object-cover"
           loading={eager ? 'eager' : 'lazy'}
           decoding={eager ? 'sync' : 'async'}
+          onLoad={() => setImgLoaded(true)}
           onError={() => onBroken(url)}
           style={{
-            willChange: 'transform',
-            animation: active ? `heroKenBurns ${SLIDE_MS}ms linear forwards` : 'none',
+            opacity: imgLoaded ? 1 : 0,
+            transition: `opacity ${IMAGE_LOAD_FADE_MS}ms ease-out`,
+            willChange: 'transform, opacity',
+            animation:
+              active && imgLoaded ? `heroKenBurns ${SLIDE_MS}ms linear forwards` : 'none',
             transform: active ? undefined : 'scale(1)',
           }}
         />
@@ -122,8 +148,8 @@ function GalleryColumn({ pool, fallbackUrl, delayMs, eager, onBroken }: ColumnPr
   if (!currentUrl) {
     return (
       <div className="flex flex-col gap-3">
-        <div className="aspect-[4/5] rounded-2xl bg-slate-200" />
-        <div className="aspect-[4/5] rounded-2xl bg-slate-200" />
+        <ShimmerPlaceholder className="aspect-[4/5] rounded-2xl" />
+        <ShimmerPlaceholder className="aspect-[4/5] rounded-2xl" />
       </div>
     );
   }
@@ -145,11 +171,7 @@ function GallerySkeleton() {
       {[0, 1, 2].map((col) => (
         <div key={col} className="flex flex-col gap-3">
           {[0, 1].map((row) => (
-            <div
-              key={row}
-              className="aspect-[4/5] rounded-2xl bg-slate-200 animate-pulse"
-              aria-hidden
-            />
+            <ShimmerPlaceholder key={row} className="aspect-[4/5] rounded-2xl" />
           ))}
         </div>
       ))}
