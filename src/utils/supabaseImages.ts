@@ -17,21 +17,27 @@ type TourCoverMapping = {
 
 export const TOUR_COVER_MAP: Record<string, TourCoverMapping> = {
   'MEL-4D3N': { folder: 'Melbourne', file: '01.jpg' },
-  'ULU-4D3N': { folder: 'Ulruru', file: '183586793_10225492427447732_8846903205565554038_n.jpg' },
-  'NZ-6D5N': { folder: 'New Zealand/Spring', file: 'T2T-10.JPG' },
+  'ULU-4D3N': { folder: 'Ulruru', file: '1.jpg' },
+  'NZ-6D5N': { folder: 'New Zealand/Cover', file: '01.jpg' },
   'TAS-3D2N': {
-    folder: 'Tasmania 02/Launceston',
-    file: '596873932_1428638042594626_8987722411601397177_n.jpg',
+    folder: 'Tasmania/Hobart',
+    file: '1.jpg',
     publicUrl: TAS_3D2N_COVER_URL,
   },
   'TAS-LH-4D3N': {
-    folder: 'Tasmania 02/Launceston',
-    file: '596811714_1428639069261190_2753284779604496226_n.jpg',
+    folder: 'Tasmania/Launceston',
+    file: '594961969_1428638085927955_7817067387013979508_n.jpg',
     publicUrl: TAS_LH_4D3N_COVER_URL,
   },
-  'KIA-1DAY': { folder: 'One day trip SYD', file: '705320467_10242162489108855_3820285517745745334_n.jpg' },
-  'CAN-2D1N': { folder: 'Cowra', file: '12 (1).jpg' },
-  'SYD-1DAY': { folder: 'SYDNEY', file: '506861557_10236863821565478_6038697174671264606_n.jpg' },
+  'KIA-1DAY': {
+    folder: 'One day trip SYD',
+    file: '35225886_2066269863700629_8276990772163641344_n.jpg',
+  },
+  'CAN-2D1N': { folder: 'Cowra', file: '1.jpg' },
+  'SYD-1DAY': {
+    folder: 'SYDNEY',
+    file: '505479211_10236865839535926_981414994444837633_n.jpg',
+  },
 };
 
 /** Extra card fallbacks when primary portfolio object is missing (404). */
