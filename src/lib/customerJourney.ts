@@ -4,6 +4,7 @@
  */
 import { supabase } from './supabase';
 import { dispatchRetargetingNotification, dispatchTransactionNotification } from './notifications';
+import { insertPlatformBookingRow } from './platformBookings';
 import { buildSettlementForTour, syncSettlementToGoogleSheets, SettlementSyncPayload } from './googleSync';
 import { syncBookingToSheet, syncSlotIncrementToSheet } from './gsheetSync';
 
@@ -364,6 +365,7 @@ export async function runPhase2Book(input: {
   /** วันเดินทางที่ลูกค้าเลือก (YYYY-MM-DD) — ใช้เป็น departure_date ในชีต */
   departureDate?: string;
   sendSms?: boolean;
+  tourName?: string;
 }): Promise<{ clientId?: string; bookingId?: string; warnings: string[] }> {
   const warnings: string[] = [];
   const tripCode = input.tripCode.trim().toUpperCase();
@@ -504,6 +506,19 @@ export async function runPhase2Book(input: {
   }
 
   if (bookingRow?.id) {
+    const platformId = await insertPlatformBookingRow({
+      externalId: input.referenceNumber,
+      clientName: input.fullName,
+      email: input.email,
+      tripCode,
+      tripName: input.tourName ?? tripCode,
+      departureDate: input.departureDate,
+      totalAmount: input.depositAud,
+    });
+    if (!platformId) {
+      warnings.push('bookings mirror row skipped (table missing or RLS)');
+    }
+
     // เส้นทางเดียว (ใช้งานได้จริง): POST ตรงไปยัง GAS Web App → append หนึ่งแถว
     // ลงแท็บ Tax_Year_2025_2026_Settlements. (ลบเส้นทางเดิมที่ผ่าน Edge Function
     // 'appendBookingRow' ออก เพราะ GAS ไม่รู้จัก action นั้น — ล้มเหลวเสมอ และ

@@ -323,6 +323,7 @@ export default function BookingCheckout() {
       const { bookingId, warnings } = await runPhase2Book({
         tourId: trip.id,
         tripCode: trip.trip_code,
+        tourName,
         fullName,
         phone,
         email,
@@ -899,19 +900,27 @@ export default function BookingCheckout() {
             </span>
           </label>
 
+          {submitError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              {submitError}
+            </div>
+          )}
+
           <button
             type="button"
-            onClick={handleConfirm}
-            disabled={!termsAccepted || submitting}
+            onClick={() => void handleConfirm()}
+            disabled={submitting}
             className="w-full inline-flex justify-center items-center py-3 rounded-xl bg-teal text-navy font-semibold text-sm disabled:opacity-40"
           >
             {submitting
               ? 'Confirming…'
-              : dateGateBlocked
-                ? 'ยังไม่เปิดจอง / Not open'
-                : seatGateFull
-                  ? 'ที่นั่งเต็มแล้ว'
-                  : 'Confirm Booking'}
+              : !termsAccepted
+                ? 'Accept terms to confirm'
+                : dateGateBlocked
+                  ? 'ยังไม่เปิดจอง / Not open'
+                  : seatGateFull
+                    ? 'ที่นั่งเต็มแล้ว'
+                    : 'Confirm Booking'}
           </button>
 
           <div className="rounded-2xl bg-white border border-slate-100 p-4">

@@ -68,6 +68,43 @@ export async function fetchConfirmedBookings(): Promise<PlatformBooking[]> {
   return rows.filter((b) => String(b.status).toLowerCase() === 'confirmed');
 }
 
+/** Mirror row in public.bookings after successful tour_bookings RPC (portal/intake). */
+export async function insertPlatformBookingRow(input: {
+  externalId: string;
+  clientName: string;
+  email: string;
+  tripCode: string;
+  tripName?: string;
+  departureDate?: string;
+  totalAmount: number;
+}): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('bookings')
+    .insert({
+      external_id: input.externalId,
+      client_name: input.clientName,
+      email: input.email,
+      trip_id: input.tripCode,
+      trip_name: input.tripName ?? input.tripCode,
+      departure_date: input.departureDate ?? null,
+      intake_status: 'pending',
+      total_amount: input.totalAmount,
+      status: 'pending',
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    if (isMissingBookingsTable(error.message)) {
+      console.warn('[Trip2Talk] bookings table missing — skip mirror insert');
+      return null;
+    }
+    console.warn('[Trip2Talk] insertPlatformBookingRow:', error.message);
+    return null;
+  }
+  return (data?.id as string | undefined) ?? null;
+}
+
 export async function validatePortalToken(token: string): Promise<{
   ok: boolean;
   booking: PlatformBooking | null;
