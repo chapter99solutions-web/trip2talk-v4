@@ -64,11 +64,12 @@ export type TripAvailability = {
  */
 export async function fetchTripAvailability(tourCode: string): Promise<TripAvailability | null> {
   if (!tourCode) return null;
+  const code = tourCode.trim().toUpperCase();
   const tenantId = await resolveDefaultTenantId();
   let q = supabase
     .from('tours')
     .select('slots_booked, slots_max, departure_start, departure_end')
-    .eq('trip_code', tourCode)
+    .eq('trip_code', code)
     .limit(1);
   if (tenantId) q = q.eq('tenant_id', tenantId);
   const { data, error } = await q.maybeSingle();
@@ -234,8 +235,31 @@ export function resolveVipTier(totalTrips: number): VipTier {
 
 let cachedTenantId: string | null = null;
 
+/** Tenant for booking RPC — fall back to the tour row when tenants lookup is empty. */
+async function resolveBookingTenantId(tripCode: string): Promise<string | null> {
+  const fromTenants = await resolveDefaultTenantId();
+  if (fromTenants) return fromTenants;
+
+  const code = tripCode.trim().toUpperCase();
+  if (!code) return null;
+
+  const { data, error } = await supabase
+    .from('tours')
+    .select('tenant_id')
+    .eq('trip_code', code)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('[Trip2Talk] resolveBookingTenantId failed:', error.message);
+    return null;
+  }
+  return (data?.tenant_id as string | undefined) ?? null;
+}
+
 async function resolveTourIdByCode(tripCode: string, tenantId: string | null): Promise<string | null> {
-  let q = supabase.from('tours').select('id').eq('trip_code', tripCode).limit(1);
+  const code = tripCode.trim().toUpperCase();
+  let q = supabase.from('tours').select('id').eq('trip_code', code).limit(1);
   if (tenantId) q = q.eq('tenant_id', tenantId);
   const { data, error } = await q.maybeSingle();
   if (error) {
@@ -255,7 +279,7 @@ function isRpcMissingError(err: { code?: string; message?: string }): boolean {
   );
 }
 
-/** Direct insert when claim_seat_and_book RPC is unavailable or trip date gate not set in DB. */
+/** Direct insert when claim_seat_and_book RPC is unavailable (legacy DB only). */
 async function insertTourBookingDirect(input: {
   tenantId: string | null;
   tripCode: string;
@@ -267,9 +291,11 @@ async function insertTourBookingDirect(input: {
   pickup?: string;
   departureDate?: string;
 }): Promise<string | null> {
-  const tourId = await resolveTourIdByCode(input.tripCode, input.tenantId);
+  const tripCode = input.tripCode.trim().toUpperCase();
+  const tenantId = input.tenantId ?? (await resolveBookingTenantId(tripCode));
+  const tourId = await resolveTourIdByCode(tripCode, tenantId);
   if (!tourId) {
-    console.error('[Trip2Talk] insertTourBookingDirect: tour not found for', input.tripCode);
+    console.error('[Trip2Talk] insertTourBookingDirect: tour not found for', tripCode);
     return null;
   }
 
@@ -286,14 +312,22 @@ async function insertTourBookingDirect(input: {
     journey_phase: 'book',
     trip_date: input.departureDate ?? null,
   };
-  if (input.tenantId) row.tenant_id = input.tenantId;
+  if (tenantId) row.tenant_id = tenantId;
 
-  console.log('[Trip2Talk] tour_bookings direct insert', { tripCode: input.tripCode, tourId });
+  console.log('[Trip2Talk] tour_bookings direct insert', { tripCode, tourId });
   const { data, error } = await supabase.from('tour_bookings').insert(row).select('id').single();
   if (error) {
     console.error('[Trip2Talk] tour_bookings direct insert failed:', error.message);
     throw error;
   }
+
+  // Legacy path: increment seats atomically via staff_adjust_seat when claim RPC missing.
+  try {
+    await incrementSlot(tripCode, 1);
+  } catch (seatErr) {
+    console.warn('[Trip2Talk] direct booking seat increment failed:', seatErr);
+  }
+
   return (data?.id as string | undefined) ?? null;
 }
 
@@ -332,7 +366,8 @@ export async function runPhase2Book(input: {
   sendSms?: boolean;
 }): Promise<{ clientId?: string; bookingId?: string; warnings: string[] }> {
   const warnings: string[] = [];
-  const tenantId = await resolveDefaultTenantId();
+  const tripCode = input.tripCode.trim().toUpperCase();
+  const tenantId = await resolveBookingTenantId(tripCode);
   const { first, last } = splitFullName(input.fullName);
   const passportPlaceholder = `WEB-${input.referenceNumber.replace(/[^A-Z0-9]/gi, '')}`;
 
@@ -402,13 +437,13 @@ export async function runPhase2Book(input: {
   //   ด่าน 2 (SEAT GATE) : เพิ่ม slots_booked แบบ atomic → ถ้าเต็มได้ 'TRIP_FULL'
   // tour_id ที่ถูกต้องถูก resolve จาก trip_code ภายใน DB (กัน FK ผิดของ flow เดิม).
   console.log('[Trip2Talk] claim_seat_and_book RPC called', {
-    tripCode: input.tripCode,
+    tripCode,
     tenantId,
     departureDate: input.departureDate,
   });
   const { data: rpcBookingId, error: bookingErr } = await supabase.rpc('claim_seat_and_book', {
     p_tenant_id: tenantId,
-    p_tour_code: input.tripCode,
+    p_tour_code: tripCode,
     p_client_id: clientId ?? null,
     p_amount_paid_aud: input.depositAud,
     p_reference_number: input.referenceNumber,
@@ -433,13 +468,13 @@ export async function runPhase2Book(input: {
     if (msg.includes('TRIP_FULL')) {
       throw new TripFullError();
     }
-    // RPC ยังไม่ deploy หรือทริปยังไม่ตั้ง departure_start — ลอง insert ตรงเข้า tour_bookings
-    if (isRpcMissingError(bookingErr) || msg.includes('TRIP_NOT_OPEN')) {
+    // RPC ยังไม่ deploy — insert ตรง + increment_slot (ไม่ bypass TRIP_NOT_OPEN).
+    if (isRpcMissingError(bookingErr)) {
       console.warn('[Trip2Talk] RPC fallback → direct tour_bookings insert:', msg);
       try {
         const directId = await insertTourBookingDirect({
           tenantId,
-          tripCode: input.tripCode,
+          tripCode,
           clientId,
           depositAud: input.depositAud,
           referenceNumber: input.referenceNumber,
@@ -450,16 +485,11 @@ export async function runPhase2Book(input: {
         });
         if (directId) {
           bookingRow = { id: directId };
-          if (msg.includes('TRIP_NOT_OPEN')) {
-            warnings.push('TRIP_NOT_OPEN bypassed — booking saved via direct insert');
-          } else {
-            warnings.push('claim_seat_and_book unavailable — booking saved via direct insert');
-          }
+          warnings.push('claim_seat_and_book unavailable — booking saved via direct insert');
         }
       } catch (directErr) {
         const directCode = (directErr as { code?: string }).code;
         if (directCode === '23505') throw new DateFullyBookedError();
-        if (msg.includes('TRIP_NOT_OPEN')) throw new TripNotOpenError();
         throw directErr instanceof Error ? directErr : new Error(String(directErr));
       }
     }
@@ -487,7 +517,7 @@ export async function runPhase2Book(input: {
       client_name: input.fullName,
       email: input.email,
       phone: input.phone,
-      tour_code: input.tripCode,
+      tour_code: tripCode,
       departure_date: input.departureDate || new Date().toISOString().slice(0, 10),
       amount: input.depositAud,
       pax: input.partyPax,
@@ -502,7 +532,7 @@ export async function runPhase2Book(input: {
     // อัปเดต "Slots Booked" ในแท็บ 'Trip info' (กระจกเงาให้เจ้าของเห็น) — non-blocking.
     // Supabase คือ source of truth ของที่นั่ง (slots_booked อัปเดต atomic ไปแล้ว);
     // ชีตเป็นเพียง mirror, ความล้มเหลวตรงนี้ไม่ทำให้การจองพัง.
-    const slotSync = await syncSlotIncrementToSheet(input.tripCode, 1);
+    const slotSync = await syncSlotIncrementToSheet(tripCode, 1);
     if (!slotSync.success) {
       warnings.push(`GSheet slot sync: ${slotSync.error ?? 'failed'}`);
     }
@@ -513,7 +543,7 @@ export async function runPhase2Book(input: {
       client_name: input.fullName,
       client_email: input.email,
       client_phone: input.phone,
-      trip_code: input.tripCode,
+      trip_code: tripCode,
       amount_aud: input.depositAud,
       reference_number: input.referenceNumber,
       payment_method: 'PAYID',

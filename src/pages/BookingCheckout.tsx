@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { formatAUD } from '../lib/payidCalc';
-import { findTripById } from '../lib/publicTours';
+import { resolveTripById } from '../lib/publicTours';
 import { findTourFallbackByCode } from '../data/tours';
 import { quoteTripTotal, resolveTripSizeTier } from '../lib/bookingPolicy';
 import TripSizeTierBadge from '../components/cyber/TripSizeTierBadge';
@@ -55,7 +55,8 @@ function toISODateInputValue(d: Date) {
 export default function BookingCheckout() {
   const { tourId } = useParams<{ tourId: string }>();
   const [search] = useSearchParams();
-  const trip = tourId ? findTripById(tourId) : undefined;
+  const [trip, setTrip] = useState<Awaited<ReturnType<typeof resolveTripById>>>(undefined);
+  const [tripLookupDone, setTripLookupDone] = useState(!tourId);
   const initialPax = Math.min(6, Math.max(1, Number(search.get('pax')) || 4));
   const [step, setStep] = useState<Step>(1);
   const [selectedDate, setSelectedDate] = useState<string>(() => toISODateInputValue(new Date()));
@@ -130,6 +131,24 @@ export default function BookingCheckout() {
     };
   }, [tourId, trip?.trip_code]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!tourId) {
+      setTrip(undefined);
+      setTripLookupDone(true);
+      return;
+    }
+    setTripLookupDone(false);
+    void resolveTripById(tourId).then((row) => {
+      if (cancelled) return;
+      setTrip(row);
+      setTripLookupDone(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [tourId]);
+
   // โหลดสถานะที่นั่ง/วันเดินทางจาก DB (source of truth). ถ้าคอลัมน์ยังไม่ถูกสร้าง
   // (ยังไม่ได้รัน migration 16) จะได้ null → ปล่อยให้จองได้ตามเดิม (fail-open),
   // เพราะ RPC + CHECK constraint ฝั่ง DB เป็นด่านสุดท้ายอยู่แล้ว.
@@ -157,6 +176,10 @@ export default function BookingCheckout() {
       setPickupLocation(pickupConfig.options[0]?.value ?? '');
     }
   }, [pickupConfig, pickupLocation]);
+
+  if (!tripLookupDone) {
+    return null;
+  }
 
   if (!trip) {
     return (
