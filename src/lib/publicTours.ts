@@ -102,3 +102,20 @@ export async function resolveTripById(id: string): Promise<Tour | undefined> {
   if (fromDb) return fromDb;
   return findTripById(code);
 }
+
+/** cover_image column values keyed by trip_code. */
+export async function fetchCoverImagesByTripCode(): Promise<Record<string, string>> {
+  const { data, error } = await supabase.from('tours').select('trip_code, cover_image');
+  if (error) {
+    console.warn('[Trip2Talk] fetchCoverImagesByTripCode:', error.message);
+    return {};
+  }
+  const out: Record<string, string> = {};
+  for (const row of data ?? []) {
+    const r = row as { trip_code?: string; cover_image?: string };
+    const code = String(r.trip_code ?? '').trim().toUpperCase();
+    const url = String(r.cover_image ?? '').trim();
+    if (code && url) out[code] = url;
+  }
+  return out;
+}

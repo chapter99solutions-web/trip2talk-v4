@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { daysUntilTrip, MARGIN_TABLE } from '../../lib/bookingRules';
 import { generatePortalLink } from '../../lib/platformBookings';
+import { fetchDashboardBookingsFromSupabase } from '../../lib/supabaseData';
 import { supabase } from '../../lib/supabase';
 import { resolveDefaultTenantId } from '../../lib/customerJourney';
 import type { TourStatus } from '../../types/tour';
@@ -389,16 +390,24 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
   };
 
   const load = useCallback(async () => {
-    const gasUrl = (import.meta.env.VITE_GAS_WEBAPP_URL as string | undefined)?.trim() || '';
-    if (!gasUrl) {
-      setError('Missing VITE_GAS_WEBAPP_URL');
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     setError(null);
     try {
+      // Supabase tour_bookings is source of truth for revenue.
+      const supaRows = await fetchDashboardBookingsFromSupabase();
+      if (supaRows.length > 0) {
+        setBookings(supaRows);
+        setTrips([]);
+        return;
+      }
+
+      const gasUrl = (import.meta.env.VITE_GAS_WEBAPP_URL as string | undefined)?.trim() || '';
+      if (!gasUrl) {
+        setBookings([]);
+        setTrips([]);
+        return;
+      }
+
       const [bRes, tRes] = await Promise.all([
         fetch(`${gasUrl}?action=getBookings`, { method: 'GET', cache: 'no-store' }),
         fetch(`${gasUrl}?action=getTrips`, { method: 'GET', cache: 'no-store' }),

@@ -107,7 +107,7 @@ export async function staffAdjustSeat(tourCode: string, delta: number): Promise<
   const code = tourCode.trim().toUpperCase();
   if (!code || delta === 0) throw new Error('Invalid trip code or delta');
 
-  const tenantId = await resolveDefaultTenantId();
+  const tenantId = await resolveBookingTenantId(code);
   const { data, error } = await supabase.rpc('staff_adjust_seat', {
     p_tenant_id: tenantId,
     p_tour_code: code,

@@ -127,10 +127,10 @@ export function buildTourCoverCandidates(
     out.push(trimmed);
   };
 
+  // DB / sheet cover_image first, then portfolio map fallbacks.
+  for (const url of extraUrls) push(url);
   if (mapping?.publicUrl) push(mapping.publicUrl);
   if (mapping?.file) push(portfolioPublicUrl(`${mapping.folder}/${mapping.file}`));
-
-  for (const url of extraUrls) push(url);
   for (const url of TOUR_COVER_FALLBACK_URLS[code] ?? []) push(url);
 
   return out;

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import IntakeFormModal from '../IntakeFormModal';
 import { BookingsTableMissingError, fetchConfirmedBookings, type PlatformBooking } from '../../lib/platformBookings';
+import { fetchDashboardBookingsFromSupabase } from '../../lib/supabaseData';
 import { logConsentToSheet } from '../../lib/tripsSheetApi';
 import { saveExpenseLocally } from '../../lib/expenseDb';
 import ReceiptUploadSection from './ReceiptUploadSection';
@@ -235,16 +236,21 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
   };
 
   const load = useCallback(async () => {
-    const gasUrl = (import.meta.env.VITE_GAS_WEBAPP_URL as string | undefined)?.trim() || '';
-    if (!gasUrl) {
-      setError('Missing VITE_GAS_WEBAPP_URL');
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     setError(null);
     try {
+      const supaRows = await fetchDashboardBookingsFromSupabase();
+      if (supaRows.length > 0) {
+        setBookings(supaRows);
+        return;
+      }
+
+      const gasUrl = (import.meta.env.VITE_GAS_WEBAPP_URL as string | undefined)?.trim() || '';
+      if (!gasUrl) {
+        setBookings([]);
+        return;
+      }
+
       const res = await fetch(`${gasUrl}?action=getBookings`, { method: 'GET', cache: 'no-store' });
       const json = (await res.json()) as any;
       const arr = json?.bookings ?? json?.data ?? [];

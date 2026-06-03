@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PublicBottomNav from '../components/public/PublicBottomNav';
 import { mergeTripsWithFallback, findTourFallbackByCode } from '../data/tours';
+import { fetchCoverImagesByTripCode } from '../lib/publicTours';
 import { fetchTripsFromSheet, TripSheetRow } from '../lib/tripsSheetApi';
 import MeetTheCrew from '../components/public/MeetTheCrew';
 import TestimonialsSection from '../components/public/TestimonialsSection';
@@ -70,8 +71,15 @@ export default function PublicPortfolio() {
       setLoadingTrips(true);
       setTripError(null);
       try {
-        const rows = await fetchTripsFromSheet();
-        if (!cancelled) setTrips(mergeTripsWithFallback(rows));
+        const [rows, coverMap] = await Promise.all([
+          fetchTripsFromSheet(),
+          fetchCoverImagesByTripCode(),
+        ]);
+        const merged = mergeTripsWithFallback(rows).map((t) => {
+          const dbCover = coverMap[t.tourCode.trim().toUpperCase()];
+          return dbCover ? { ...t, coverUrl: dbCover } : t;
+        });
+        if (!cancelled) setTrips(merged);
       } catch (e) {
         if (!cancelled) {
           setTripError(e instanceof Error ? e.message : 'Could not load trips');

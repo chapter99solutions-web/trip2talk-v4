@@ -6,7 +6,7 @@ import { formatAUD } from '../../lib/payidCalc';
 import {
   runPhase4OnTrip,
   fetchTripAvailability,
-  incrementSlot,
+  staffAdjustSeat,
   TripFullError,
   TripNotOpenError,
   type TripAvailability,
@@ -173,19 +173,26 @@ export default function CashierPOS({
     setSeatBusy(true);
     setSeatMsg(null);
     try {
-      const newBooked = await incrementSlot(tripCode, delta);
-      const max = availability?.slotsMax ?? null;
+      const newBooked = await staffAdjustSeat(tripCode, delta);
+      const max = availability?.slotsMax ?? selectedTour?.slots_max ?? null;
       const left = max != null ? Math.max(0, max - newBooked) : null;
-      setAvailability((prev) =>
-        prev
-          ? {
-              ...prev,
-              slotsBooked: newBooked,
-              seatsLeft: left,
-              isOpen: left == null || left > 0,
-            }
-          : prev
-      );
+      setAvailability((prev) => ({
+        slotsBooked: newBooked,
+        slotsMax: max ?? prev?.slotsMax ?? null,
+        seatsLeft: left,
+        departureStart: prev?.departureStart ?? null,
+        departureEnd: prev?.departureEnd ?? null,
+        isOpen: left == null || left > 0,
+      }));
+      setData((prev) => {
+        if (!prev || !selectedTour) return prev;
+        return {
+          ...prev,
+          tours: prev.tours.map((t) =>
+            t.id === selectedTour.id ? { ...t, slots_booked: newBooked, current_pax: newBooked } : t
+          ),
+        };
+      });
       void syncSlotIncrementToSheet(tripCode, delta);
       showSeatToast(
         'ok',
