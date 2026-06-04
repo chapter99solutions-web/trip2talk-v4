@@ -1530,7 +1530,7 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
                   value={tripForm.description}
                   onChange={(e) => updateForm('description', e.target.value)}
                   rows={3}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm resize-y"
+                  className={`${OWNER_DARK_FIELD_MT_CLS} resize-y`}
                   placeholder={lang === 'TH' ? 'รายละเอียดทริป…' : 'Trip details…'}
                 />
               </label>
