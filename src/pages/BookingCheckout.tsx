@@ -230,7 +230,7 @@ export default function BookingCheckout() {
     'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&q=80';
   const tourName = portfolio?.title ?? trip.destination;
   const enquirySubject = `สอบถามทริป ${tourName}`;
-  const enquiryBody = `สวัสดีครับ/ค่ะ\n\nสนใจทริป: ${tourName}\nอยากสอบถามรอบและวันที่ที่เปิดรับจองครับ/ค่ะ\n\nชื่อ: \nจำนวนคน: \nช่วงเวลาที่สะดวก: `;
+  const enquiryBody = `สวัสดีครับ/ค่ะ\n\nสนใจทริป: ${tourName}\nจำนวนคน: \nช่วงเวลาที่สะดวก: `;
   const enquiryMailtoHref = `mailto:${ENQUIRY_EMAIL}?subject=${encodeURIComponent(enquirySubject)}&body=${encodeURIComponent(enquiryBody)}`;
 
   const packageDef = PACKAGES.find((p) => p.id === pkg) ?? PACKAGES[0];

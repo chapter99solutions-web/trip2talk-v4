@@ -501,7 +501,7 @@ export default function ClientPortal() {
       const next: Session = {
         query: id,
         bookingId: match.bookingId,
-        customerName: match.customerName || 'friend',
+        customerName: match.customerName || 'Guest',
         tourCode: match.tourCode,
       };
       setSession(next);

@@ -24,6 +24,8 @@ type BookingSheet = {
   customerName: string;
   tourCode: string;
   tripName: string;
+  tripLocation: string;
+  dateRangeLabel: string;
   guests: number | null;
   pickupLocation: string;
   departTime: string;
@@ -199,6 +201,8 @@ export default function ClientVIPHubPage() {
           customerName: b.customerName,
           tourCode: b.tourCode,
           tripName: t?.tourName || b.tourCode,
+          tripLocation: t?.countryTag || t?.tourName || b.tourCode,
+          dateRangeLabel: b.departTime,
           guests: b.guests,
           pickupLocation: b.pickupLocation,
           departTime: b.departTime,
@@ -229,11 +233,12 @@ export default function ClientVIPHubPage() {
 
   const greetingName = booking?.customerName?.trim() || '';
   const passTripName = booking?.tripName || trip?.tourName || 'Trip2Talk Journey';
-  const destination = trip?.countryTag || passTripName;
-  const tripTitle = trip?.tourName || passTripName;
+  const destination = booking?.tripLocation || trip?.countryTag || passTripName;
+  const tripTitle = booking?.tripName || trip?.tourName || passTripName;
+  const tripCodeLabel = booking?.tourCode || trip?.tourCode || '';
   const pax = booking?.guests ?? 1;
   const pickup = pickupShortLabel(booking?.pickupLocation ?? null);
-  const depart = booking?.departTime?.trim() || '—';
+  const depart = booking?.dateRangeLabel?.trim() || booking?.departTime?.trim() || '—';
 
   const handleExpressRequest = (tier: '3day' | '24h') => {
     const amount = tier === '24h' ? 150 : 80;
@@ -307,6 +312,9 @@ export default function ClientVIPHubPage() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-[#9A9A9A]">{destination}</p>
           <p className="text-[22px] font-bold leading-snug mt-1">{tripTitle}</p>
+          {tripCodeLabel && (
+            <p className="text-xs font-mono text-[#9A9A9A] mt-1">{tripCodeLabel}</p>
+          )}
         </div>
 
         <div className="flex gap-2 overflow-x-auto pb-1">
@@ -332,8 +340,8 @@ export default function ClientVIPHubPage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-black/10" />
 
                 <div className="absolute top-4 left-4 right-4 flex items-start justify-between gap-3">
-                  <div className="px-3 py-1.5 rounded-full bg-white/20 backdrop-blur border border-white/25 text-white text-xs font-semibold">
-                    Photo Pass
+                  <div className="px-3 py-1.5 rounded-full bg-white/20 backdrop-blur border border-white/25 text-white text-xs font-semibold max-w-[70%] truncate">
+                    {passTripName}
                   </div>
                   <div className="bg-white rounded-2xl px-3 py-2 border border-sage-100 shadow-sm">
                     <p className="text-[11px] text-[#9A9A9A] font-medium">Days</p>

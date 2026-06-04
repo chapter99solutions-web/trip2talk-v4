@@ -74,6 +74,7 @@ export default function TripScheduleManager({ lang, onToast }: Props) {
           'id, trip_code, title, start_date, end_date, max_pax, slots_booked, slots_max, price_aud, status'
         )
         .in('trip_code', [...REAL_TOUR_CODES])
+        .in('status', ['ACTIVE', 'CONFIRMED'])
         .order('trip_code', { ascending: true });
 
       if (error) throw error;
@@ -149,7 +150,7 @@ export default function TripScheduleManager({ lang, onToast }: Props) {
           price_aud: priceAud,
           price_per_person: priceAud,
         })
-        .eq('id', row.id);
+        .eq('trip_code', row.trip_code);
 
       if (error) throw error;
 
@@ -167,7 +168,7 @@ export default function TripScheduleManager({ lang, onToast }: Props) {
   const setTripStatus = async (row: ScheduleTourRow, status: 'ACTIVE' | 'CONFIRMED') => {
     setStatusBusyId(row.id);
     try {
-      const { error } = await supabase.from('tours').update({ status }).eq('id', row.id);
+      const { error } = await supabase.from('tours').update({ status }).eq('trip_code', row.trip_code);
       if (error) throw error;
       onToast(
         'ok',
@@ -206,23 +207,24 @@ export default function TripScheduleManager({ lang, onToast }: Props) {
         <table className="min-w-[920px] w-full text-left">
           <thead className="text-[11px] uppercase tracking-wider text-white/60">
             <tr className="border-b border-white/10">
-              <th className="p-3">Trip</th>
-              <th className="p-3">{lang === 'TH' ? 'วันที่ปัจจุบัน' : 'Current dates'}</th>
+              <th className="p-3">{lang === 'TH' ? 'ทริป' : 'Trip'}</th>
+              <th className="p-3">{lang === 'TH' ? 'วันที่' : 'Dates'}</th>
               <th className="p-3">{lang === 'TH' ? 'ที่นั่ง' : 'Seats'}</th>
-              <th className="p-3">Status</th>
+              <th className="p-3">{lang === 'TH' ? 'ราคา' : 'Price'}</th>
+              <th className="p-3">{lang === 'TH' ? 'สถานะ' : 'Status'}</th>
               <th className="p-3">Actions</th>
             </tr>
           </thead>
           <tbody className="text-sm">
             {loading ? (
               <tr>
-                <td className="p-4 text-white/60" colSpan={5}>
+                <td className="p-4 text-white/60" colSpan={6}>
                   {lang === 'TH' ? 'กำลังโหลด…' : 'Loading…'}
                 </td>
               </tr>
             ) : orderedRows.length === 0 ? (
               <tr>
-                <td className="p-4 text-white/60" colSpan={5}>
+                <td className="p-4 text-white/60" colSpan={6}>
                   {lang === 'TH' ? 'ไม่พบทริปในระบบ' : 'No trips found'}
                 </td>
               </tr>
@@ -244,14 +246,12 @@ export default function TripScheduleManager({ lang, onToast }: Props) {
                       </div>
                       <div className="text-white/80 text-xs mt-0.5">{row.title || '—'}</div>
                     </td>
-                    <td className="p-3 text-white/80">
-                      {dateLabel}
-                      {row.price_aud != null && (
-                        <div className="text-xs text-white/50 mt-1">{formatAud(row.price_aud)}</div>
-                      )}
-                    </td>
+                    <td className="p-3 text-white/80">{dateLabel}</td>
                     <td className="p-3 font-mono text-xs text-white/80">
                       {booked}/{maxSeats || '—'}
+                    </td>
+                    <td className="p-3 font-mono text-xs text-white/80">
+                      {row.price_aud != null ? formatAud(row.price_aud) : '—'}
                     </td>
                     <td className="p-3">
                       <span

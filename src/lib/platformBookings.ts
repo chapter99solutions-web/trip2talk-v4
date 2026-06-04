@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { formatTourDateRangeLabel } from './publicTours';
 
 export type PlatformBooking = {
   id: string;
@@ -149,10 +150,70 @@ export type HubBookingView = {
   customerName: string;
   tourCode: string;
   tripName: string;
+  tripLocation: string;
+  dateRangeLabel: string;
   guests: number;
   pickupLocation: string;
   departTime: string;
 };
+
+type HubTourRow = {
+  trip_code: string;
+  destination: string | null;
+  title: string | null;
+  start_date: string | null;
+  end_date: string | null;
+};
+
+async function fetchTourForHub(tripCode: string): Promise<HubTourRow | null> {
+  const code = tripCode.trim();
+  if (!code) return null;
+
+  const { data, error } = await supabase
+    .from('tours')
+    .select('trip_code, destination, title, start_date, end_date')
+    .eq('trip_code', code)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('[Trip2Talk] fetchTourForHub:', error.message);
+    return null;
+  }
+
+  return (data as HubTourRow | null) ?? null;
+}
+
+function buildHubView(input: {
+  bookingId: string;
+  customerName: string;
+  tourCode: string;
+  tripNameFallback: string;
+  departureDate?: string | null;
+  guests?: number;
+  pickupLocation?: string;
+  tour?: HubTourRow | null;
+}): HubBookingView {
+  const tour = input.tour;
+  const tourCode = (tour?.trip_code || input.tourCode || '').trim();
+  const tripLocation = (tour?.destination || input.tripNameFallback || tourCode).trim();
+  const tripName = (tour?.title || input.tripNameFallback || tripLocation || tourCode || 'Trip2Talk Journey').trim();
+  const dateRangeLabel = tour?.start_date
+    ? formatTourDateRangeLabel(tour.start_date, tour.end_date)
+    : formatDepartureDate(input.departureDate);
+
+  return {
+    bookingId: input.bookingId,
+    customerName: input.customerName.trim() || 'Guest',
+    tourCode,
+    tripName,
+    tripLocation,
+    dateRangeLabel,
+    guests: input.guests ?? 1,
+    pickupLocation: (input.pickupLocation || '').trim(),
+    departTime: dateRangeLabel || formatDepartureDate(input.departureDate),
+  };
+}
 
 function clientNameFromRow(c: Record<string, unknown> | null | undefined): string {
   if (!c) return '';
@@ -179,16 +240,16 @@ export async function fetchHubBookingByRef(ref: string): Promise<HubBookingView 
   const platformRow = await fetchBookingByExternalId(bookingRef);
   if (platformRow) {
     const tourCode = (platformRow.trip_id || '').trim();
-    const tripName = (platformRow.trip_name || tourCode || 'Trip2Talk Journey').trim();
-    return {
+    const tour = await fetchTourForHub(tourCode);
+    return buildHubView({
       bookingId: platformRow.external_id || platformRow.id,
-      customerName: platformRow.client_name.trim(),
+      customerName: platformRow.client_name,
       tourCode,
-      tripName,
+      tripNameFallback: (platformRow.trip_name || tourCode || 'Trip2Talk Journey').trim(),
+      departureDate: platformRow.departure_date,
       guests: 1,
-      pickupLocation: '',
-      departTime: formatDepartureDate(platformRow.departure_date),
-    };
+      tour,
+    });
   }
 
   const { data, error } = await supabase
@@ -201,7 +262,7 @@ export async function fetchHubBookingByRef(ref: string): Promise<HubBookingView 
       trip_date,
       preferred_pickup,
       crm_clients (first_name_en, last_name_en, first_name_th, last_name_th),
-      tours (trip_code, destination)
+      tours (trip_code, destination, title, start_date, end_date)
     `
     )
     .eq('reference_number', bookingRef)
@@ -210,24 +271,25 @@ export async function fetchHubBookingByRef(ref: string): Promise<HubBookingView 
 
   if (error || !data) return null;
 
-  const tours = data.tours as { trip_code?: string; destination?: string } | null;
-  const tourCode = String(tours?.trip_code ?? '').trim();
-  const tripName = String(tours?.destination ?? tourCode ?? 'Trip2Talk Journey').trim();
+  const tours = data.tours as HubTourRow | HubTourRow[] | null;
+  const tourRow = Array.isArray(tours) ? tours[0] : tours;
+  const tourCode = String(tourRow?.trip_code ?? '').trim();
   const rawClient = data.crm_clients;
   const clientRow = Array.isArray(rawClient) ? rawClient[0] : rawClient;
   const customerName = clientNameFromRow(
     (clientRow as Record<string, unknown> | null | undefined) ?? null
   );
 
-  return {
+  return buildHubView({
     bookingId: String(data.reference_number || data.id),
     customerName: customerName || 'Guest',
     tourCode,
-    tripName,
+    tripNameFallback: String(tourRow?.title ?? tourRow?.destination ?? tourCode).trim(),
+    departureDate: String(data.trip_date ?? ''),
     guests: Number(data.party_pax ?? 1) || 1,
     pickupLocation: String(data.preferred_pickup ?? '').trim(),
-    departTime: formatDepartureDate(String(data.trip_date ?? '')),
-  };
+    tour: tourRow ?? (tourCode ? await fetchTourForHub(tourCode) : null),
+  });
 }
 
 export async function validatePortalToken(token: string): Promise<{

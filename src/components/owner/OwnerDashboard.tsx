@@ -888,6 +888,8 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
           </div>
         </section>
 
+        <TripScheduleManager lang={lang} onToast={showToast} />
+
         {/* Pending intakes */}
         <section className="space-y-3">
           <h2 className="text-sm font-semibold tracking-wide" style={{ color: GOLD }}>
@@ -1054,8 +1056,6 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
             </table>
           </div>
         </section>
-
-        <TripScheduleManager lang={lang} onToast={showToast} />
 
         {/* SECTION 3.5 — Manage trips (Supabase tours) */}
         <section className="space-y-3">
