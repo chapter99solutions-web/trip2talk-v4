@@ -1,6 +1,7 @@
 import { Component, Suspense, lazy, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import InstallPrompt from './components/pwa/InstallPrompt';
+import UpdateToast from './components/pwa/UpdateToast';
 import OfflineBanner from './components/shared/OfflineBanner';
 import PublicShell from './components/layout/PublicShell';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -112,6 +113,7 @@ export default function App() {
   return (
     <>
       <InstallPrompt />
+      <UpdateToast />
       <BrowserRouter>
         <OfflineBanner />
         <RouteErrorBoundary>

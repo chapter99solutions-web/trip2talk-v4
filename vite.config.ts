@@ -6,13 +6,14 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Exclude HTML from precache so navigations use NetworkFirst (sw.ts), not CacheFirst.
+        globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
       },
       manifest: {
         short_name: 'Trip2Talk',

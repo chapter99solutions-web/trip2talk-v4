@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
+import { notifyPwaUpdateAvailable } from './lib/pwaUpdate';
 import App from './App';
 import './styles/cyberpunk.css';
 import './index.css';
@@ -10,9 +11,9 @@ import './lib/gsheetSync';
 
 const updateSW = registerSW({
   onNeedRefresh() {
-    if (confirm('New version available! Update now?')) {
-      updateSW(true);
-    }
+    notifyPwaUpdateAvailable(() => {
+      void updateSW(true);
+    });
   },
   onOfflineReady() {
     console.log('[Trip2Talk] App ready for offline use');

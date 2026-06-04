@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
-import { CacheFirst, NetworkFirst, StaleWhileRevalidate } from 'workbox-strategies';
+import { NetworkFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 
@@ -9,9 +9,7 @@ declare const self: ServiceWorkerGlobalScope & {
   __WB_MANIFEST: Array<{ url: string; revision: string | null }>;
 };
 
-const CACHE_NAME = 'trip2talk-v2';
-
-const NAV_ROUTES = ['/', '/trips', '/gallery', '/about', '/contact'];
+const CACHE_NAME = 'trip2talk-v3';
 
 // Caches we intentionally keep around. Anything else (e.g. an older
 // `trip2talk-v1`) is purged on activate so a cache-name bump takes effect.
@@ -22,21 +20,12 @@ const EXPECTED_CACHES = new Set<string>([
   'google-fonts-cache',
 ]);
 
-// Precache Vite's hashed build output. Revision-based precaching means every
-// deploy fetches the new hashed JS/CSS and prunes the old revisions, so we
-// never get stuck serving stale built assets — the known staleness pitfall.
+// Precache Vite's hashed build output (JS/CSS/assets). HTML navigations are
+// handled separately with NetworkFirst so deploys reach users without hard refresh.
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
-// Warm the key public navigation routes into the versioned cache on install.
-// Each route is added individually so one transient failure can't abort the
-// whole service-worker install.
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) =>
-      Promise.allSettled(NAV_ROUTES.map((route) => cache.add(route)))
-    )
-  );
+self.addEventListener('install', () => {
   void self.skipWaiting();
 });
 
@@ -55,14 +44,12 @@ self.addEventListener('activate', (event) => {
   void self.clients.claim();
 });
 
-// Navigation routes: cache-first against `trip2talk-v2`, falling back to the
-// network. The new service worker re-warms these on each deploy (see install),
-// so cached navigations stay in sync with freshly precached assets.
+// Navigation / HTML: network-first so users get the latest shell after each deploy.
 registerRoute(
-  ({ request, url }) =>
-    request.mode === 'navigate' && NAV_ROUTES.includes(url.pathname),
-  new CacheFirst({
+  ({ request }) => request.mode === 'navigate',
+  new NetworkFirst({
     cacheName: CACHE_NAME,
+    networkTimeoutSeconds: 5,
     plugins: [new CacheableResponsePlugin({ statuses: [0, 200] })],
   })
 );
