@@ -3,6 +3,7 @@ import { formatTourDateRangeLabel } from '../../lib/publicTours';
 import { REAL_TOUR_CODES } from '../../lib/realTourCodes';
 import { supabase } from '../../lib/supabase';
 import type { TourStatus } from '../../types/tour';
+import { OWNER_DARK_FIELD_CLS } from './ownerFormStyles';
 
 type Lang = 'TH' | 'EN';
 
@@ -272,7 +273,7 @@ export default function TripScheduleManager({ lang, onToast }: Props) {
                                   prev ? { ...prev, start_date: e.target.value } : prev
                                 )
                               }
-                              className="mt-1 w-full rounded-lg border border-white/15 bg-black/30 px-2 py-1.5 text-white text-xs"
+                              className={`mt-1 w-full ${OWNER_DARK_FIELD_CLS} text-xs`}
                             />
                           </label>
                           <label className="block text-[10px] uppercase text-white/50">
@@ -285,7 +286,7 @@ export default function TripScheduleManager({ lang, onToast }: Props) {
                                   prev ? { ...prev, end_date: e.target.value } : prev
                                 )
                               }
-                              className="mt-1 w-full rounded-lg border border-white/15 bg-black/30 px-2 py-1.5 text-white text-xs"
+                              className={`mt-1 w-full ${OWNER_DARK_FIELD_CLS} text-xs`}
                             />
                           </label>
                           <label className="block text-[10px] uppercase text-white/50">
@@ -299,7 +300,7 @@ export default function TripScheduleManager({ lang, onToast }: Props) {
                                   prev ? { ...prev, max_pax: e.target.value } : prev
                                 )
                               }
-                              className="mt-1 w-full rounded-lg border border-white/15 bg-black/30 px-2 py-1.5 text-white text-xs"
+                              className={`mt-1 w-full ${OWNER_DARK_FIELD_CLS} text-xs`}
                             />
                           </label>
                           <label className="block text-[10px] uppercase text-white/50">
@@ -313,7 +314,7 @@ export default function TripScheduleManager({ lang, onToast }: Props) {
                                   prev ? { ...prev, price_aud: e.target.value } : prev
                                 )
                               }
-                              className="mt-1 w-full rounded-lg border border-white/15 bg-black/30 px-2 py-1.5 text-white text-xs"
+                              className={`mt-1 w-full ${OWNER_DARK_FIELD_CLS} text-xs`}
                             />
                           </label>
                           <div className="flex flex-wrap gap-2 pt-1">

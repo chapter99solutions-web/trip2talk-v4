@@ -21,6 +21,7 @@ import IntakeFormModal from '../IntakeFormModal';
 import FBInboxTrigger from '../FBInboxTrigger';
 import FinancialTransactionsPanel from './FinancialTransactionsPanel';
 import TripScheduleManager from './TripScheduleManager';
+import { OWNER_DARK_FIELD_CLS, OWNER_DARK_FIELD_MT_CLS } from './ownerFormStyles';
 
 type Lang = 'TH' | 'EN';
 
@@ -945,7 +946,7 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
             <select
               value={portalBookingId || bookings[0]?.bookingId || ''}
               onChange={(e) => setPortalBookingId(e.target.value)}
-              className="flex-1 rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+              className={`flex-1 ${OWNER_DARK_FIELD_CLS}`}
             >
               {bookings.map((b) => (
                 <option key={b.bookingId} value={b.bookingId}>
@@ -1382,7 +1383,7 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
                 <input
                   value={tripForm.trip_code}
                   onChange={(e) => updateForm('trip_code', e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  className={OWNER_DARK_FIELD_MT_CLS}
                   placeholder="MEL-4D3N"
                 />
               </label>
@@ -1391,7 +1392,7 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
                 <select
                   value={tripForm.trip_type}
                   onChange={(e) => updateForm('trip_type', e.target.value as TripForm['trip_type'])}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  className={OWNER_DARK_FIELD_MT_CLS}
                 >
                   <option value="one_day">ทริปวันเดียว (One day)</option>
                   <option value="overnight">ทริปค้างคืน (Overnight)</option>
@@ -1403,7 +1404,7 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
                 <input
                   value={tripForm.name_en}
                   onChange={(e) => updateForm('name_en', e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  className={OWNER_DARK_FIELD_MT_CLS}
                   placeholder="Melbourne 4D3N"
                 />
               </label>
@@ -1412,7 +1413,7 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
                 <input
                   value={tripForm.name_th}
                   onChange={(e) => updateForm('name_th', e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  className={OWNER_DARK_FIELD_MT_CLS}
                   placeholder="เมลเบิร์น 4 วัน 3 คืน"
                 />
               </label>
@@ -1422,7 +1423,7 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
                 <input
                   value={tripForm.destination}
                   onChange={(e) => updateForm('destination', e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  className={OWNER_DARK_FIELD_MT_CLS}
                   placeholder="Melbourne"
                 />
               </label>
@@ -1431,7 +1432,7 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
                 <input
                   value={tripForm.duration_text}
                   onChange={(e) => updateForm('duration_text', e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  className={OWNER_DARK_FIELD_MT_CLS}
                   placeholder="4 Days 3 Nights"
                 />
               </label>
@@ -1443,7 +1444,7 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
                   inputMode="decimal"
                   value={tripForm.price_aud}
                   onChange={(e) => updateForm('price_aud', e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  className={OWNER_DARK_FIELD_MT_CLS}
                   placeholder="0"
                 />
               </label>
@@ -1454,7 +1455,7 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
                   inputMode="decimal"
                   value={tripForm.private_price_aud}
                   onChange={(e) => updateForm('private_price_aud', e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  className={OWNER_DARK_FIELD_MT_CLS}
                   placeholder="0"
                 />
               </label>
@@ -1466,7 +1467,7 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
                   inputMode="numeric"
                   value={tripForm.max_pax}
                   onChange={(e) => updateForm('max_pax', e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  className={OWNER_DARK_FIELD_MT_CLS}
                   placeholder="5"
                 />
               </label>
@@ -1475,7 +1476,7 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
                 <select
                   value={tripForm.status}
                   onChange={(e) => updateForm('status', e.target.value as TourStatus)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  className={OWNER_DARK_FIELD_MT_CLS}
                 >
                   {TOUR_STATUS_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -1491,7 +1492,7 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
                   type="date"
                   value={tripForm.start_date}
                   onChange={(e) => updateForm('start_date', e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  className={OWNER_DARK_FIELD_MT_CLS}
                 />
               </label>
               <label className="block sm:col-span-1">
@@ -1500,7 +1501,7 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
                   type="date"
                   value={tripForm.end_date}
                   onChange={(e) => updateForm('end_date', e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  className={OWNER_DARK_FIELD_MT_CLS}
                 />
               </label>
 
@@ -1509,7 +1510,7 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
                 <input
                   value={tripForm.weather}
                   onChange={(e) => updateForm('weather', e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  className={OWNER_DARK_FIELD_MT_CLS}
                   placeholder="Sunny 18-24°C"
                 />
               </label>
@@ -1518,7 +1519,7 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
                 <input
                   value={tripForm.cover_image_url}
                   onChange={(e) => updateForm('cover_image_url', e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+                  className={OWNER_DARK_FIELD_MT_CLS}
                   placeholder="https://…supabase.co/storage/…"
                 />
               </label>

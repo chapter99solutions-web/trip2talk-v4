@@ -10,6 +10,7 @@ import {
   type PaymentType,
   type TransactionRow,
 } from '../../lib/transactions';
+import { OWNER_DARK_FIELD_FULL_CLS } from './ownerFormStyles';
 
 const NAVY = '#0d1b2a';
 const GOLD = '#d4af37';
@@ -217,7 +218,7 @@ export default function FinancialTransactionsPanel({ lang, supaTours, showToast 
             <select
               value={tripCode}
               onChange={(e) => setTripCode(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+              className={OWNER_DARK_FIELD_FULL_CLS}
             >
               {activeTours.length === 0 ? (
                 <option value="">{lang === 'TH' ? 'ไม่มีทริป ACTIVE' : 'No active trips'}</option>
@@ -238,7 +239,7 @@ export default function FinancialTransactionsPanel({ lang, supaTours, showToast 
               step="0.01"
               value={amountAud}
               onChange={(e) => setAmountAud(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+              className={OWNER_DARK_FIELD_FULL_CLS}
             />
           </div>
           <div>
@@ -246,7 +247,7 @@ export default function FinancialTransactionsPanel({ lang, supaTours, showToast 
             <select
               value={paymentType}
               onChange={(e) => setPaymentType(e.target.value as PaymentType)}
-              className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+              className={OWNER_DARK_FIELD_FULL_CLS}
             >
               <option value="DEPOSIT">DEPOSIT</option>
               <option value="FINAL">FINAL</option>
@@ -258,7 +259,7 @@ export default function FinancialTransactionsPanel({ lang, supaTours, showToast 
             <select
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-              className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+              className={OWNER_DARK_FIELD_FULL_CLS}
             >
               <option value="PAYID">PAYID</option>
               <option value="CASH">CASH</option>
@@ -270,7 +271,7 @@ export default function FinancialTransactionsPanel({ lang, supaTours, showToast 
             <input
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2.5 text-sm"
+              className={OWNER_DARK_FIELD_FULL_CLS}
             />
           </div>
           <div className="flex items-end">

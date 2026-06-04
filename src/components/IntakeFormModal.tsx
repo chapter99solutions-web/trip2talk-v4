@@ -128,7 +128,7 @@ export default function IntakeFormModal({
   };
 
   const inputCls =
-    'w-full text-sm border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white transition-all';
+    'w-full text-sm border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 bg-white text-[#1a1a1a] placeholder:text-[#9ca3af] [color-scheme:light] transition-all';
 
   const labelCls = 'block text-xs font-semibold text-gray-600 mb-1.5';
 
@@ -160,7 +160,7 @@ export default function IntakeFormModal({
       onClick={dismissible ? undefined : (e) => e.stopPropagation()}
     >
       <div
-        className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[92vh] flex flex-col"
+        className="bg-white text-gray-900 w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[92vh] flex flex-col [color-scheme:light]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
@@ -269,7 +269,7 @@ export default function IntakeFormModal({
                       className={`w-full text-left text-sm px-4 py-3 rounded-xl border transition-all ${
                         form.dietary.includes(opt.id)
                           ? 'border-teal-500 bg-teal-50 text-teal-900 font-medium'
-                          : 'border-gray-200 bg-white text-gray-700'
+                          : 'border-gray-200 bg-white text-[#1a1a1a]'
                       }`}
                     >
                       {lang === 'TH' ? opt.th : opt.en}
@@ -312,8 +312,8 @@ export default function IntakeFormModal({
                       onClick={() => setField('motionSickness', v)}
                       className={`flex-1 py-3 rounded-xl text-sm font-semibold border transition-all ${
                         form.motionSickness === v
-                          ? 'border-teal-500 bg-teal-50 text-teal-800'
-                          : 'border-gray-200 bg-white text-gray-600'
+                          ? 'border-teal-500 bg-teal-50 text-teal-900'
+                          : 'border-gray-200 bg-white text-[#1a1a1a]'
                       }`}
                     >
                       {v === 'yes'
@@ -347,12 +347,12 @@ export default function IntakeFormModal({
                       onClick={() => togglePhotoStyle(opt.id)}
                       className={`p-4 rounded-2xl border text-left transition-all ${
                         selected
-                          ? 'border-teal-500 bg-teal-50 ring-2 ring-teal-200'
-                          : 'border-gray-200 bg-white'
+                          ? 'border-teal-500 bg-teal-50 ring-2 ring-teal-200 text-[#1a1a1a]'
+                          : 'border-gray-200 bg-white text-[#1a1a1a]'
                       }`}
                     >
                       <span className="text-2xl block mb-1">{opt.emoji}</span>
-                      <span className="text-xs font-semibold text-gray-800 leading-snug block">
+                      <span className="text-xs font-semibold text-[#1a1a1a] leading-snug block">
                         {lang === 'TH' ? opt.th : opt.en}
                       </span>
                     </button>
