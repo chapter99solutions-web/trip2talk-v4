@@ -352,7 +352,7 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
     // รูปปกใช้ภาพจริงจากโฟลเดอร์ Hobart (1.jpg) แทนภาพโพสต์ FB เดิมที่มีกล่องค้นหา "#Trip 2 Talk" ติดมาในรูป
     // ส่ง path เต็มแบบเข้ารหัส %20 ครั้งเดียว (ห้าม double-encode) ให้ตรงรูปแบบเดียวกับ CAN-2D1N
     galleryPhotos: [
-      'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/gallery/photos/Tasmania/1650/502620104_10236666362749131_6250277977642078256_n.jpg',
+      'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/gallery/photos/Tasmania/1650/596811714_1428639069261190_2753284779604496226_n.jpg',
       'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/gallery/photos/Tasmania/1650/502620104_10236666362749131_6250277977642078256_n.jpg',
     ],
     heroVideoUrl: `${PORTFOLIO_BASE}/Tasmania%2002/VDO/tas01.mp4`,

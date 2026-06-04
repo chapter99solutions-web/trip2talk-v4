@@ -13,7 +13,7 @@ export function portfolioPublicUrl(objectPath: string): string {
 
 /** Card / sheet cover — Tasmania/Hobart */
 export const TAS_3D2N_COVER_URL =
-  'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/gallery/photos/Tasmania/1650/502620104_10236666362749131_6250277977642078256_n.jpg';
+  'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/gallery/photos/Tasmania/1650/596811714_1428639069261190_2753284779604496226_n.jpg';
 
 /** Card / sheet cover — Tasmania/Launceston */
 export const TAS_LH_4D3N_COVER_URL =
