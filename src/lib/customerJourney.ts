@@ -324,7 +324,8 @@ async function insertTourBookingDirect(input: {
 
   // Legacy path: increment seats atomically via staff_adjust_seat when claim RPC missing.
   try {
-    await incrementSlot(tripCode, 1);
+    const seats = Math.max(1, input.partyPax || 1);
+    await incrementSlot(tripCode, seats);
   } catch (seatErr) {
     console.warn('[Trip2Talk] direct booking seat increment failed:', seatErr);
   }

@@ -288,6 +288,7 @@ export default function BookingCheckout() {
     if (!selectedDate) {
       setSubmitError('กรุณาเลือกรอบเดินทางที่เปิดรับจอง');
       setStep(1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     if (!termsAccepted) {
@@ -363,6 +364,7 @@ export default function BookingCheckout() {
         const detail = warnings.length > 0 ? warnings.join('; ') : 'Booking was not saved to the database';
         setSubmitError(detail);
         console.error('[Trip2Talk] Phase 2 (book) completed without bookingId:', warnings);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
 
@@ -396,6 +398,7 @@ export default function BookingCheckout() {
         tripCode: trip.trip_code,
       });
       setBookingRef(reference_number);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       // กรณีวันเต็ม (ชน UNIQUE constraint) — แสดงข้อความไทย, รีเฟรช availability,
       // และ "ไม่" แสดงหน้าจอจองสำเร็จ (ไม่ setBookingRef).
@@ -428,7 +431,8 @@ export default function BookingCheckout() {
     return (
       <div className="max-w-lg mx-auto px-4 py-16 text-center space-y-4">
         <div className="text-4xl text-teal">✓</div>
-        <h1 className="font-serif text-xl text-slate-900">Booking request received</h1>
+        <h1 className="font-serif text-xl text-slate-900">Booking confirmed</h1>
+        <p className="font-mono text-lg font-semibold text-navy tracking-wide">{ref}</p>
         <p className="text-sm text-slate-600">
           We will confirm your Private Photo Journey for{' '}
           <span className="font-semibold text-slate-900">{confirmedTourName}</span>
@@ -442,9 +446,6 @@ export default function BookingCheckout() {
             </>
           ) : null}
           .
-        </p>
-        <p className="text-xs text-slate-500">
-          Reference: <span className="font-mono font-semibold text-navy">{ref}</span>
         </p>
         <Link
           to={`/trip/${ref}`}
@@ -513,8 +514,11 @@ export default function BookingCheckout() {
         </div>
       </div>
 
-      {submitError && step !== 1 && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+      {submitError && (
+        <div
+          className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+          role="alert"
+        >
           {submitError}
         </div>
       )}

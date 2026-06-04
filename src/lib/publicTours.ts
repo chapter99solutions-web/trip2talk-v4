@@ -109,17 +109,18 @@ export type AvailableTourDate = {
   end_date: string | null;
 };
 
-/** ACTIVE tour rows with a scheduled start_date for checkout date cards. */
+/** Bookable tour rows (CONFIRMED/ACTIVE) with departure or start date for checkout. */
+const BOOKABLE_TOUR_STATUSES = ['ACTIVE', 'CONFIRMED', 'active'] as const;
+
 export async function fetchAvailableTourDates(tripCode: string): Promise<AvailableTourDate[]> {
   const code = tripCode.trim().toUpperCase();
   if (!code) return [];
 
   const { data, error } = await supabase
     .from('tours')
-    .select('id, start_date, end_date')
+    .select('id, start_date, end_date, departure_start, departure_end')
     .eq('trip_code', code)
-    .eq('status', 'ACTIVE')
-    .not('start_date', 'is', null)
+    .in('status', [...BOOKABLE_TOUR_STATUSES])
     .order('start_date', { ascending: true });
 
   if (error) {
@@ -129,13 +130,20 @@ export async function fetchAvailableTourDates(tripCode: string): Promise<Availab
 
   return (data ?? [])
     .map((row) => {
-      const r = row as { id?: string; start_date?: string; end_date?: string | null };
-      const start = String(r.start_date ?? '').trim();
+      const r = row as {
+        id?: string;
+        start_date?: string;
+        end_date?: string | null;
+        departure_start?: string | null;
+        departure_end?: string | null;
+      };
+      const start = String(r.departure_start ?? r.start_date ?? '').trim();
       if (!start) return null;
+      const endRaw = r.departure_end ?? r.end_date;
       return {
         id: String(r.id ?? start),
         start_date: start,
-        end_date: r.end_date ? String(r.end_date).trim() : null,
+        end_date: endRaw ? String(endRaw).trim() : null,
       };
     })
     .filter((row): row is AvailableTourDate => row !== null);
