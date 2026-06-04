@@ -15,7 +15,7 @@ function scrollToSection(id: string) {
 const STATS = [
   { value: '8', label: 'Curated Trips' },
   { value: '100%', label: 'Small Group' },
-  { value: 'Local', label: 'Expert Guides' },
+  { value: 'Local', label: 'Photographers' },
 ];
 
 const FEATURES = [
@@ -30,7 +30,7 @@ const FEATURES = [
     icon: '🛂',
   },
   {
-    title: 'Expert Guides',
+    title: 'Thai Photographers',
     desc: 'Led by working photographers — not generic mass-market trip operators.',
     icon: '📷',
   },
@@ -98,12 +98,19 @@ export default function PublicPortfolio() {
             <span className="text-emerald-300 italic font-medium">Now booking Summer 2025</span>
           </p>
           <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold leading-snug tracking-tight max-w-3xl mx-auto">
-            ทริปถ่ายภาพ premium สำหรับครอบครัวไทยในออสเตรเลีย — guide ภาษาไทย ภาพสวยกลับบ้าน
+            ทริปถ่ายภาพ premium สำหรับ
+            <br className="hidden sm:block" />
+            ครอบครัวไทยในออสเตรเลีย —
+            <br className="hidden sm:block" />
+            ช่างภาพไทย ภาพสวยกลับบ้าน
           </h1>
           <div className="mt-5 max-w-2xl mx-auto text-center space-y-3">
             <p className="font-light text-base md:text-lg text-emerald-100/95 leading-relaxed">
-              พ่อแม่บินมาจากไทย? พาเที่ยวออสอย่างมั่นใจ มี guide ภาษาไทยดูแลตลอดทริป กลับบ้านพร้อมรูประดับ
-              professional
+              พ่อแม่บินมาจากไทย? พาเที่ยวออสอย่างมั่นใจ
+              <br className="hidden sm:block" />
+              มีช่างภาพไทยดูแลตลอดทริป
+              <br className="hidden sm:block" />
+              กลับบ้านพร้อมรูประดับ professional
             </p>
             <p className="font-light text-lg text-white">
               Small group. Real light. Photos you&apos;ll actually keep.

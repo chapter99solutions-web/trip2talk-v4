@@ -13,6 +13,7 @@ import {
   logConsentToSheet,
   TripSheetRow,
 } from '../lib/tripsSheetApi';
+import { fetchBookingByExternalId } from '../lib/platformBookings';
 import ItineraryTimeline from '../components/client/ItineraryTimeline';
 import { fetchCityWeather } from '../lib/weather';
 
@@ -165,6 +166,36 @@ export default function ClientVIPHubPage() {
       setLoading(true);
       setError(null);
       try {
+        const platformRow = await fetchBookingByExternalId(resolvedBookingId);
+        if (platformRow) {
+          const tourCode = (platformRow.trip_id || '').trim();
+          if (!tourCode) throw new Error('Booking not found');
+          const t = await fetchTripByCodeFromSheet(tourCode);
+          if (!t) throw new Error('Trip not found for this booking');
+          if (cancelled) return;
+          setBooking({
+            bookingId: platformRow.external_id || platformRow.id,
+            customerName: platformRow.client_name,
+            tourCode,
+            guests: 1,
+            pickupLocation: '',
+            departTime: platformRow.departure_date || '',
+          });
+          setTrip(t);
+
+          try {
+            const album = await fetchAlbumByBookingRef(platformRow.external_id || platformRow.id);
+            if (album && !cancelled) {
+              setAlbumStatus(album.album_status);
+              setAlbumUrl(album.album_url);
+              setAlbumExpiresAt(album.album_expires_at);
+            }
+          } catch {
+            // Supabase album fields optional when sheet-only booking
+          }
+          return;
+        }
+
         const b = await fetchCustomerBookingByIdFromSheet(resolvedBookingId);
         if (!b) throw new Error('Booking not found');
         const t = await fetchTripByCodeFromSheet(b.tourCode);

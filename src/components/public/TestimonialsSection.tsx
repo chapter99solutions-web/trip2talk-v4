@@ -45,7 +45,7 @@ function ReviewsVideoBackground() {
         style={{ textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}
       >
         <span className="uppercase tracking-[0.2em] text-sm font-light">
-          WE SHOOT ·  WE GUIDE ·  WE DRIVE
+          WE SHOOT ·  WE PHOTOGRAPH ·  WE DRIVE
         </span>
         <span className="text-xl font-medium">ประสบการณ์ที่คุณจะไม่มีวันลืม</span>
       </div>

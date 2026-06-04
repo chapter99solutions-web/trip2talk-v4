@@ -508,9 +508,10 @@ export async function runPhase2Book(input: {
   if (bookingRow?.id) {
     const platformId = await insertPlatformBookingRow({
       externalId: input.referenceNumber,
-      clientName: input.fullName,
-      email: input.email,
       tripCode,
+      guestName: input.fullName,
+      guestEmail: input.email,
+      guests: input.partyPax || 1,
       tripName: input.tourName ?? tripCode,
       departureDate: input.departureDate,
       totalAmount: input.depositAud,

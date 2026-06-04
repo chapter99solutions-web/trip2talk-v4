@@ -14,7 +14,7 @@ type Step = 1 | 2 | 3 | 4 | 5;
 type VisaType = 'student' | 'other';
 type Experience = 'beginner' | 'hobbyist' | 'experienced';
 
-const INCLUDED = ['Private photo guide', 'Finished .JPG delivery', 'Trip briefing'];
+const INCLUDED = ['Private Thai photographer', 'Finished .JPG delivery', 'Trip briefing'];
 const EXCLUDED = ['RAW files', 'Flights', 'Personal travel insurance (non-OSHC)'];
 
 interface ClientTripWizardProps {

@@ -68,27 +68,28 @@ export async function fetchConfirmedBookings(): Promise<PlatformBooking[]> {
   return rows.filter((b) => String(b.status).toLowerCase() === 'confirmed');
 }
 
-/** Mirror row in public.bookings after successful tour_bookings RPC (portal/intake). */
+/** Mirror row in public.bookings after successful web checkout (portal/intake). */
 export async function insertPlatformBookingRow(input: {
   externalId: string;
-  clientName: string;
-  email: string;
   tripCode: string;
+  guestName: string;
+  guestEmail: string;
+  guests?: number;
   tripName?: string;
   departureDate?: string;
-  totalAmount: number;
+  totalAmount?: number;
 }): Promise<string | null> {
   const { data, error } = await supabase
     .from('bookings')
     .insert({
       external_id: input.externalId,
-      client_name: input.clientName,
-      email: input.email,
       trip_id: input.tripCode,
+      client_name: input.guestName,
+      email: input.guestEmail,
       trip_name: input.tripName ?? input.tripCode,
       departure_date: input.departureDate ?? null,
       intake_status: 'pending',
-      total_amount: input.totalAmount,
+      total_amount: input.totalAmount ?? 0,
       status: 'pending',
     })
     .select('id')
@@ -99,10 +100,35 @@ export async function insertPlatformBookingRow(input: {
       console.warn('[Trip2Talk] bookings table missing — skip mirror insert');
       return null;
     }
-    console.warn('[Trip2Talk] insertPlatformBookingRow:', error.message);
+    console.warn('[Trip2Talk] insertPlatformBookingRow:', error.message, {
+      externalId: input.externalId,
+      tripCode: input.tripCode,
+      guests: input.guests ?? 1,
+    });
     return null;
   }
   return (data?.id as string | undefined) ?? null;
+}
+
+export async function fetchBookingByExternalId(externalId: string): Promise<PlatformBooking | null> {
+  const ref = externalId.trim();
+  if (!ref) return null;
+
+  const { data, error } = await supabase
+    .from('bookings')
+    .select(
+      'id, external_id, client_name, email, trip_id, trip_name, departure_date, intake_status, total_amount, status, created_at'
+    )
+    .eq('external_id', ref)
+    .maybeSingle();
+
+  if (error) {
+    if (isMissingBookingsTable(error.message)) return null;
+    console.warn('[Trip2Talk] fetchBookingByExternalId:', error.message);
+    return null;
+  }
+
+  return (data as PlatformBooking | null) ?? null;
 }
 
 export async function validatePortalToken(token: string): Promise<{

@@ -44,7 +44,7 @@ const WHY_LIGHT: { icon: string; title: Bi; body: Bi }[] = [
     icon: '🚐',
     title: { th: 'พื้นที่ในรถตู้แชร์กัน', en: 'Shared van space' },
     body: {
-      th: 'รถตู้ 8 ที่นั่ง (ลูกทัวร์ 6 + พี่แสน + คนขับ) พื้นที่เก็บกระเป๋าจำกัด ทุกคนต้องแพ็คเบาเพื่อให้ของลงครบ',
+      th: 'รถตู้ 8 ที่นั่ง (ลูกทริป 6 + พี่แสน + คนขับ) พื้นที่เก็บกระเป๋าจำกัด ทุกคนต้องแพ็คเบาเพื่อให้ของลงครบ',
       en: '8-seat van (6 guests + Saen + driver). Storage is limited — everyone packs light so all bags fit.',
     },
   },

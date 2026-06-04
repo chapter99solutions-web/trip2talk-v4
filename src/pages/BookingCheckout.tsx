@@ -434,7 +434,7 @@ export default function BookingCheckout() {
           Reference: <span className="font-mono font-semibold text-navy">{ref}</span>
         </p>
         <Link
-          to={`/trip/${trip.trip_code}`}
+          to={`/trip/${ref}`}
           className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-navy text-white text-sm font-semibold hover:bg-navy-dark transition-colors"
         >
           Open trip hub <span aria-hidden>→</span>
