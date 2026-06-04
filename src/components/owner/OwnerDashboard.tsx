@@ -20,6 +20,7 @@ import type { TourStatus } from '../../types/tour';
 import IntakeFormModal from '../IntakeFormModal';
 import FBInboxTrigger from '../FBInboxTrigger';
 import FinancialTransactionsPanel from './FinancialTransactionsPanel';
+import TripScheduleManager from './TripScheduleManager';
 
 type Lang = 'TH' | 'EN';
 
@@ -1052,6 +1053,8 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
             </table>
           </div>
         </section>
+
+        <TripScheduleManager lang={lang} onToast={showToast} />
 
         {/* SECTION 3.5 — Manage trips (Supabase tours) */}
         <section className="space-y-3">

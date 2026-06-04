@@ -159,10 +159,13 @@ export default function BookingCheckout() {
       if (cancelled) return;
       setAvailableDates(rows);
       setDatesLoading(false);
-      if (rows.length === 1) {
-        const only = rows[0];
-        setSelectedDate(only.start_date);
-        setSelectedDateLabel(formatTourDateRangeLabel(only.start_date, only.end_date));
+      if (rows.length > 0) {
+        const primary = rows[0];
+        setSelectedDate(primary.start_date);
+        setSelectedDateLabel(formatTourDateRangeLabel(primary.start_date, primary.end_date));
+      } else {
+        setSelectedDate('');
+        setSelectedDateLabel('');
       }
     });
     return () => {
@@ -231,12 +234,7 @@ export default function BookingCheckout() {
   const fmtThaiDate = (d: Date) =>
     d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
 
-  const canProceedStep1 = Boolean(selectedDate) && quote?.valid;
-
-  const selectAvailableDate = (row: AvailableTourDate) => {
-    setSelectedDate(row.start_date);
-    setSelectedDateLabel(formatTourDateRangeLabel(row.start_date, row.end_date));
-  };
+  const canProceedStep1 = hasAvailableDates && Boolean(selectedDate) && quote?.valid;
 
   const pickupRequiresSuburb =
     pickupConfig.kind === 'day' && pickupLocation === 'route_waypoint';
@@ -474,49 +472,31 @@ export default function BookingCheckout() {
         <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-5 space-y-5">
           <h2 className="font-serif text-xl font-semibold text-slate-900">เลือกรอบ &amp; จำนวนผู้เดินทาง</h2>
 
-          {!hasAvailableDates && !datesLoading && (
-            <p className="text-sm text-slate-600 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
-              ทริปนี้กำลังเปิดรอบใหม่ — ทักเราเพื่อจองล่วงหน้า
-            </p>
-          )}
-
-          <div className={`grid gap-4 ${hasAvailableDates ? 'sm:grid-cols-2' : 'grid-cols-1'}`}>
-            {hasAvailableDates && (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-                <p className="text-sm font-semibold text-slate-900">จองรอบที่มีอยู่</p>
-                {datesLoading ? (
-                  <p className="text-sm text-slate-500">กำลังโหลดรอบ…</p>
-                ) : (
-                  <div className="space-y-2">
-                    {availableDates.map((row) => {
-                      const active = selectedDate === row.start_date;
-                      const label = formatTourDateRangeLabel(row.start_date, row.end_date);
-                      return (
-                        <button
-                          key={row.id}
-                          type="button"
-                          onClick={() => selectAvailableDate(row)}
-                          className={`w-full text-left rounded-xl border px-4 py-3 transition-colors ${
-                            active
-                              ? 'border-teal bg-white shadow-sm ring-2 ring-teal/30'
-                              : 'border-slate-200 bg-white hover:border-teal/40'
-                          }`}
-                        >
-                          <p className="font-semibold text-slate-900">{label}</p>
-                          <p className="text-xs text-slate-500 mt-0.5 font-mono">{row.start_date}</p>
-                        </button>
-                      );
-                    })}
+          {datesLoading ? (
+            <p className="text-sm text-slate-500">กำลังโหลดรอบ…</p>
+          ) : hasAvailableDates ? (
+            <div className="space-y-2">
+              {availableDates.map((row) => {
+                const label = formatTourDateRangeLabel(row.start_date, row.end_date);
+                return (
+                  <div
+                    key={row.id}
+                    className="rounded-2xl border border-teal/30 bg-teal/5 px-4 py-3 text-slate-900"
+                  >
+                    <p className="font-semibold">📅 {label}</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      วันเดินทางกำหนดโดยทีมงาน — ลูกค้าไม่สามารถเปลี่ยนวันได้
+                    </p>
                   </div>
-                )}
-              </div>
-            )}
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
-              <p className="text-sm font-semibold text-slate-900">ถามวันอื่น</p>
-              <p className="text-sm text-slate-700">ทักเราเพื่อนัดวันที่ต้องการ</p>
-              <p className="text-xs text-slate-500">พี่แสนจะดูคิวและลงวันให้ในระบบ</p>
-              <div className="flex flex-col gap-2 pt-1">
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 space-y-3">
+              <p className="text-sm text-slate-800 font-medium">
+                รอบถัดไปกำลังเปิด — ทักเราเพื่อจองล่วงหน้า
+              </p>
+              <div className="flex flex-col gap-2">
                 <a
                   href={LINE_CONTACT_URL}
                   target="_blank"
@@ -535,7 +515,7 @@ export default function BookingCheckout() {
                 </a>
               </div>
             </div>
-          </div>
+          )}
 
           <div>
             <label className="text-xs text-slate-500 block mb-1">Guests</label>

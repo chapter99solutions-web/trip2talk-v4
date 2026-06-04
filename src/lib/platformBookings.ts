@@ -130,6 +130,7 @@ export async function fetchBookingByExternalId(externalId: string): Promise<Plat
       'id, external_id, client_name, email, trip_id, trip_name, departure_date, intake_status, total_amount, status, created_at'
     )
     .eq('external_id', ref)
+    .limit(1)
     .maybeSingle();
 
   if (error) {
@@ -139,6 +140,92 @@ export async function fetchBookingByExternalId(externalId: string): Promise<Plat
   }
 
   return (data as PlatformBooking | null) ?? null;
+}
+
+export type HubBookingView = {
+  bookingId: string;
+  customerName: string;
+  tourCode: string;
+  tripName: string;
+  guests: number;
+  pickupLocation: string;
+  departTime: string;
+};
+
+function clientNameFromRow(c: Record<string, unknown> | null | undefined): string {
+  if (!c) return '';
+  const en = `${String(c.first_name_en ?? '').trim()} ${String(c.last_name_en ?? '').trim()}`.trim();
+  if (en) return en;
+  const th = `${String(c.first_name_th ?? '').trim()} ${String(c.last_name_th ?? '').trim()}`.trim();
+  return th;
+}
+
+function formatDepartureDate(raw: string | null | undefined): string {
+  const value = String(raw ?? '').trim();
+  if (!value) return '';
+  const iso = value.slice(0, 10);
+  const parsed = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/** Resolve `/trip/:ref` hub data — `bookings.external_id` first, then `tour_bookings.reference_number`. */
+export async function fetchHubBookingByRef(ref: string): Promise<HubBookingView | null> {
+  const bookingRef = decodeURIComponent(ref).trim();
+  if (!bookingRef) return null;
+
+  const platformRow = await fetchBookingByExternalId(bookingRef);
+  if (platformRow) {
+    const tourCode = (platformRow.trip_id || '').trim();
+    const tripName = (platformRow.trip_name || tourCode || 'Trip2Talk Journey').trim();
+    return {
+      bookingId: platformRow.external_id || platformRow.id,
+      customerName: platformRow.client_name.trim(),
+      tourCode,
+      tripName,
+      guests: 1,
+      pickupLocation: '',
+      departTime: formatDepartureDate(platformRow.departure_date),
+    };
+  }
+
+  const { data, error } = await supabase
+    .from('tour_bookings')
+    .select(
+      `
+      id,
+      reference_number,
+      party_pax,
+      trip_date,
+      preferred_pickup,
+      crm_clients (first_name_en, last_name_en, first_name_th, last_name_th),
+      tours (trip_code, destination)
+    `
+    )
+    .eq('reference_number', bookingRef)
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  const tours = data.tours as { trip_code?: string; destination?: string } | null;
+  const tourCode = String(tours?.trip_code ?? '').trim();
+  const tripName = String(tours?.destination ?? tourCode ?? 'Trip2Talk Journey').trim();
+  const rawClient = data.crm_clients;
+  const clientRow = Array.isArray(rawClient) ? rawClient[0] : rawClient;
+  const customerName = clientNameFromRow(
+    (clientRow as Record<string, unknown> | null | undefined) ?? null
+  );
+
+  return {
+    bookingId: String(data.reference_number || data.id),
+    customerName: customerName || 'Guest',
+    tourCode,
+    tripName,
+    guests: Number(data.party_pax ?? 1) || 1,
+    pickupLocation: String(data.preferred_pickup ?? '').trim(),
+    departTime: formatDepartureDate(String(data.trip_date ?? '')),
+  };
 }
 
 export async function validatePortalToken(token: string): Promise<{

@@ -13,7 +13,7 @@ import {
   logConsentToSheet,
   TripSheetRow,
 } from '../lib/tripsSheetApi';
-import { fetchBookingByExternalId } from '../lib/platformBookings';
+import { fetchHubBookingByRef } from '../lib/platformBookings';
 import ItineraryTimeline from '../components/client/ItineraryTimeline';
 import { fetchCityWeather } from '../lib/weather';
 
@@ -23,6 +23,7 @@ type BookingSheet = {
   bookingId: string;
   customerName: string;
   tourCode: string;
+  tripName: string;
   guests: number | null;
   pickupLocation: string;
   departTime: string;
@@ -116,7 +117,7 @@ function SwipeCheckIn({
 export default function ClientVIPHubPage() {
   const t = usePublicStrings();
   const { bookingRef, bookingId } = useParams<{ bookingRef?: string; bookingId?: string }>();
-  const resolvedBookingId = (bookingId || bookingRef || '').trim();
+  const resolvedBookingId = decodeURIComponent((bookingId || bookingRef || '').trim());
 
   const [tab, setTab] = useState<TabId>('pass');
   const [booking, setBooking] = useState<BookingSheet | null>(null);
@@ -166,32 +167,25 @@ export default function ClientVIPHubPage() {
       setLoading(true);
       setError(null);
       try {
-        const platformRow = await fetchBookingByExternalId(resolvedBookingId);
-        if (platformRow) {
-          const tourCode = (platformRow.trip_id || '').trim();
-          if (!tourCode) throw new Error('Booking not found');
-          const t = await fetchTripByCodeFromSheet(tourCode);
-          if (!t) throw new Error('Trip not found for this booking');
+        const hubRow = await fetchHubBookingByRef(resolvedBookingId);
+        if (hubRow) {
           if (cancelled) return;
-          setBooking({
-            bookingId: platformRow.external_id || platformRow.id,
-            customerName: platformRow.client_name,
-            tourCode,
-            guests: 1,
-            pickupLocation: '',
-            departTime: platformRow.departure_date || '',
-          });
-          setTrip(t);
+          setBooking(hubRow);
+
+          if (hubRow.tourCode) {
+            const t = await fetchTripByCodeFromSheet(hubRow.tourCode);
+            if (t && !cancelled) setTrip(t);
+          }
 
           try {
-            const album = await fetchAlbumByBookingRef(platformRow.external_id || platformRow.id);
+            const album = await fetchAlbumByBookingRef(hubRow.bookingId);
             if (album && !cancelled) {
               setAlbumStatus(album.album_status);
               setAlbumUrl(album.album_url);
               setAlbumExpiresAt(album.album_expires_at);
             }
           } catch {
-            // Supabase album fields optional when sheet-only booking
+            // Album metadata optional until staff delivers photos
           }
           return;
         }
@@ -199,17 +193,17 @@ export default function ClientVIPHubPage() {
         const b = await fetchCustomerBookingByIdFromSheet(resolvedBookingId);
         if (!b) throw new Error('Booking not found');
         const t = await fetchTripByCodeFromSheet(b.tourCode);
-        if (!t) throw new Error('Trip not found for this booking');
         if (cancelled) return;
         setBooking({
           bookingId: b.bookingId,
           customerName: b.customerName,
           tourCode: b.tourCode,
+          tripName: t?.tourName || b.tourCode,
           guests: b.guests,
           pickupLocation: b.pickupLocation,
           departTime: b.departTime,
         });
-        setTrip(t);
+        if (t) setTrip(t);
 
         try {
           const album = await fetchAlbumByBookingRef(b.bookingId);
@@ -217,12 +211,9 @@ export default function ClientVIPHubPage() {
             setAlbumStatus(album.album_status);
             setAlbumUrl(album.album_url);
             setAlbumExpiresAt(album.album_expires_at);
-            if (album.facebook_chat_url) {
-              // messengerUrl comes from trip sheet by default
-            }
           }
         } catch {
-          // Supabase album fields optional when sheet-only booking
+          // Album metadata optional when sheet-only booking
         }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Load failed');
@@ -236,11 +227,10 @@ export default function ClientVIPHubPage() {
     };
   }, [resolvedBookingId]);
 
-  const greetingName = booking?.customerName?.trim() || 'friend';
-
-  const tripCode = trip?.tourCode ?? booking?.tourCode ?? 'TRIP';
-  const destination = trip?.countryTag || 'Trip2Talk';
-  const tripTitle = trip?.tourName || `${destination} Photo Journey`;
+  const greetingName = booking?.customerName?.trim() || '';
+  const passTripName = booking?.tripName || trip?.tourName || 'Trip2Talk Journey';
+  const destination = trip?.countryTag || passTripName;
+  const tripTitle = trip?.tourName || passTripName;
   const pax = booking?.guests ?? 1;
   const pickup = pickupShortLabel(booking?.pickupLocation ?? null);
   const depart = booking?.departTime?.trim() || '—';
@@ -278,6 +268,22 @@ export default function ClientVIPHubPage() {
     );
   }
 
+  if (!loading && error && !booking) {
+    return (
+      <div className="min-h-screen bg-sage-50 text-[#1C1C1E] px-4 py-16">
+        <div className="max-w-lg mx-auto text-center bg-white rounded-[28px] border border-sage-100 p-6 space-y-3">
+          <p className="text-lg font-semibold">Booking not found</p>
+          <p className="text-sm text-[#9A9A9A]">
+            We couldn&apos;t find a booking for <span className="font-mono text-[#1C1C1E]">{resolvedBookingId}</span>.
+          </p>
+          <Link to="/" className="text-sm inline-block font-semibold text-sage-700 hover:underline">
+            Back to home
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-sage-50 text-[#1C1C1E] pb-28">
       <div className="max-w-lg mx-auto px-4 pt-6 space-y-4">
@@ -285,7 +291,7 @@ export default function ClientVIPHubPage() {
           <div>
             <p className="text-sm text-[#9A9A9A] font-medium">Hi,</p>
             <h1 className="text-[22px] font-bold leading-tight">
-              {greetingName} <span aria-hidden>👋</span>
+              {greetingName || (loading ? '…' : 'Guest')} <span aria-hidden>👋</span>
             </h1>
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -336,8 +342,11 @@ export default function ClientVIPHubPage() {
                 </div>
 
                 <div className="absolute bottom-4 left-4 right-4 text-white">
-                  <p className="text-[20px] font-bold leading-snug">{tripCode}</p>
-                  <p className="text-sm text-white/80 mt-0.5">{destination}</p>
+                  <p className="text-sm text-white/90 font-semibold">{greetingName || 'Guest'}</p>
+                  <p className="text-[20px] font-bold leading-snug mt-1">{passTripName}</p>
+                  {depart !== '—' && (
+                    <p className="text-sm text-white/80 mt-0.5">Departs {depart}</p>
+                  )}
 
                   <SwipeCheckIn onChecked={doCheckIn} disabled={checkedIn || loading} />
 
