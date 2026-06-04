@@ -18,6 +18,7 @@ const AlbumPrepGate = lazy(() => import('./pages/AlbumPrepGate'));
 const PhotoDeliveryTerms = lazy(() => import('./pages/PhotoDeliveryTerms'));
 const TravelPackageTerms = lazy(() => import('./pages/TravelPackageTerms'));
 const About = lazy(() => import('./pages/About'));
+const Gallery = lazy(() => import('./pages/Gallery'));
 const Contact = lazy(() => import('./pages/Contact'));
 const Calendar = lazy(() => import('./pages/Calendar'));
 const Saved = lazy(() => import('./pages/Saved'));
@@ -123,6 +124,7 @@ export default function App() {
             <Route path="/" element={<PublicPortfolio />} />
             <Route path="/portal" element={<ClientPortal />} />
             <Route path="/about" element={<About />} />
+            <Route path="/gallery" element={<Gallery />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/saved" element={<Saved />} />

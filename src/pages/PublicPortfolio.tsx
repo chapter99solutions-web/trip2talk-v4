@@ -57,9 +57,9 @@ export default function PublicPortfolio() {
             <a href="#tours" className="hover:text-emerald-600 transition-colors">
               Trips
             </a>
-            <a href="#gallery" className="hover:text-emerald-600 transition-colors">
+            <Link to="/gallery" className="hover:text-emerald-600 transition-colors">
               Gallery
-            </a>
+            </Link>
             <a href="#reviews" className="hover:text-emerald-600 transition-colors">
               Reviews
             </a>

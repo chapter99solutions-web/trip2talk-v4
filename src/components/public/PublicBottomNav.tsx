@@ -30,22 +30,9 @@ export default function PublicBottomNav() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
 
-  // Center camera button opens the Gallery. There is no standalone /gallery
-  // route (the router catch-all redirects unknown paths to "/"), so the
-  // canonical gallery is the PortfolioGallery section (id="portfolio") on the
-  // homepage. Navigate home if needed, then smooth-scroll to it.
   const goToGallery = () => {
-    const scrollToGallery = () =>
-      document
-        .getElementById('portfolio')
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-    if (pathname === '/') {
-      scrollToGallery();
-    } else {
-      navigate('/');
-      window.setTimeout(scrollToGallery, 120);
-    }
+    if (pathname === '/gallery') return;
+    navigate('/gallery');
   };
 
   return (
@@ -62,9 +49,11 @@ export default function PublicBottomNav() {
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
         {NAV.map((item) => {
           const isActive =
-            item.to === '/'
-              ? pathname === '/'
-              : pathname.startsWith(item.to.replace(/\/$/, '')) && item.to !== '/';
+            item.kind === 'primary'
+              ? pathname === '/gallery'
+              : item.to === '/'
+                ? pathname === '/'
+                : pathname.startsWith(item.to.replace(/\/$/, '')) && item.to !== '/';
 
           const { Icon } = item;
 
