@@ -366,6 +366,11 @@ export async function runPhase2Book(input: {
   departureDate?: string;
   sendSms?: boolean;
   tourName?: string;
+  photoConsent?: boolean;
+  emergencyName?: string;
+  emergencyPhone?: string;
+  medicalNotes?: string;
+  termsAcceptedAt?: string;
 }): Promise<{ clientId?: string; bookingId?: string; warnings: string[] }> {
   const warnings: string[] = [];
   const tripCode = input.tripCode.trim().toUpperCase();
@@ -515,6 +520,11 @@ export async function runPhase2Book(input: {
       tripName: input.tourName ?? tripCode,
       departureDate: input.departureDate,
       totalAmount: input.depositAud,
+      photoConsent: input.photoConsent,
+      emergencyName: input.emergencyName,
+      emergencyPhone: input.emergencyPhone,
+      medicalNotes: input.medicalNotes,
+      termsAcceptedAt: input.termsAcceptedAt,
     });
     if (!platformId) {
       warnings.push('bookings mirror row skipped (table missing or RLS)');

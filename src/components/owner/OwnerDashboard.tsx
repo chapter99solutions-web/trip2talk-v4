@@ -19,6 +19,7 @@ import { resolveDefaultTenantId } from '../../lib/customerJourney';
 import type { TourStatus } from '../../types/tour';
 import IntakeFormModal from '../IntakeFormModal';
 import FBInboxTrigger from '../FBInboxTrigger';
+import FinancialTransactionsPanel from './FinancialTransactionsPanel';
 
 type Lang = 'TH' | 'EN';
 
@@ -721,6 +722,8 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
 
         {view === 'financial' && (
           <>
+        <FinancialTransactionsPanel lang={lang} supaTours={supaTours} showToast={showToast} />
+
         {/* SECTION 2 — Revenue Summary Cards */}
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-3">

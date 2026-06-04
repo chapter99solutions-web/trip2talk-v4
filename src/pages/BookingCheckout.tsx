@@ -81,6 +81,10 @@ export default function BookingCheckout() {
   const [oshc, setOshc] = useState('');
 
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [photoConsent, setPhotoConsent] = useState(false);
+  const [emergencyName, setEmergencyName] = useState('');
+  const [emergencyPhone, setEmergencyPhone] = useState('');
+  const [medicalNotes, setMedicalNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [bookingRef, setBookingRef] = useState<string | null>(null);
@@ -285,6 +289,14 @@ export default function BookingCheckout() {
       setSubmitError('กรุณายอมรับเงื่อนไขการใช้บริการก่อนยืนยันการจอง');
       return;
     }
+    if (!photoConsent) {
+      setSubmitError('กรุณายินยอมให้ใช้ภาพถ่ายเพื่อการโปรโมท Trip2Talk');
+      return;
+    }
+    if (!emergencyName.trim() || !emergencyPhone.trim()) {
+      setSubmitError('กรุณากรอกชื่อและเบอร์ผู้ติดต่อฉุกเฉิน');
+      return;
+    }
     if (!quote?.valid) {
       setSubmitError('จำนวนผู้เดินทางไม่ถูกต้อง — กรุณากลับไปเลือกจำนวนคนใหม่');
       return;
@@ -318,6 +330,7 @@ export default function BookingCheckout() {
     setSubmitError(null);
 
     const reference_number = generateBookingRef();
+    const termsAcceptedAt = new Date().toISOString();
 
     try {
       const { bookingId, warnings } = await runPhase2Book({
@@ -333,6 +346,11 @@ export default function BookingCheckout() {
         tripSizeTier: resolveTripSizeTier(partyPax) ?? undefined,
         pickup: pickupLocation,
         departureDate: selectedDate,
+        photoConsent,
+        emergencyName: emergencyName.trim(),
+        emergencyPhone: emergencyPhone.trim(),
+        medicalNotes: medicalNotes.trim(),
+        termsAcceptedAt,
       });
 
       if (warnings.length > 0) {
@@ -900,6 +918,58 @@ export default function BookingCheckout() {
             </span>
           </label>
 
+          <label className="flex items-start gap-3 text-sm text-slate-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={photoConsent}
+              onChange={(e) => setPhotoConsent(e.target.checked)}
+              className="mt-1 accent-teal shrink-0"
+            />
+            <span>
+              <span className="block">ยินยอมให้ใช้ภาพถ่ายเพื่อการโปรโมท Trip2Talk</span>
+              <span className="block text-xs text-slate-500 mt-0.5">
+                I consent to photos being used for Trip2Talk marketing
+              </span>
+              <span className="text-red-600"> *</span>
+            </span>
+          </label>
+
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-3">
+            <p className="text-sm font-semibold text-slate-900">
+              ชื่อผู้ติดต่อฉุกเฉิน / Emergency Contact Name
+              <span className="text-red-600"> *</span>
+            </p>
+            <input
+              value={emergencyName}
+              onChange={(e) => setEmergencyName(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-teal/30"
+              required
+            />
+            <div>
+              <label className="text-sm font-semibold text-slate-900 block mb-1">
+                เบอร์โทร / Phone <span className="text-red-600">*</span>
+              </label>
+              <input
+                value={emergencyPhone}
+                onChange={(e) => setEmergencyPhone(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-teal/30"
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-semibold text-slate-900 block mb-1">
+              ข้อมูลสุขภาพที่ควรทราบ (ถ้ามี) / Medical notes (optional)
+            </label>
+            <textarea
+              value={medicalNotes}
+              onChange={(e) => setMedicalNotes(e.target.value)}
+              rows={3}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-teal/30 resize-y"
+            />
+          </div>
+
           {submitError && (
             <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
               {submitError}
@@ -914,9 +984,11 @@ export default function BookingCheckout() {
           >
             {submitting
               ? 'Confirming…'
-              : !termsAccepted
-                ? 'Accept terms to confirm'
-                : dateGateBlocked
+              : !termsAccepted || !photoConsent
+                ? 'Accept terms & photo consent to confirm'
+                : !emergencyName.trim() || !emergencyPhone.trim()
+                  ? 'Add emergency contact to confirm'
+                  : dateGateBlocked
                   ? 'ยังไม่เปิดจอง / Not open'
                   : seatGateFull
                     ? 'ที่นั่งเต็มแล้ว'
