@@ -23,14 +23,18 @@ import {
   PRICING,
 } from '../lib/bookingRules';
 import { ONE_DAY_PICKUP_OPTIONS } from '../lib/pickup-options';
+import { fetchFirstGalleryPhotoUrls } from '../lib/galleryStorage';
+import { TAS_3D2N_COVER_URL, TAS_LH_4D3N_COVER_URL } from '../lib/portfolioUrls';
 
 type Step = 1 | 2 | 3 | 4;
 type VisaType = 'student' | 'other';
 type PackageId = 'STANDARD' | 'SESSION' | 'VIP';
 
 const PAYID = 'trip2talk...';
-const LINE_CONTACT_URL = 'https://line.me/ti/p/~trip2talk';
 const FACEBOOK_CONTACT_URL = 'https://m.me/trip_to_talk';
+const ENQUIRY_EMAIL = 'trip2talksyd@gmail.com';
+const CHECKOUT_YOUTUBE_EMBED =
+  'https://www.youtube.com/embed/TJtTSnXPHeA?autoplay=1&mute=1&loop=1&playlist=TJtTSnXPHeA&controls=0&showinfo=0&rel=0&modestbranding=1';
 
 const PACKAGES: Array<{
   id: PackageId;
@@ -59,6 +63,7 @@ export default function BookingCheckout() {
   const [selectedDateLabel, setSelectedDateLabel] = useState('');
   const [availableDates, setAvailableDates] = useState<AvailableTourDate[]>([]);
   const [datesLoading, setDatesLoading] = useState(false);
+  const [enquiryGalleryPhotos, setEnquiryGalleryPhotos] = useState<string[]>([]);
   const [partyPax, setPartyPax] = useState(initialPax);
 
   const [pkg, setPkg] = useState<PackageId>('STANDARD');
@@ -173,6 +178,22 @@ export default function BookingCheckout() {
     };
   }, [tripCodeForLookup]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void fetchFirstGalleryPhotoUrls(4).then((urls) => {
+      if (cancelled) return;
+      if (urls.length >= 4) {
+        setEnquiryGalleryPhotos(urls);
+        return;
+      }
+      const fallbacks = [TAS_3D2N_COVER_URL, TAS_LH_4D3N_COVER_URL, TAS_3D2N_COVER_URL, TAS_LH_4D3N_COVER_URL];
+      setEnquiryGalleryPhotos([...urls, ...fallbacks].slice(0, 4));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // If the currently-selected pickup is not valid for the active tour type
   // (e.g. tour code changed, or stale state), reset to the first option so the
   // form never submits a stale/invalid value.
@@ -206,6 +227,9 @@ export default function BookingCheckout() {
     portfolio?.image ??
     'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&q=80';
   const tourName = portfolio?.title ?? trip.destination;
+  const enquirySubject = `สอบถามทริป ${tourName}`;
+  const enquiryBody = `สวัสดีครับ สนใจทริป ${tourName} อยากสอบถามรอบและวันที่ที่เปิดครับ`;
+  const enquiryMailtoHref = `mailto:${ENQUIRY_EMAIL}?subject=${encodeURIComponent(enquirySubject)}&body=${encodeURIComponent(enquiryBody)}`;
 
   const packageDef = PACKAGES.find((p) => p.id === pkg) ?? PACKAGES[0];
   const baseTotal = quote?.valid ? quote.totalAud : 0;
@@ -423,7 +447,25 @@ export default function BookingCheckout() {
   }
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-10 space-y-6">
+    <>
+      <div className="relative w-full aspect-video max-h-[200px] sm:max-h-[300px] overflow-hidden bg-black">
+        <iframe
+          title="Trip2Talk journey preview"
+          src={CHECKOUT_YOUTUBE_EMBED}
+          className="absolute inset-0 h-full w-full pointer-events-none"
+          allow="autoplay; encrypted-media; picture-in-picture"
+          referrerPolicy="strict-origin-when-cross-origin"
+        />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/25 via-black/10 to-white" />
+        <p
+          className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-base sm:text-lg font-bold text-white"
+          style={{ textShadow: '0 2px 12px rgba(0,0,0,0.85)' }}
+        >
+          🔥 ที่นั่งใกล้เต็มแล้ว — จองก่อนหมด
+        </p>
+      </div>
+
+      <div className="max-w-lg mx-auto px-4 py-10 space-y-6">
       <Link to={`/tours/${tourId}`} className="text-xs text-slate-500 hover:text-teal">
         ← Trip details
       </Link>
@@ -494,26 +536,37 @@ export default function BookingCheckout() {
           ) : (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 space-y-3">
               <p className="text-sm text-slate-800 font-medium">
-                รอบถัดไปกำลังเปิด — ทักเราเพื่อจองล่วงหน้า
+                รอบถัดไปกำลังเปิด — ติดต่อเราทาง Facebook หรืออีเมล
               </p>
               <div className="flex flex-col gap-2">
-                <a
-                  href={LINE_CONTACT_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex justify-center items-center gap-2 px-4 py-2.5 rounded-full bg-[#06C755] text-white text-sm font-semibold hover:opacity-90 transition-opacity"
-                >
-                  LINE
-                </a>
                 <a
                   href={FACEBOOK_CONTACT_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex justify-center items-center gap-2 px-4 py-2.5 rounded-full bg-[#0084FF] text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+                  className="w-full inline-flex justify-center items-center gap-2 px-4 py-2.5 rounded-full bg-[#0084FF] text-white text-sm font-semibold hover:opacity-90 transition-opacity"
                 >
-                  Facebook Messenger
+                  💬 Facebook Messenger
+                </a>
+                <a
+                  href={enquiryMailtoHref}
+                  className="w-full inline-flex justify-center items-center gap-2 px-4 py-2.5 rounded-full border border-slate-300 bg-white text-slate-800 text-sm font-semibold hover:bg-slate-50 transition-colors"
+                >
+                  ✉️ อีเมลหาเรา
                 </a>
               </div>
+              {enquiryGalleryPhotos.length > 0 && (
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  {enquiryGalleryPhotos.slice(0, 4).map((src, idx) => (
+                    <img
+                      key={`${src}-${idx}`}
+                      src={src}
+                      alt=""
+                      className="aspect-square w-full rounded-xl object-cover border border-amber-100"
+                      loading="lazy"
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -941,6 +994,7 @@ export default function BookingCheckout() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

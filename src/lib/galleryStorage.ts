@@ -91,6 +91,51 @@ export async function getPortfolioPhotoUrl(
   return urls[0] ?? null;
 }
 
+const GALLERY_BUCKET = 'gallery';
+const GALLERY_PHOTOS_ROOT = 'photos';
+
+function isImageFileName(name: string): boolean {
+  return /\.(jpe?g|png|webp|gif)$/i.test(name);
+}
+
+async function collectGalleryPhotoUrls(folder: string, urls: string[], limit: number): Promise<void> {
+  if (urls.length >= limit) return;
+
+  const { data, error } = await supabase.storage.from(GALLERY_BUCKET).list(folder, {
+    limit: 100,
+    sortBy: { column: 'name', order: 'asc' },
+  });
+
+  if (error || !data?.length) return;
+
+  for (const entry of data) {
+    if (urls.length >= limit) break;
+    const meta = entry.metadata as Record<string, unknown> | null;
+    const path = `${folder}/${entry.name}`;
+
+    if (isStorageFile(entry.name, entry.id, meta) && isImageFileName(entry.name)) {
+      const { data: urlData } = supabase.storage.from(GALLERY_BUCKET).getPublicUrl(path);
+      if (urlData.publicUrl) urls.push(urlData.publicUrl);
+      continue;
+    }
+
+    if (!entry.id && !isImageFileName(entry.name)) {
+      await collectGalleryPhotoUrls(path, urls, limit);
+    }
+  }
+}
+
+/** First N public images under `gallery/photos/` (aurora / trip gallery bucket). */
+export async function fetchFirstGalleryPhotoUrls(limit = 4): Promise<string[]> {
+  const urls: string[] = [];
+  try {
+    await collectGalleryPhotoUrls(GALLERY_PHOTOS_ROOT, urls, limit);
+  } catch (e) {
+    console.warn('[galleryStorage] fetchFirstGalleryPhotoUrls:', e);
+  }
+  return urls.slice(0, limit);
+}
+
 export function splitIntoColumnPools(urls: string[], fallbacks: string[]): string[][] {
   const pools: string[][] = [[], [], []];
   urls.forEach((url, i) => {
