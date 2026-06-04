@@ -55,8 +55,8 @@ export default function TripStackCard({
               tourCode={tour.tourCode}
               alt={display.title}
               fallbackUrls={[
-                tour.coverUrl,
                 findTourFallbackByCode(tour.tourCode)?.galleryPhotos?.[0],
+                tour.coverUrl,
               ]}
               aspectClassName="h-full w-full"
               imgClassName="absolute inset-0 w-full h-full object-cover"

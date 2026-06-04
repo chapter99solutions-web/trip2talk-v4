@@ -40,6 +40,12 @@ export const TOUR_COVER_MAP: Record<string, TourCoverMapping> = {
   },
 };
 
+/** Pinned card thumbnails (gallery bucket) — always tried before sheet/DB portfolio paths. */
+export const TOUR_CARD_COVER_URL: Partial<Record<string, string>> = {
+  'TAS-3D2N': TAS_3D2N_COVER_URL,
+  'TAS-LH-4D3N': TAS_LH_4D3N_COVER_URL,
+};
+
 /** Extra card fallbacks when primary portfolio object is missing (404). */
 export const TOUR_COVER_FALLBACK_URLS: Record<string, string[]> = {
   'TAS-3D2N': [
@@ -47,7 +53,7 @@ export const TOUR_COVER_FALLBACK_URLS: Record<string, string[]> = {
     'https://images.unsplash.com/photo-1483347756197-71ef7742304b?w=1200&q=80',
   ],
   'TAS-LH-4D3N': [
-    portfolioPublicUrl('Tasmania/596371362_1428639202594510_8709278754225773992_n.jpg'),
+    TAS_LH_4D3N_COVER_URL,
     'https://images.unsplash.com/photo-1499002238440-d264edd596ec?w=1200&q=80',
   ],
 };
@@ -127,12 +133,14 @@ export function buildTourCoverCandidates(
     out.push(trimmed);
   };
 
-  // DB / sheet cover_image first, then portfolio map fallbacks.
+  // Gallery / pinned covers first — sheet & DB often still point at old portfolio paths.
+  const pinned = TOUR_CARD_COVER_URL[code] ?? mapping?.publicUrl;
+  if (pinned) push(pinned);
   for (const url of extraUrls) push(url);
-  if (mapping?.publicUrl) push(mapping.publicUrl);
   if (mapping?.file) push(portfolioPublicUrl(`${mapping.folder}/${mapping.file}`));
   for (const url of TOUR_COVER_FALLBACK_URLS[code] ?? []) push(url);
 
+  console.log('[TourCard]', code, 'cover candidates', out);
   return out;
 }
 

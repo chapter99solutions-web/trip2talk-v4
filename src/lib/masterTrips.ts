@@ -7,6 +7,7 @@ export type TripType = 'one_day' | 'overnight';
 export type MasterTripSeed = {
   tourCode: string;
   tourName: string;
+  active: boolean;
   countryTag: string;
   weather: string;
   standardPrice: number;
@@ -20,10 +21,12 @@ export type MasterTripSeed = {
   coverUrl?: string;
 };
 
+/** Active trips only — CAN-2D1N inactive (not in 7-trip catalogue). */
 export const MASTER_TRIP_SEEDS: MasterTripSeed[] = [
   {
     tourCode: 'MEL-4D3N',
-    tourName: 'Secret Southern Coast (4D3N)',
+    tourName: 'Victoria Photo Trip (4D3N)', // unified with tours.ts
+    active: true,
     countryTag: 'AU-VIC',
     weather: 'Autumn 14-18°C',
     standardPrice: 1550,
@@ -39,6 +42,7 @@ export const MASTER_TRIP_SEEDS: MasterTripSeed[] = [
   {
     tourCode: 'ULU-4D3N',
     tourName: 'The Red Desert Odyssey (4D3N)',
+    active: true,
     countryTag: 'AU-NT',
     weather: 'Desert 28°C day / 8°C night',
     standardPrice: 1690,
@@ -54,6 +58,7 @@ export const MASTER_TRIP_SEEDS: MasterTripSeed[] = [
   {
     tourCode: 'NZ-6D5N',
     tourName: 'The Alpine Kingdom (6D5N)',
+    active: true,
     countryTag: 'NZ-SI',
     weather: 'Varies by season',
     standardPrice: 2300,
@@ -69,6 +74,7 @@ export const MASTER_TRIP_SEEDS: MasterTripSeed[] = [
   {
     tourCode: 'TAS-3D2N',
     tourName: 'Tasmania Mini Aurora Hunt (3D2N)',
+    active: true,
     countryTag: 'AU-TAS',
     weather: 'Winter 6-12°C',
     standardPrice: 1350,
@@ -84,6 +90,7 @@ export const MASTER_TRIP_SEEDS: MasterTripSeed[] = [
   {
     tourCode: 'TAS-LH-4D3N',
     tourName: 'Tasmania Summer: Launceston – Hobart (4D3N)',
+    active: true,
     countryTag: 'AU-TAS',
     weather: 'Summer 16-22°C',
     standardPrice: 1650,
@@ -98,7 +105,8 @@ export const MASTER_TRIP_SEEDS: MasterTripSeed[] = [
   },
   {
     tourCode: 'KIA-1DAY',
-    tourName: 'The Coastal Cliffs (1 Day)',
+    tourName: 'Sydney – Kiama One Day Photo Trip (1 Day)', // unified with tours.ts
+    active: true,
     countryTag: 'AU-NSW',
     weather: 'Winter 12-16°C',
     standardPrice: 250,
@@ -113,7 +121,8 @@ export const MASTER_TRIP_SEEDS: MasterTripSeed[] = [
   },
   {
     tourCode: 'CAN-2D1N',
-    tourName: 'The Golden Fields (2D1N)',
+    tourName: 'Cowra & Canowindra Canola Fields Photo Trip (2D1N)', // unified with tours.ts
+    active: false,
     countryTag: 'AU-NSW',
     weather: 'Spring 18-24°C',
     standardPrice: 380,
@@ -128,7 +137,8 @@ export const MASTER_TRIP_SEEDS: MasterTripSeed[] = [
   },
   {
     tourCode: 'SYD-1DAY',
-    tourName: 'Secret Sydney (1 Day)',
+    tourName: 'One Day Trip in Sydney & Photoshoot Packages (1 Day)', // unified with tours.ts
+    active: true,
     countryTag: 'AU-NSW',
     weather: 'All seasons',
     standardPrice: 250,

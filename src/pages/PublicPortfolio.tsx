@@ -1,30 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PublicBottomNav from '../components/public/PublicBottomNav';
-import { mergeTripsWithFallback, findTourFallbackByCode } from '../data/tours';
-import { fetchCoverImagesByTripCode } from '../lib/publicTours';
-import { fetchTripsFromSheet, TripSheetRow } from '../lib/tripsSheetApi';
 import MeetTheCrew from '../components/public/MeetTheCrew';
 import TestimonialsSection from '../components/public/TestimonialsSection';
-import MobileTripStack from '../components/public/MobileTripStack';
 import PortfolioGallery from '../components/public/PortfolioGallery';
 import LanguageToggle from '../components/i18n/LanguageToggle';
 import { usePublicStrings } from '../lib/publicI18n';
-import { filterTripsByCategory, TripFilterId } from '../lib/tripFilters';
-import SeasonPrepSection from '../components/public/SeasonPrepSection';
 import HeroSlideshowBackground from '../components/public/HeroSlideshowBackground';
 import TargetAudienceSection from '../components/public/TargetAudienceSection';
-import TourCard from '../components/public/TourCard';
-import { useSavedTrips } from '../hooks/useSavedTrips';
-
+import TripListingSection from '../components/trips/TripListingSection';
 function scrollToSection(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
 }
 
 const STATS = [
-  { value: '400+', label: 'Destinations' },
-  { value: '98%', label: 'Satisfaction' },
-  { value: '120+', label: 'Guides' },
+  { value: '8', label: 'Curated Trips' },
+  { value: '100%', label: 'Small Group' },
+  { value: 'Local', label: 'Expert Guides' },
 ];
 
 const FEATURES = [
@@ -50,67 +41,10 @@ const FEATURES = [
   },
 ];
 
-const TRIP_FILTERS: { id: TripFilterId; labelKey: keyof ReturnType<typeof usePublicStrings> }[] = [
-  { id: 'all', labelKey: 'filter_all' },
-  { id: 'one_day', labelKey: 'filter_one_day' },
-  { id: 'overnight', labelKey: 'filter_overnight' },
-  { id: 'by_season', labelKey: 'filter_by_season' },
-];
-
 export default function PublicPortfolio() {
   const t = usePublicStrings();
-  const { saved, toggle: toggleSave } = useSavedTrips();
-  const [trips, setTrips] = useState<TripSheetRow[]>([]);
-  const [loadingTrips, setLoadingTrips] = useState(true);
-  const [tripError, setTripError] = useState<string | null>(null);
-  const [tripFilter, setTripFilter] = useState<TripFilterId>('all');
+  const exploreHref = '/tours/TAS-3D2N';
 
-  useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      setLoadingTrips(true);
-      setTripError(null);
-      try {
-        const [rows, coverMap] = await Promise.all([
-          fetchTripsFromSheet(),
-          fetchCoverImagesByTripCode(),
-        ]);
-        const merged = mergeTripsWithFallback(rows).map((t) => {
-          const dbCover = coverMap[t.tourCode.trim().toUpperCase()];
-          return dbCover ? { ...t, coverUrl: dbCover } : t;
-        });
-        if (!cancelled) setTrips(merged);
-      } catch (e) {
-        if (!cancelled) {
-          setTripError(e instanceof Error ? e.message : 'Could not load trips');
-          setTrips(mergeTripsWithFallback([]));
-        }
-      } finally {
-        if (!cancelled) setLoadingTrips(false);
-      }
-    };
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const exploreHref = useMemo(() => {
-    const first = trips[0];
-    return first ? `/tours/${encodeURIComponent(first.tourCode)}` : '/';
-  }, [trips]);
-
-  const filteredTrips = useMemo(() => {
-    const list = filterTripsByCategory(trips, tripFilter);
-    // Flagship/featured trips lead the grid.
-    return [...list].sort((a, b) => {
-      const fa = findTourFallbackByCode(a.tourCode)?.featured ? 1 : 0;
-      const fb = findTourFallbackByCode(b.tourCode)?.featured ? 1 : 0;
-      return fb - fa;
-    });
-  }, [trips, tripFilter]);
-
-  const showSeasonPrep = tripFilter === 'by_season';
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans antialiased pb-20">
       {/* Sticky nav */}
@@ -207,73 +141,7 @@ export default function PublicPortfolio() {
 
       <PortfolioGallery title={t.portfolio_gallery} />
 
-      {/* Trips */}
-      <section id="tours" className="max-w-6xl mx-auto px-4 py-20">
-        <div className="text-center mb-10">
-          <h2 className="font-serif text-3xl md:text-4xl font-semibold text-slate-900">{t.curated_journeys}</h2>
-          <p className="text-slate-500 mt-2 text-sm">{t.tier_subtitle}</p>
-          {tripError && <p className="text-xs text-red-700 mt-2">Live trips unavailable: {tripError}</p>}
-        </div>
-        <div className="flex flex-wrap justify-center gap-2 mb-8">
-          {TRIP_FILTERS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => setTripFilter(f.id)}
-              className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
-                tripFilter === f.id
-                  ? 'bg-neutral-950 text-white'
-                  : 'bg-white text-slate-700 border border-slate-200 hover:border-slate-300'
-              }`}
-            >
-              {t[f.labelKey]}
-            </button>
-          ))}
-        </div>
-        {loadingTrips ? (
-          <>
-            <div className="md:hidden space-y-4 px-4">
-              <div className="flex gap-3 overflow-hidden">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="h-10 w-28 rounded-full bg-slate-100 animate-pulse shrink-0" />
-                ))}
-              </div>
-              <div className="rounded-[32px] bg-slate-100 h-[min(72vh,520px)] animate-pulse" />
-            </div>
-            <div id="gallery" className="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="rounded-2xl border border-slate-100 bg-slate-50 h-[360px] animate-pulse" />
-              ))}
-            </div>
-          </>
-        ) : trips.length === 0 ? (
-          <div className="max-w-xl mx-auto text-center py-12">
-            <p className="text-slate-700 font-semibold">No trips available right now.</p>
-            <p className="text-sm text-slate-500 mt-2">Please check again soon.</p>
-          </div>
-        ) : showSeasonPrep ? (
-          <SeasonPrepSection />
-        ) : filteredTrips.length === 0 ? (
-          <div className="max-w-xl mx-auto text-center py-12">
-            <p className="text-slate-700 font-semibold">No trips match this filter.</p>
-          </div>
-        ) : (
-          <div className="space-y-8">
-            <MobileTripStack trips={filteredTrips} saved={saved} onToggleSave={toggleSave} />
-            <div id="gallery" className="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredTrips.map((tour, idx) => (
-                <TourCard
-                  key={tour.tourCode}
-                  tour={tour}
-                  saved={saved.has(tour.tourCode)}
-                  onToggleSave={() => toggleSave(tour.tourCode)}
-                  large={idx === 0 && tripFilter === 'all'}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-      </section>
+      <TripListingSection />
 
       <TargetAudienceSection />
 

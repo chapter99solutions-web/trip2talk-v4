@@ -109,3 +109,27 @@ body {
   );
   animation: galleryShimmerSweep 1.5s ease-in-out infinite;
 }
+
+@keyframes tripCardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.trip-card-enter {
+  animation: tripCardFadeIn 0.55s ease-out forwards;
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trip-card-enter {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

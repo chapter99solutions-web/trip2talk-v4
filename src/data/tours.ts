@@ -1,11 +1,6 @@
 import { MASTER_TRIP_SEEDS } from '../lib/masterTrips';
 import { isRealTourCode } from '../lib/realTourCodes';
-import {
-  PORTFOLIO_PUBLIC_BASE,
-  TAS_3D2N_COVER_URL,
-  TAS_3D2N_HERO_POSTER_URL,
-  TAS_LH_4D3N_COVER_URL,
-} from '../lib/portfolioUrls';
+import { PORTFOLIO_PUBLIC_BASE } from '../lib/portfolioUrls';
 import type { TripSeason, TripType } from '../lib/masterTrips';
 import type { TripSheetRow } from '../lib/tripsSheetApi';
 
@@ -356,7 +351,10 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
       'พักร่วมกันแบบ Dormitory/Design Airbnb อัปเกรดห้องส่วนตัวเพิ่ม $350-$550 AUD/คืน',
     // รูปปกใช้ภาพจริงจากโฟลเดอร์ Hobart (1.jpg) แทนภาพโพสต์ FB เดิมที่มีกล่องค้นหา "#Trip 2 Talk" ติดมาในรูป
     // ส่ง path เต็มแบบเข้ารหัส %20 ครั้งเดียว (ห้าม double-encode) ให้ตรงรูปแบบเดียวกับ CAN-2D1N
-    galleryPhotos: [TAS_3D2N_COVER_URL, TAS_3D2N_HERO_POSTER_URL],
+    galleryPhotos: [
+      'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/gallery/photos/Tasmania/1650/502620104_10236666362749131_6250277977642078256_n.jpg',
+      'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/gallery/photos/Tasmania/1650/502620104_10236666362749131_6250277977642078256_n.jpg',
+    ],
     heroVideoUrl: `${PORTFOLIO_BASE}/Tasmania%2002/VDO/tas01.mp4`,
     // ใช้กลไกแกลเลอรีเดียวกับ CAN-2D1N: ดึงรูปสดจากโฟลเดอร์ portfolio แบบ auto-populate
     galleryFolder: 'Tasmania 02/Hobart',
@@ -415,7 +413,9 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
     ],
     excluded: ['ตั๋วเครื่องบิน', 'อาหารทุกมื้อ', 'ประกันการเดินทาง'],
     accommodation: 'Dormitory/Hostel/Motel อัปเกรดห้องเดี่ยวเพิ่ม $250-$550 AUD/คืน',
-    galleryPhotos: [TAS_LH_4D3N_COVER_URL],
+    galleryPhotos: [
+      'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/gallery/photos/Tasmania/1350/596371362_1428639202594510_8709278754225773992_n%20(1).jpg',
+    ],
     galleryFolder: 'Tasmania 02/Launceston',
   },
   {

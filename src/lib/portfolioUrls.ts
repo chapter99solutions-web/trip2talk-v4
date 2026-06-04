@@ -12,12 +12,12 @@ export function portfolioPublicUrl(objectPath: string): string {
 }
 
 /** Card / sheet cover — Tasmania/Hobart */
-export const TAS_3D2N_COVER_URL = portfolioPublicUrl('Tasmania/Hobart/1.jpg');
+export const TAS_3D2N_COVER_URL =
+  'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/gallery/photos/Tasmania/1650/502620104_10236666362749131_6250277977642078256_n.jpg';
 
 /** Card / sheet cover — Tasmania/Launceston */
-export const TAS_LH_4D3N_COVER_URL = portfolioPublicUrl(
-  'Tasmania/Launceston/594961969_1428638085927955_7817067387013979508_n.jpg',
-);
+export const TAS_LH_4D3N_COVER_URL =
+  'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/gallery/photos/Tasmania/1350/596371362_1428639202594510_8709278754225773992_n%20(1).jpg';
 
 /** Hero video poster + fallback when Hobart object is missing */
-export const TAS_3D2N_HERO_POSTER_URL = portfolioPublicUrl('Tasmania/Hobart/1.jpg');
+export const TAS_3D2N_HERO_POSTER_URL = TAS_3D2N_COVER_URL;
