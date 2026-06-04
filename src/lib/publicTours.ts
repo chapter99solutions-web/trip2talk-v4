@@ -103,6 +103,65 @@ export async function resolveTripById(id: string): Promise<Tour | undefined> {
   return findTripById(code);
 }
 
+export type AvailableTourDate = {
+  id: string;
+  start_date: string;
+  end_date: string | null;
+};
+
+/** ACTIVE tour rows with a scheduled start_date for checkout date cards. */
+export async function fetchAvailableTourDates(tripCode: string): Promise<AvailableTourDate[]> {
+  const code = tripCode.trim().toUpperCase();
+  if (!code) return [];
+
+  const { data, error } = await supabase
+    .from('tours')
+    .select('id, start_date, end_date')
+    .eq('trip_code', code)
+    .eq('status', 'ACTIVE')
+    .not('start_date', 'is', null)
+    .order('start_date', { ascending: true });
+
+  if (error) {
+    console.warn('[Trip2Talk] fetchAvailableTourDates:', error.message);
+    return [];
+  }
+
+  return (data ?? [])
+    .map((row) => {
+      const r = row as { id?: string; start_date?: string; end_date?: string | null };
+      const start = String(r.start_date ?? '').trim();
+      if (!start) return null;
+      return {
+        id: String(r.id ?? start),
+        start_date: start,
+        end_date: r.end_date ? String(r.end_date).trim() : null,
+      };
+    })
+    .filter((row): row is AvailableTourDate => row !== null);
+}
+
+export function formatTourDateRangeLabel(startIso: string, endIso: string | null): string {
+  const start = new Date(startIso);
+  if (!Number.isFinite(start.getTime())) return startIso;
+
+  const end = endIso ? new Date(endIso) : null;
+  if (!end || !Number.isFinite(end.getTime()) || endIso === startIso) {
+    return start.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
+  const sameMonth =
+    start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+  if (sameMonth) {
+    const monthYear = start.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
+    return `${start.getDate()}-${end.getDate()} ${monthYear}`;
+  }
+
+  const startLabel = start.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  const endLabel = end.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  return `${startLabel} – ${endLabel}`;
+}
+
 /** cover_image column values keyed by trip_code. */
 export async function fetchCoverImagesByTripCode(): Promise<Record<string, string>> {
   const { data, error } = await supabase.from('tours').select('trip_code, cover_image');

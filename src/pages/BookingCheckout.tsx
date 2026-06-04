@@ -1,20 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { formatAUD } from '../lib/payidCalc';
-import { resolveTripById } from '../lib/publicTours';
-import { findTourFallbackByCode } from '../data/tours';
+import {
+  fetchAvailableTourDates,
+  formatTourDateRangeLabel,
+  resolveTripById,
+  type AvailableTourDate,
+} from '../lib/publicTours';
 import { quoteTripTotal, resolveTripSizeTier } from '../lib/bookingPolicy';
 import TripSizeTierBadge from '../components/cyber/TripSizeTierBadge';
 import BookingPolicyPanel from '../components/policy/BookingPolicyPanel';
 import { generateBookingRef } from '../lib/bookingRef';
 import {
   runPhase2Book,
-  isTripDateAvailable,
   DateFullyBookedError,
   TripFullError,
   TripNotOpenError,
-  fetchTripAvailability,
-  type TripAvailability,
 } from '../lib/customerJourney';
 import { PORTFOLIO_TOURS } from '../lib/portfolioTours';
 import {
@@ -28,6 +29,8 @@ type VisaType = 'student' | 'other';
 type PackageId = 'STANDARD' | 'SESSION' | 'VIP';
 
 const PAYID = 'trip2talk...';
+const LINE_CONTACT_URL = 'https://line.me/ti/p/~trip2talk';
+const FACEBOOK_CONTACT_URL = 'https://m.me/trip_to_talk';
 
 const PACKAGES: Array<{
   id: PackageId;
@@ -45,13 +48,6 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-function toISODateInputValue(d: Date) {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
-
 export default function BookingCheckout() {
   const { tourId } = useParams<{ tourId: string }>();
   const [search] = useSearchParams();
@@ -59,12 +55,11 @@ export default function BookingCheckout() {
   const [tripLookupDone, setTripLookupDone] = useState(!tourId);
   const initialPax = Math.min(6, Math.max(1, Number(search.get('pax')) || 4));
   const [step, setStep] = useState<Step>(1);
-  const [selectedDate, setSelectedDate] = useState<string>(() => toISODateInputValue(new Date()));
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedDateLabel, setSelectedDateLabel] = useState('');
+  const [availableDates, setAvailableDates] = useState<AvailableTourDate[]>([]);
+  const [datesLoading, setDatesLoading] = useState(false);
   const [partyPax, setPartyPax] = useState(initialPax);
-  const [availabilityChecked, setAvailabilityChecked] = useState(false);
-  // กฎ "หนึ่งทริปต่อหนึ่งวัน": null = ยังไม่ตรวจ, true = ว่าง, false = เต็มแล้ว
-  const [dateAvailable, setDateAvailable] = useState<boolean | null>(null);
-  const [checkingAvailability, setCheckingAvailability] = useState(false);
 
   const [pkg, setPkg] = useState<PackageId>('STANDARD');
 
@@ -96,9 +91,6 @@ export default function BookingCheckout() {
     tourName: string;
     tripCode: string;
   } | null>(null);
-
-  // สถานะที่นั่ง/วันเดินทางสด ๆ จาก DB (source of truth) — ใช้คุมด่านจอง 2 ชั้น.
-  const [availability, setAvailability] = useState<TripAvailability | null>(null);
 
   const quote = useMemo(
     () => (trip ? quoteTripTotal(trip.price_aud, partyPax) : null),
@@ -153,18 +145,25 @@ export default function BookingCheckout() {
     };
   }, [tourId]);
 
-  // โหลดสถานะที่นั่ง/วันเดินทางจาก DB (source of truth). ถ้าคอลัมน์ยังไม่ถูกสร้าง
-  // (ยังไม่ได้รัน migration 16) จะได้ null → ปล่อยให้จองได้ตามเดิม (fail-open),
-  // เพราะ RPC + CHECK constraint ฝั่ง DB เป็นด่านสุดท้ายอยู่แล้ว.
   const tripCodeForLookup = trip?.trip_code;
+  const hasAvailableDates = availableDates.length > 0;
+
   useEffect(() => {
     let cancelled = false;
-    if (!tripCodeForLookup) return;
-    void fetchTripAvailability(tripCodeForLookup).then((a) => {
+    if (!tripCodeForLookup) {
+      setAvailableDates([]);
+      return;
+    }
+    setDatesLoading(true);
+    void fetchAvailableTourDates(tripCodeForLookup).then((rows) => {
       if (cancelled) return;
-      setAvailability(a);
-      // ถ้า DB มีวันออกเดินทางจริง ตั้งเป็นค่าเริ่มต้นของช่องวันที่ (ผูกกับวันจริง).
-      if (a?.departureStart) setSelectedDate(a.departureStart);
+      setAvailableDates(rows);
+      setDatesLoading(false);
+      if (rows.length === 1) {
+        const only = rows[0];
+        setSelectedDate(only.start_date);
+        setSelectedDateLabel(formatTourDateRangeLabel(only.start_date, only.end_date));
+      }
     });
     return () => {
       cancelled = true;
@@ -224,9 +223,7 @@ export default function BookingCheckout() {
   const installment1Due = new Date(bookingDate);
   installment1Due.setDate(installment1Due.getDate() + 30);
 
-  const tripStartIso =
-    findTourFallbackByCode(trip.trip_code)?.nextDate ??
-    (tourId ? findTourFallbackByCode(tourId)?.nextDate : undefined);
+  const tripStartIso = selectedDate || undefined;
   const tripStartDate = tripStartIso ? new Date(tripStartIso) : null;
   const installment2Due = tripStartDate ? new Date(tripStartDate) : null;
   if (installment2Due) installment2Due.setDate(installment2Due.getDate() - 20);
@@ -234,36 +231,13 @@ export default function BookingCheckout() {
   const fmtThaiDate = (d: Date) =>
     d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
 
-  // ───────── ด่านจอง 2 ชั้น (precedence: DATE GATE ก่อน → SEAT GATE) ─────────
-  // ใช้ข้อมูลสด ๆ จาก DB. ถ้า availability เป็น null (ยังไม่รัน migration / ไม่พบทริป)
-  // จะ "ไม่บล็อก" ฝั่ง UI (fail-open) — ฝั่ง DB (RPC) ยังเป็นด่านสุดท้ายเสมอ.
-  // ด่าน 1: ไม่มี departure_start = ยังไม่เปิดจอง.
-  const dateGateBlocked = Boolean(availability) && !availability?.departureStart;
-  // ด่าน 2: มีวันแล้วแต่ที่นั่งเต็ม (seatsLeft <= 0).
-  const seatGateFull =
-    !dateGateBlocked && availability?.seatsLeft != null && availability.seatsLeft <= 0;
-  const gateBlocked = dateGateBlocked || seatGateFull;
-  const seatsLeft = availability?.seatsLeft ?? null;
+  const canProceedStep1 = Boolean(selectedDate) && quote?.valid;
 
-  const canProceedStep1 =
-    Boolean(selectedDate) && quote?.valid && dateAvailable !== false && !gateBlocked;
-
-  // ตรวจ availability ของวันที่เลือก (กฎหนึ่งทริปต่อวัน) ก่อนให้ไปต่อ
-  const handleCheckAvailability = async () => {
-    if (!selectedDate) return;
-    setCheckingAvailability(true);
-    setSubmitError(null);
-    try {
-      const available = await isTripDateAvailable(selectedDate);
-      setDateAvailable(available);
-    } catch {
-      // fail-open: ถ้าตรวจไม่ได้ ปล่อยให้จองต่อ (DB constraint กันซ้ำอยู่แล้ว)
-      setDateAvailable(true);
-    } finally {
-      setAvailabilityChecked(true);
-      setCheckingAvailability(false);
-    }
+  const selectAvailableDate = (row: AvailableTourDate) => {
+    setSelectedDate(row.start_date);
+    setSelectedDateLabel(formatTourDateRangeLabel(row.start_date, row.end_date));
   };
+
   const pickupRequiresSuburb =
     pickupConfig.kind === 'day' && pickupLocation === 'route_waypoint';
 
@@ -281,10 +255,14 @@ export default function BookingCheckout() {
       quoteValid: quote?.valid,
       canProceedStep3,
       blockedByBuffer,
-      gateBlocked,
     });
 
     if (submitting) return;
+    if (!selectedDate) {
+      setSubmitError('กรุณาเลือกรอบเดินทางที่เปิดรับจอง');
+      setStep(1);
+      return;
+    }
     if (!termsAccepted) {
       setSubmitError('กรุณายอมรับเงื่อนไขการใช้บริการก่อนยืนยันการจอง');
       return;
@@ -309,14 +287,6 @@ export default function BookingCheckout() {
       setSubmitError(
         'ทริปนี้ยังไม่ถึงจำนวนขั้นต่ำ และใกล้วันเดินทางเกินไป — กรุณาอัปเกรดเป็น Private Luxury Trip'
       );
-      return;
-    }
-    if (dateGateBlocked) {
-      setSubmitError('ยังไม่มีวันเดินทาง กรุณาติดต่อเจ้าหน้าที่');
-      return;
-    }
-    if (seatGateFull) {
-      setSubmitError('ที่นั่งเต็มแล้ว');
       return;
     }
 
@@ -366,7 +336,6 @@ export default function BookingCheckout() {
 
       // Task 3: Resend confirmation email (best-effort; do not block booking UI)
       try {
-        const departureDate = availability?.departureStart || selectedDate;
         await fetch('/api/send-confirmation', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -377,7 +346,7 @@ export default function BookingCheckout() {
             customerEmail: email,
             tripCode: trip.trip_code,
             tripName: tourName,
-            departureDate,
+            departureDate: selectedDate,
             pax: partyPax,
             totalAud,
             payId: PAYID,
@@ -400,22 +369,16 @@ export default function BookingCheckout() {
       // และ "ไม่" แสดงหน้าจอจองสำเร็จ (ไม่ setBookingRef).
       if (err instanceof DateFullyBookedError) {
         setSubmitError(err.message);
-        setDateAvailable(false);
-        setAvailabilityChecked(true);
         setStep(1);
         return;
       }
-      // ด่านที่นั่งเต็ม (server-side) — รีเฟรช availability + แสดง "เต็มแล้ว".
       if (err instanceof TripFullError) {
         setSubmitError('ที่นั่งเต็มแล้ว');
-        if (tripCodeForLookup) void fetchTripAvailability(tripCodeForLookup).then(setAvailability);
         setStep(1);
         return;
       }
-      // ด่านวันเดินทาง (server-side) — ทริปยังไม่เปิดจอง.
       if (err instanceof TripNotOpenError) {
         setSubmitError('ยังไม่มีวันเดินทาง กรุณาติดต่อเจ้าหน้าที่');
-        if (tripCodeForLookup) void fetchTripAvailability(tripCodeForLookup).then(setAvailability);
         setStep(1);
         return;
       }
@@ -500,122 +463,122 @@ export default function BookingCheckout() {
         </div>
       </div>
 
-      {submitError && (
+      {submitError && step !== 1 && (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {submitError}
         </div>
       )}
 
-      {/* ด่าน 1 (DATE GATE): ทริปยังไม่กำหนดวันออกเดินทาง = ยังไม่เปิดจอง */}
-      {dateGateBlocked && (
-        <div className="rounded-2xl border border-slate-300 bg-slate-50 p-4 text-sm text-slate-700 space-y-1">
-          <p className="font-semibold text-slate-900">🗓️ Dates coming soon / เปิดจองเร็ว ๆ นี้</p>
-          <p>ยังไม่มีวันเดินทาง กรุณาติดต่อเจ้าหน้าที่</p>
-        </div>
-      )}
-
-      {/* ด่าน 2 (SEAT GATE): ที่นั่งเต็ม */}
-      {seatGateFull && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          <span className="px-2 py-0.5 mr-2 rounded-full bg-red-600 text-white text-xs font-semibold">
-            ที่นั่งเต็มแล้ว
-          </span>
-          กรุณาเลือกทริปอื่น
-        </div>
-      )}
-
-      {/* แสดง "เหลือกี่ที่นั่ง" สด ๆ จาก DB เมื่อทราบและยังเปิดจอง */}
-      {!gateBlocked && seatsLeft != null && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-          🔥 เหลือ {seatsLeft} ที่นั่ง (seats left)
-        </div>
-      )}
-
       {/* Step 1 */}
       {step === 1 && (
-        <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-5 space-y-4">
-          <h2 className="font-serif text-xl font-semibold text-slate-900">Select date & guests</h2>
+        <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-5 space-y-5">
+          <h2 className="font-serif text-xl font-semibold text-slate-900">เลือกรอบ &amp; จำนวนผู้เดินทาง</h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-slate-500 block mb-1">Date</label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => {
-                  setSelectedDate(e.target.value);
-                  setAvailabilityChecked(false);
-                  setDateAvailable(null);
-                }}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-teal/30"
-              />
-            </div>
+          {!hasAvailableDates && !datesLoading && (
+            <p className="text-sm text-slate-600 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+              ทริปนี้กำลังเปิดรอบใหม่ — ทักเราเพื่อจองล่วงหน้า
+            </p>
+          )}
 
-            <div>
-              <label className="text-xs text-slate-500 block mb-1">Guests</label>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPartyPax((p) => clamp(p - 1, 1, 6));
-                    setAvailabilityChecked(false);
-                  }}
-                  className="w-10 h-10 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold"
-                >
-                  −
-                </button>
-                <div className="flex-1 text-center rounded-xl border border-slate-200 bg-white py-2 font-semibold text-slate-900">
-                  {partyPax}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPartyPax((p) => clamp(p + 1, 1, 6));
-                    setAvailabilityChecked(false);
-                  }}
-                  className="w-10 h-10 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold"
-                >
-                  +
-                </button>
+          <div className={`grid gap-4 ${hasAvailableDates ? 'sm:grid-cols-2' : 'grid-cols-1'}`}>
+            {hasAvailableDates && (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                <p className="text-sm font-semibold text-slate-900">จองรอบที่มีอยู่</p>
+                {datesLoading ? (
+                  <p className="text-sm text-slate-500">กำลังโหลดรอบ…</p>
+                ) : (
+                  <div className="space-y-2">
+                    {availableDates.map((row) => {
+                      const active = selectedDate === row.start_date;
+                      const label = formatTourDateRangeLabel(row.start_date, row.end_date);
+                      return (
+                        <button
+                          key={row.id}
+                          type="button"
+                          onClick={() => selectAvailableDate(row)}
+                          className={`w-full text-left rounded-xl border px-4 py-3 transition-colors ${
+                            active
+                              ? 'border-teal bg-white shadow-sm ring-2 ring-teal/30'
+                              : 'border-slate-200 bg-white hover:border-teal/40'
+                          }`}
+                        >
+                          <p className="font-semibold text-slate-900">{label}</p>
+                          <p className="text-xs text-slate-500 mt-0.5 font-mono">{row.start_date}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-              {quote?.tier && <div className="mt-2">{<TripSizeTierBadge tier={quote.tier} />}</div>}
+            )}
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+              <p className="text-sm font-semibold text-slate-900">ถามวันอื่น</p>
+              <p className="text-sm text-slate-700">ทักเราเพื่อนัดวันที่ต้องการ</p>
+              <p className="text-xs text-slate-500">พี่แสนจะดูคิวและลงวันให้ในระบบ</p>
+              <div className="flex flex-col gap-2 pt-1">
+                <a
+                  href={LINE_CONTACT_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex justify-center items-center gap-2 px-4 py-2.5 rounded-full bg-[#06C755] text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+                >
+                  LINE
+                </a>
+                <a
+                  href={FACEBOOK_CONTACT_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex justify-center items-center gap-2 px-4 py-2.5 rounded-full bg-[#0084FF] text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+                >
+                  Facebook Messenger
+                </a>
+              </div>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleCheckAvailability}
-            disabled={!selectedDate || !quote?.valid || checkingAvailability}
-            className="w-full inline-flex justify-center items-center gap-2 py-3 rounded-full bg-navy text-white text-sm font-semibold hover:bg-navy-dark transition-colors disabled:opacity-40"
-          >
-            {checkingAvailability ? 'Checking…' : 'Check Availability'} <span aria-hidden>→</span>
-          </button>
-
-          {availabilityChecked && dateAvailable === true && (
-            <div className="rounded-2xl bg-slate-50 border border-slate-100 p-4 text-sm text-slate-700">
-              ✅ Available — continue to choose a package.
+          <div>
+            <label className="text-xs text-slate-500 block mb-1">Guests</label>
+            <div className="flex items-center gap-2 max-w-xs">
+              <button
+                type="button"
+                onClick={() => setPartyPax((p) => clamp(p - 1, 1, 6))}
+                className="w-10 h-10 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold"
+              >
+                −
+              </button>
+              <div className="flex-1 text-center rounded-xl border border-slate-200 bg-white py-2 font-semibold text-slate-900">
+                {partyPax}
+              </div>
+              <button
+                type="button"
+                onClick={() => setPartyPax((p) => clamp(p + 1, 1, 6))}
+                className="w-10 h-10 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold"
+              >
+                +
+              </button>
             </div>
-          )}
-
-          {availabilityChecked && dateAvailable === false && (
-            <div className="rounded-2xl bg-red-50 border border-red-200 p-4 text-sm text-red-700 flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded-full bg-red-600 text-white text-xs font-semibold">
-                เต็มแล้ว (Fully booked)
-              </span>
-              <span>วันนี้มีคนจองแล้ว — กรุณาเลือกวันอื่น</span>
-            </div>
-          )}
-
-          <div className="flex justify-end">
-            <button
-              type="button"
-              disabled={!availabilityChecked || dateAvailable === false}
-              onClick={() => setStep(2)}
-              className="px-5 py-2.5 rounded-full bg-teal text-navy font-semibold text-sm disabled:opacity-40"
-            >
-              Continue <span aria-hidden>→</span>
-            </button>
+            {quote?.tier && <div className="mt-2">{<TripSizeTierBadge tier={quote.tier} />}</div>}
           </div>
+
+          {submitError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              {submitError}
+            </div>
+          )}
+
+          {hasAvailableDates && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                disabled={!canProceedStep1}
+                onClick={() => setStep(2)}
+                className="px-5 py-2.5 rounded-full bg-teal text-navy font-semibold text-sm disabled:opacity-40"
+              >
+                Continue <span aria-hidden>→</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -813,7 +776,9 @@ export default function BookingCheckout() {
             <div className="px-5 pb-5 space-y-2 text-sm text-white/80">
               <div className="flex justify-between">
                 <span>Date</span>
-                <span className="font-mono text-white/90">{selectedDate}</span>
+                <span className="font-mono text-white/90 text-right">
+                  {selectedDateLabel || selectedDate || '—'}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>Guests</span>
@@ -988,11 +953,7 @@ export default function BookingCheckout() {
                 ? 'Accept terms & photo consent to confirm'
                 : !emergencyName.trim() || !emergencyPhone.trim()
                   ? 'Add emergency contact to confirm'
-                  : dateGateBlocked
-                  ? 'ยังไม่เปิดจอง / Not open'
-                  : seatGateFull
-                    ? 'ที่นั่งเต็มแล้ว'
-                    : 'Confirm Booking'}
+                  : 'Confirm Booking'}
           </button>
 
           <div className="rounded-2xl bg-white border border-slate-100 p-4">
