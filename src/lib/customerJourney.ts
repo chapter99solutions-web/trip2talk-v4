@@ -371,6 +371,7 @@ export async function runPhase2Book(input: {
   emergencyPhone?: string;
   medicalNotes?: string;
   termsAcceptedAt?: string;
+  waiverData?: Record<string, unknown>;
 }): Promise<{ clientId?: string; bookingId?: string; warnings: string[] }> {
   const warnings: string[] = [];
   const tripCode = input.tripCode.trim().toUpperCase();
@@ -525,6 +526,7 @@ export async function runPhase2Book(input: {
       emergencyPhone: input.emergencyPhone,
       medicalNotes: input.medicalNotes,
       termsAcceptedAt: input.termsAcceptedAt,
+      waiverData: input.waiverData,
     });
     if (!platformId) {
       warnings.push('bookings mirror row skipped (table missing or RLS)');

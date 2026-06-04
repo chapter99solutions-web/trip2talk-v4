@@ -83,6 +83,7 @@ export async function insertPlatformBookingRow(input: {
   emergencyPhone?: string;
   medicalNotes?: string;
   termsAcceptedAt?: string;
+  waiverData?: Record<string, unknown>;
 }): Promise<string | null> {
   const { data, error } = await supabase
     .from('bookings')
@@ -101,6 +102,7 @@ export async function insertPlatformBookingRow(input: {
       emergency_phone: input.emergencyPhone?.trim() || null,
       medical_notes: input.medicalNotes?.trim() || null,
       terms_accepted_at: input.termsAcceptedAt ?? null,
+      waiver_data: input.waiverData ?? null,
     })
     .select('id')
     .single();

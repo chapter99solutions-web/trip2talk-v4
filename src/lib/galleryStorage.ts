@@ -136,6 +136,46 @@ export async function fetchFirstGalleryPhotoUrls(limit = 4): Promise<string[]> {
   return urls.slice(0, limit);
 }
 
+export type EnquiryGalleryPhoto = {
+  url: string;
+  fileName: string;
+};
+
+/** Unique checkout enquiry grid photos from `gallery/photos/` (no padding duplicates). */
+export async function fetchEnquiryGalleryPhotos(maxUnique = 4): Promise<EnquiryGalleryPhoto[]> {
+  const { data, error } = await supabase.storage.from(GALLERY_BUCKET).list(GALLERY_PHOTOS_ROOT, {
+    limit: 8,
+    sortBy: { column: 'name', order: 'asc' },
+  });
+
+  if (error) {
+    console.warn('[galleryStorage] fetchEnquiryGalleryPhotos:', error.message);
+    return [];
+  }
+  if (!data?.length) return [];
+
+  const seen = new Set<string>();
+  const photos: EnquiryGalleryPhoto[] = [];
+
+  for (const entry of data) {
+    if (photos.length >= maxUnique) break;
+    const meta = entry.metadata as Record<string, unknown> | null;
+    if (!isStorageFile(entry.name, entry.id, meta) || !isImageFileName(entry.name)) continue;
+
+    const dedupeKey = entry.name.toLowerCase();
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+
+    const path = `${GALLERY_PHOTOS_ROOT}/${entry.name}`;
+    const { data: urlData } = supabase.storage.from(GALLERY_BUCKET).getPublicUrl(path);
+    if (urlData.publicUrl) {
+      photos.push({ url: urlData.publicUrl, fileName: entry.name });
+    }
+  }
+
+  return photos;
+}
+
 export function splitIntoColumnPools(urls: string[], fallbacks: string[]): string[][] {
   const pools: string[][] = [[], [], []];
   urls.forEach((url, i) => {

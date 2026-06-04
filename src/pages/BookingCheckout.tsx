@@ -23,10 +23,17 @@ import {
   PRICING,
 } from '../lib/bookingRules';
 import { ONE_DAY_PICKUP_OPTIONS } from '../lib/pickup-options';
-import { fetchFirstGalleryPhotoUrls } from '../lib/galleryStorage';
-import { TAS_3D2N_COVER_URL, TAS_LH_4D3N_COVER_URL } from '../lib/portfolioUrls';
+import { fetchEnquiryGalleryPhotos, type EnquiryGalleryPhoto } from '../lib/galleryStorage';
+import WaiverForm from '../components/WaiverForm';
+import {
+  buildMedicalNotesFromWaiver,
+  EMPTY_WAIVER_FORM,
+  isWaiverFormValid,
+  photoConsentFromWaiver,
+  type WaiverFormData,
+} from '../types/waiverForm';
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
 type VisaType = 'student' | 'other';
 type PackageId = 'STANDARD' | 'SESSION' | 'VIP';
 
@@ -63,7 +70,8 @@ export default function BookingCheckout() {
   const [selectedDateLabel, setSelectedDateLabel] = useState('');
   const [availableDates, setAvailableDates] = useState<AvailableTourDate[]>([]);
   const [datesLoading, setDatesLoading] = useState(false);
-  const [enquiryGalleryPhotos, setEnquiryGalleryPhotos] = useState<string[]>([]);
+  const [enquiryGalleryPhotos, setEnquiryGalleryPhotos] = useState<EnquiryGalleryPhoto[]>([]);
+  const [enquiryLightboxUrl, setEnquiryLightboxUrl] = useState<string | null>(null);
   const [partyPax, setPartyPax] = useState(initialPax);
 
   const [pkg, setPkg] = useState<PackageId>('STANDARD');
@@ -81,10 +89,9 @@ export default function BookingCheckout() {
   const [oshc, setOshc] = useState('');
 
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [photoConsent, setPhotoConsent] = useState(false);
+  const [waiverForm, setWaiverForm] = useState<WaiverFormData>(EMPTY_WAIVER_FORM);
   const [emergencyName, setEmergencyName] = useState('');
   const [emergencyPhone, setEmergencyPhone] = useState('');
-  const [medicalNotes, setMedicalNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [bookingRef, setBookingRef] = useState<string | null>(null);
@@ -180,14 +187,9 @@ export default function BookingCheckout() {
 
   useEffect(() => {
     let cancelled = false;
-    void fetchFirstGalleryPhotoUrls(4).then((urls) => {
+    void fetchEnquiryGalleryPhotos(4).then((photos) => {
       if (cancelled) return;
-      if (urls.length >= 4) {
-        setEnquiryGalleryPhotos(urls);
-        return;
-      }
-      const fallbacks = [TAS_3D2N_COVER_URL, TAS_LH_4D3N_COVER_URL, TAS_3D2N_COVER_URL, TAS_LH_4D3N_COVER_URL];
-      setEnquiryGalleryPhotos([...urls, ...fallbacks].slice(0, 4));
+      setEnquiryGalleryPhotos(photos);
     });
     return () => {
       cancelled = true;
@@ -228,7 +230,7 @@ export default function BookingCheckout() {
     'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&q=80';
   const tourName = portfolio?.title ?? trip.destination;
   const enquirySubject = `สอบถามทริป ${tourName}`;
-  const enquiryBody = `สวัสดีครับ สนใจทริป ${tourName} อยากสอบถามรอบและวันที่ที่เปิดครับ`;
+  const enquiryBody = `สวัสดีครับ/ค่ะ\n\nสนใจทริป: ${tourName}\nอยากสอบถามรอบและวันที่ที่เปิดรับจองครับ/ค่ะ\n\nชื่อ: \nจำนวนคน: \nช่วงเวลาที่สะดวก: `;
   const enquiryMailtoHref = `mailto:${ENQUIRY_EMAIL}?subject=${encodeURIComponent(enquirySubject)}&body=${encodeURIComponent(enquiryBody)}`;
 
   const packageDef = PACKAGES.find((p) => p.id === pkg) ?? PACKAGES[0];
@@ -270,6 +272,9 @@ export default function BookingCheckout() {
     (!pickupRequiresSuburb || hotelName.trim()) &&
     (visaType !== 'student' || oshc.trim());
 
+  const canProceedStep4 = isWaiverFormValid(waiverForm);
+  const photoConsent = photoConsentFromWaiver(waiverForm);
+
   const handleConfirm = async () => {
     console.log('SUBMIT FIRED');
     console.log('[Trip2Talk] handleConfirm fired', {
@@ -289,8 +294,9 @@ export default function BookingCheckout() {
       setSubmitError('กรุณายอมรับเงื่อนไขการใช้บริการก่อนยืนยันการจอง');
       return;
     }
-    if (!photoConsent) {
-      setSubmitError('กรุณายินยอมให้ใช้ภาพถ่ายเพื่อการโปรโมท Trip2Talk');
+    if (!canProceedStep4) {
+      setSubmitError('กรุณากรอกหนังสือยินยอมให้ครบทุกข้อที่จำเป็น');
+      setStep(4);
       return;
     }
     if (!emergencyName.trim() || !emergencyPhone.trim()) {
@@ -341,8 +347,12 @@ export default function BookingCheckout() {
         photoConsent,
         emergencyName: emergencyName.trim(),
         emergencyPhone: emergencyPhone.trim(),
-        medicalNotes: medicalNotes.trim(),
+        medicalNotes: buildMedicalNotesFromWaiver(waiverForm),
         termsAcceptedAt,
+        waiverData: {
+          ...waiverForm,
+          signedAt: termsAcceptedAt,
+        },
       });
 
       if (warnings.length > 0) {
@@ -489,7 +499,7 @@ export default function BookingCheckout() {
 
       <div className="flex items-center justify-between text-xs text-slate-500">
         <p>
-          Step <span className="font-semibold text-slate-900">{step}</span> / 4
+          Step <span className="font-semibold text-slate-900">{step}</span> / 5
         </p>
         <div className="flex gap-2">
           <button
@@ -549,22 +559,41 @@ export default function BookingCheckout() {
                 </a>
                 <a
                   href={enquiryMailtoHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="w-full inline-flex justify-center items-center gap-2 px-4 py-2.5 rounded-full border border-slate-300 bg-white text-slate-800 text-sm font-semibold hover:bg-slate-50 transition-colors"
                 >
                   ✉️ อีเมลหาเรา
                 </a>
               </div>
               {enquiryGalleryPhotos.length > 0 && (
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  {enquiryGalleryPhotos.slice(0, 4).map((src, idx) => (
-                    <img
-                      key={`${src}-${idx}`}
-                      src={src}
-                      alt=""
-                      className="aspect-square w-full rounded-xl object-cover border border-amber-100"
-                      loading="lazy"
-                    />
-                  ))}
+                <div className="pt-1 space-y-2">
+                  <div
+                    className={`grid gap-2 ${
+                      enquiryGalleryPhotos.length === 1
+                        ? 'grid-cols-1 max-w-[12rem] mx-auto'
+                        : 'grid-cols-2'
+                    }`}
+                  >
+                    {enquiryGalleryPhotos.map((photo) => (
+                      <button
+                        key={photo.fileName}
+                        type="button"
+                        onClick={() => setEnquiryLightboxUrl(photo.url)}
+                        className="rounded-xl overflow-hidden border border-amber-100 focus:outline-none focus:ring-2 focus:ring-teal/40"
+                      >
+                        <img
+                          src={photo.url}
+                          alt={`ทริป Trip2Talk — ${photo.fileName}`}
+                          className="aspect-square w-full object-cover"
+                          loading="lazy"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-center text-xs text-slate-600">
+                    ภาพจากทริปจริง — ถ่ายโดยช่างภาพ Trip2Talk
+                  </p>
                 </div>
               )}
             </div>
@@ -787,8 +816,25 @@ export default function BookingCheckout() {
         </div>
       )}
 
-      {/* Step 4 */}
+      {/* Step 4 — Waiver & Consent */}
       {step === 4 && (
+        <div className="space-y-4">
+          <WaiverForm value={waiverForm} onChange={setWaiverForm} />
+          <div className="flex justify-end">
+            <button
+              type="button"
+              disabled={!canProceedStep4}
+              onClick={() => setStep(5)}
+              className="px-5 py-2.5 rounded-full bg-teal text-navy font-semibold text-sm disabled:opacity-40"
+            >
+              Continue <span aria-hidden>→</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 5 — Summary & confirm */}
+      {step === 5 && (
         <div className="space-y-4">
           <h2 className="font-serif text-xl font-semibold text-slate-900">Checkout summary</h2>
 
@@ -916,22 +962,6 @@ export default function BookingCheckout() {
             </span>
           </label>
 
-          <label className="flex items-start gap-3 text-sm text-slate-700 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={photoConsent}
-              onChange={(e) => setPhotoConsent(e.target.checked)}
-              className="mt-1 accent-teal shrink-0"
-            />
-            <span>
-              <span className="block">ยินยอมให้ใช้ภาพถ่ายเพื่อการโปรโมท Trip2Talk</span>
-              <span className="block text-xs text-slate-500 mt-0.5">
-                I consent to photos being used for Trip2Talk marketing
-              </span>
-              <span className="text-red-600"> *</span>
-            </span>
-          </label>
-
           <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-3">
             <p className="text-sm font-semibold text-slate-900">
               ชื่อผู้ติดต่อฉุกเฉิน / Emergency Contact Name
@@ -956,18 +986,6 @@ export default function BookingCheckout() {
             </div>
           </div>
 
-          <div>
-            <label className="text-sm font-semibold text-slate-900 block mb-1">
-              ข้อมูลสุขภาพที่ควรทราบ (ถ้ามี) / Medical notes (optional)
-            </label>
-            <textarea
-              value={medicalNotes}
-              onChange={(e) => setMedicalNotes(e.target.value)}
-              rows={3}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900 outline-none focus:ring-2 focus:ring-teal/30 resize-y"
-            />
-          </div>
-
           {submitError && (
             <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
               {submitError}
@@ -977,16 +995,24 @@ export default function BookingCheckout() {
           <button
             type="button"
             onClick={() => void handleConfirm()}
-            disabled={submitting}
+            disabled={
+              submitting ||
+              !termsAccepted ||
+              !canProceedStep4 ||
+              !emergencyName.trim() ||
+              !emergencyPhone.trim()
+            }
             className="w-full inline-flex justify-center items-center py-3 rounded-xl bg-teal text-navy font-semibold text-sm disabled:opacity-40"
           >
             {submitting
               ? 'Confirming…'
-              : !termsAccepted || !photoConsent
-                ? 'Accept terms & photo consent to confirm'
-                : !emergencyName.trim() || !emergencyPhone.trim()
-                  ? 'Add emergency contact to confirm'
-                  : 'Confirm Booking'}
+              : !termsAccepted
+                ? 'Accept terms to confirm'
+                : !canProceedStep4
+                  ? 'Complete waiver to confirm'
+                  : !emergencyName.trim() || !emergencyPhone.trim()
+                    ? 'Add emergency contact to confirm'
+                    : 'Confirm Booking'}
           </button>
 
           <div className="rounded-2xl bg-white border border-slate-100 p-4">
@@ -995,6 +1021,22 @@ export default function BookingCheckout() {
         </div>
       )}
       </div>
+
+      {enquiryLightboxUrl && (
+        <button
+          type="button"
+          aria-label="ปิดภาพ"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setEnquiryLightboxUrl(null)}
+        >
+          <img
+            src={enquiryLightboxUrl}
+            alt="ภาพจากทริป Trip2Talk"
+            className="max-h-[90vh] max-w-full rounded-2xl object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </button>
+      )}
     </>
   );
 }
