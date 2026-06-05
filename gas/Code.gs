@@ -88,6 +88,9 @@ function doGet(e) {
     if (actionNorm === 'list' && (sheetNorm === tripsTabNorm || sheetNorm === 'trips_data')) {
       return json_(readTrips_({ debug: debug }));
     }
+    if (actionNorm === 'seedtripinfosheet') {
+      return json_(seedTripInfoSheet_());
+    }
     if (action === 'seedTrips' || action === 'seedMasterTrips') {
       return json_(seedMasterTrips_());
     }
@@ -196,7 +199,7 @@ function readTrips_(options) {
         (normalized.tourName || '')
     );
     if (!normalized.tourCode) {
-      Logger.log('[Trip2Talk] WARN row ' + (r + 1) + ' has no Tour Code — skipped');
+      Logger.log('[Trip2Talk] WARN row ' + (r + 1) + ' has no Trip/Tour Code — skipped');
       continue;
     }
     trips.push(normalized);
@@ -214,10 +217,331 @@ function readTrips_(options) {
   };
 }
 
+/** Row 1 headers for the public Trip info tab (20 columns, Title Case). */
+function tripInfoSheetHeaders_() {
+  return [
+    'Trip Code',
+    'Tour Name',
+    'Cover',
+    'Price',
+    'Max Pax',
+    'Departure Date',
+    'Duration',
+    'Highlight 1',
+    'Highlight 2',
+    'Highlight 3',
+    'Highlight 4',
+    'Itinerary',
+    'Meeting Point',
+    'Included',
+    'Excluded',
+    'Note',
+    'Status',
+    'Installment 1',
+    'Installment 2',
+    'Installment 3',
+  ];
+}
+
+function durationDaysFromDurationLabel_(label) {
+  var m = String(label || '').match(/(\d+)\s*Day/i);
+  return m ? Number(m[1]) : 1;
+}
+
+function meetingPointLabel_(pickupType) {
+  if (pickupType === 'airport_terminal') {
+    return 'Sydney Airport Terminal (overnight trips)';
+  }
+  return 'Thai Town, Sydney (Dixon St)';
+}
+
+function itinerarySummary_(days) {
+  return days
+    .map(function (d) {
+      return 'Day ' + d.day + ': ' + d.title + ' — ' + d.desc;
+    })
+    .join(' | ');
+}
+
+function joinList_(items) {
+  return items.join('; ');
+}
+
+function installmentAmounts_(standardPrice, durationDays) {
+  if (durationDays <= 1) {
+    return { i1: 100, i2: '', i3: '' };
+  }
+  var remaining = Math.max(0, Number(standardPrice) - 100);
+  var half = Math.round(remaining / 2);
+  return { i1: 100, i2: half, i3: remaining - half };
+}
+
+function padHighlights_(list) {
+  var out = ['', '', '', ''];
+  for (var i = 0; i < 4 && i < list.length; i++) {
+    out[i] = list[i];
+  }
+  return out;
+}
+
+/** Canonical 8 trips — aligned with src/data/tours.ts + src/lib/realTourCodes.ts */
+function tripInfoSeedDefinitions_() {
+  var portfolio = 'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio';
+  return [
+    {
+      tourCode: 'TAS-3D2N',
+      tourName: 'Tasmania Mini Aurora Hunt (3D2N)',
+      coverUrl:
+        portfolio +
+        '/Tasmania/Launceston/596811714_1428639069261190_2753284779604496226_n.jpg',
+      standardPrice: 1350,
+      maxPax: 6,
+      durationLabel: '3 Days 2 Nights',
+      highlights: ['Mt Wellington Aurora Hunt', 'Bruny Island', 'MONA', ''],
+      itinerary: [
+        { day: 1, title: 'Port Arthur → Mt. Wellington Aurora Hunt', desc: 'Private SUV · Hobart Market · Aurora on Mt Wellington' },
+        { day: 2, title: 'Bruny Island Full Day', desc: 'The Neck · Lighthouse · optional oyster farm' },
+        { day: 3, title: 'MONA → Waterfront → SYD', desc: 'MONA · Waterfront · flight home' },
+      ],
+      pickupType: 'airport_terminal',
+      included: ['Private SUV + driver', 'Professional photographer', 'Drinking water', 'Entry fees per plan', 'Flight booking assistance'],
+      excluded: ['Flights', 'All meals', 'Travel insurance'],
+      note: 'Winter aurora-focused Hobart loop · Design Airbnb dormitory',
+      status: 'CONFIRMED',
+    },
+    {
+      tourCode: 'MEL-4D3N',
+      tourName: 'Victoria Photo Trip (4D3N)',
+      coverUrl: portfolio + '/Melbourne/01.jpg',
+      standardPrice: 1550,
+      maxPax: 5,
+      durationLabel: '4 Days 3 Nights',
+      highlights: [
+        'Great Ocean Road & The Twelve Apostles',
+        'Pink Lake',
+        'Melbourne City street art',
+        '',
+      ],
+      itinerary: [
+        { day: 1, title: 'SYD → Twelve Apostles', desc: 'Great Ocean Road golden hour · Milky Way' },
+        { day: 2, title: 'Pink Lake', desc: 'Blue hour · Milky Way reflections' },
+        { day: 3, title: 'Melbourne City', desc: 'Street art · State Library · Flinders St' },
+        { day: 4, title: 'Melbourne → SYD', desc: 'Morning city · return flight' },
+      ],
+      pickupType: 'airport_terminal',
+      included: ['SUV + driver + fuel', 'Professional photographer', 'Drinking water', 'Park entry', 'Flight booking help'],
+      excluded: ['Return flights', 'All meals', 'Travel insurance'],
+      note: 'Secret Southern Coast · dormitory upgrade available',
+      status: 'DRAFT',
+    },
+    {
+      tourCode: 'ULU-4D3N',
+      tourName: 'The Red Desert Odyssey (4D3N)',
+      coverUrl: portfolio + '/Ulruru/1.jpg',
+      standardPrice: 1690,
+      maxPax: 5,
+      durationLabel: '4 Days 3 Nights',
+      highlights: ['Uluru sunrise/sunset', 'Field of Light', 'Kata Tjuta (The Olgas)', ''],
+      itinerary: [
+        { day: 1, title: 'SYD → Uluru Sunset', desc: 'Outback Lodge · rock colour change · Milky Way' },
+        { day: 2, title: 'Field of Light → Kata Tjuta', desc: 'Olgas walk · evening light installation' },
+        { day: 3, title: 'Uluru Sunrise → Base Walk', desc: 'Base walk · desert Milky Way' },
+        { day: 4, title: 'Kata Tjuta Dune → SYD', desc: 'Final sunrise · return flight' },
+      ],
+      pickupType: 'airport_terminal',
+      included: ['Vehicle + driver', 'Outback Lodge 3 nights', 'Park passes', 'Field of Light ticket', 'Photographer'],
+      excluded: ['Flights', 'All meals', 'Travel insurance'],
+      note: 'Red centre Outback · fixed private price',
+      status: 'DRAFT',
+    },
+    {
+      tourCode: 'NZ-6D5N',
+      tourName: 'The Alpine Kingdom (6D5N)',
+      coverUrl: portfolio + '/New%20Zealand/Cover/01.jpg',
+      standardPrice: 2300,
+      maxPax: 5,
+      durationLabel: '6 Days 5 Nights',
+      highlights: ['Milford Sound', 'Lake Tekapo & Church', 'Queenstown & Southern Alps', ''],
+      itinerary: [
+        { day: 1, title: 'SYD → Christchurch', desc: 'Arrival · city walk' },
+        { day: 2, title: 'Lake Tekapo', desc: 'Church of the Good Shepherd · Milky Way' },
+        { day: 3, title: 'Mt Cook / Aoraki', desc: 'Hooker Valley · glacier views' },
+        { day: 4, title: 'Queenstown', desc: 'Remarkables · Lake Wakatipu' },
+        { day: 5, title: 'Milford Sound', desc: 'Fiordland drive · cruise' },
+        { day: 6, title: 'Queenstown → SYD', desc: 'Final captures · fly home' },
+      ],
+      pickupType: 'airport_terminal',
+      included: ['SUV + driver 6 days', '5 nights accommodation', 'Photographer', 'Milford cruise', 'Park fees'],
+      excluded: ['Flights', 'All meals', 'Travel insurance'],
+      note: 'South Island flagship · all-year departures',
+      status: 'CONFIRMED',
+    },
+    {
+      tourCode: 'TAS-LH-4D3N',
+      tourName: 'Tasmania Summer: Launceston – Hobart (4D3N)',
+      coverUrl:
+        portfolio +
+        '/Tasmania/Launceston/596371362_1428639202594510_8709278754225773992_n.jpg',
+      standardPrice: 1650,
+      maxPax: 6,
+      durationLabel: '4 Days 3 Nights',
+      highlights: ['Bridestowe Lavender', 'Cradle Mountain', 'MONA', 'Mt Wellington'],
+      itinerary: [
+        { day: 1, title: 'Bridestowe → Richmond → Aurora', desc: 'Lavender fields · aurora hunt' },
+        { day: 2, title: 'Cradle Mountain', desc: 'Full day · reflections · night mission' },
+        { day: 3, title: 'MONA → Hobart → Mt Wellington', desc: 'MONA · Cascade · golden hour' },
+        { day: 4, title: 'Last Capture → SYD', desc: 'Waterfront · return flight' },
+      ],
+      pickupType: 'airport_terminal',
+      included: ['Launceston–Hobart transport', 'Photographer mentor', 'Water', 'Lavender + MONA entries'],
+      excluded: ['Flights', 'All meals', 'Travel insurance'],
+      note: 'Summer Launceston–Hobart · lavender season',
+      status: 'DRAFT',
+    },
+    {
+      tourCode: 'KIA-1DAY',
+      tourName: 'Sydney – Kiama One Day Photo Trip (1 Day)',
+      coverUrl:
+        portfolio +
+        '/One%20day%20trip%20SYD/705320467_10242162489108855_3820285517745745334_n.jpg',
+      standardPrice: 250,
+      maxPax: 4,
+      durationLabel: '1 Day',
+      highlights: ['Helensburgh Old Station', 'Seacliff Bridge', 'Bombo Headland Quarry', ''],
+      itinerary: [
+        {
+          day: 1,
+          title: 'Kiama coast (08:00–19:00)',
+          desc: 'Thai Town pickup · Helensburgh · Seacliff · Bombo Headland twilight',
+        },
+      ],
+      pickupType: 'thaitown_main',
+      included: ['Thai Town pickup/drop-off', 'Vehicle + driver', 'Photographer', 'Water'],
+      excluded: ['Food & drinks', 'Travel insurance'],
+      note: 'Winter only day trip · peak season $290',
+      status: 'DRAFT',
+    },
+    {
+      tourCode: 'CAN-2D1N',
+      tourName: 'Cowra & Canowindra Canola Fields Photo Trip (2D1N)',
+      coverUrl: portfolio + '/Cowra/1.jpg',
+      standardPrice: 380,
+      maxPax: 4,
+      durationLabel: '2 Days 1 Night',
+      highlights: ['Canola fields', 'Cowra & Canowindra towns', 'Cowra Japanese Garden', ''],
+      itinerary: [
+        { day: 1, title: 'Canola & heritage towns', desc: 'Secret fields · Cowra · Canowindra · overnight' },
+        { day: 2, title: 'Garden & morning fields', desc: 'Japanese Garden optional · return Sydney' },
+      ],
+      pickupType: 'thaitown_main',
+      included: ['1 night dorm stay', 'Vehicle + fuel', 'Photographer', 'Water'],
+      excluded: ['All meals', 'Garden entry (optional)', 'Travel insurance'],
+      note: 'Spring only · Oct departures',
+      status: 'DRAFT',
+    },
+    {
+      tourCode: 'SYD-1DAY',
+      tourName: 'One Day Trip in Sydney & Photoshoot Packages (1 Day)',
+      coverUrl:
+        portfolio +
+        '/SYDNEY/505479211_10236865839535926_981414994444837633_n.jpg',
+      standardPrice: 250,
+      maxPax: 4,
+      durationLabel: '1 Day',
+      highlights: ['Sydney 5 Best Locations', 'Anna Bay Sand Dunes', 'Milky Way Hunt', 'Kiama Coast'],
+      itinerary: [
+        {
+          day: 1,
+          title: 'Sydney day packages',
+          desc: 'City shoots · Anna Bay · Kiama · Milky Way (winter eve)',
+        },
+      ],
+      pickupType: 'thaitown_main',
+      included: ['Vehicle + driver', 'Photographer', 'Drone', 'Water'],
+      excluded: ['Food', 'Travel insurance'],
+      note: 'From $250/person · $100 deposit · Influencer pkg $680',
+      status: 'DRAFT',
+    },
+  ];
+}
+
+function tripInfoRowFromDefinition_(trip) {
+  var hl = padHighlights_(trip.highlights);
+  var days = durationDaysFromDurationLabel_(trip.durationLabel);
+  var inst = installmentAmounts_(trip.standardPrice, days);
+  return [
+    trip.tourCode,
+    trip.tourName,
+    trip.coverUrl,
+    trip.standardPrice,
+    trip.maxPax,
+    '',
+    trip.durationLabel,
+    hl[0],
+    hl[1],
+    hl[2],
+    hl[3],
+    itinerarySummary_(trip.itinerary),
+    meetingPointLabel_(trip.pickupType),
+    joinList_(trip.included),
+    joinList_(trip.excluded),
+    trip.note,
+    trip.status,
+    inst.i1,
+    inst.i2,
+    inst.i3,
+  ];
+}
+
+/** Callable from Apps Script editor or ?action=seedTripInfoSheet */
+function seedTripInfoSheet() {
+  return seedTripInfoSheet_();
+}
+
+/**
+ * Create or replace the "Trip info" tab with headers + 8 seeded rows.
+ * Does not delete the legacy Trips_Data tab.
+ */
+function seedTripInfoSheet_() {
+  var spreadsheetId = spreadsheetId_();
+  var ss = ss_();
+  var headers = tripInfoSheetHeaders_();
+  var definitions = tripInfoSeedDefinitions_();
+  var dataRows = definitions.map(tripInfoRowFromDefinition_);
+  var sh = ss.getSheetByName(TRIPS_TAB);
+
+  if (!sh) {
+    sh = ss.insertSheet(TRIPS_TAB);
+  }
+
+  sh.clear();
+  var table = [headers].concat(dataRows);
+  sh.getRange(1, 1, table.length, headers.length).setValues(table);
+  sh.setFrozenRows(1);
+
+  Logger.log('[Trip2Talk] seedTripInfoSheet_ wrote ' + dataRows.length + ' rows to "' + TRIPS_TAB + '"');
+
+  return {
+    ok: true,
+    status: 'ok',
+    version: GAS_VERSION,
+    tab: TRIPS_TAB,
+    spreadsheetId: spreadsheetId,
+    rowsWritten: dataRows.length,
+    tourCodes: definitions.map(function (t) {
+      return t.tourCode;
+    }),
+    message: 'Seeded "' + TRIPS_TAB + '" with ' + dataRows.length + ' trips',
+  };
+}
+
 function doPost(e) {
   try {
     const body = e.postData && e.postData.contents ? JSON.parse(e.postData.contents) : {};
     const actionNorm = String(body.action || '').trim().toLowerCase();
+    if (actionNorm === 'seedtripinfosheet') {
+      return json_(seedTripInfoSheet_());
+    }
     if (
       actionNorm === 'gettrips' ||
       actionNorm === 'readtrips' ||
@@ -299,7 +623,7 @@ function upsertTrip_(trip) {
   }
   var rowObj = tripRowFromNormalized_(normalized, trip);
   var values = sh.getDataRange().getValues();
-  var codeCol = headerIndex_(headers, ['Tour Code', 'tourCode', 'tour_code']);
+  var codeCol = headerIndex_(headers, ['Trip Code', 'Tour Code', 'tourCode', 'tour_code']);
   var rowIndex = -1;
   if (values.length > 1 && codeCol >= 0) {
     for (var r = 1; r < values.length; r++) {
@@ -885,7 +1209,7 @@ function appendBookingRow_(data) {
  */
 function incrementSlot_(data) {
   var d = data || {};
-  var tourCode = pick_(d, ['tour_code', 'Tour Code', 'tourCode']);
+  var tourCode = pick_(d, ['tour_code', 'Trip Code', 'Tour Code', 'tourCode']);
   if (!tourCode) {
     return { status: 'error', message: 'tour_code is required' };
   }
@@ -903,10 +1227,10 @@ function incrementSlot_(data) {
   var headers = values[0].map(function (h) {
     return String(h || '').trim();
   });
-  var codeCol = headerIndex_(headers, ['Tour Code', 'tourCode', 'tour_code']);
+  var codeCol = headerIndex_(headers, ['Trip Code', 'Tour Code', 'tourCode', 'tour_code']);
   var bookedCol = headerIndex_(headers, ['Slots Booked', 'slotsBooked', 'Booked']);
   if (codeCol < 0 || bookedCol < 0) {
-    return { status: 'error', message: 'Missing Tour Code / Slots Booked column' };
+    return { status: 'error', message: 'Missing Trip/Tour Code / Slots Booked column' };
   }
   for (var r = 1; r < values.length; r++) {
     if (String(values[r][codeCol] || '').trim().toLowerCase() === tourCode.toLowerCase()) {
@@ -926,8 +1250,23 @@ function appendIntake_(intake) {
   return updateIntake_(intake);
 }
 
+function highlightsFromTripInfoRow_(r) {
+  var parts = [];
+  var keys = ['Highlight 1', 'Highlight 2', 'Highlight 3', 'Highlight 4'];
+  for (var i = 0; i < keys.length; i++) {
+    var v = pick_(r, [keys[i]]);
+    if (v) parts.push(v);
+  }
+  if (parts.length) return parts.join(', ');
+  return pick_(r, ['highlights', 'Highlights']);
+}
+
 function normalizeTripRow_(r) {
-  var durationDays = Number(pick_(r, ['durationDays', 'Duration Days', 'days']) || 1);
+  var durationLabel = pick_(r, ['Duration', 'durationLabel']);
+  var durationDays =
+    Number(pick_(r, ['durationDays', 'Duration Days', 'days']) || 0) ||
+    durationDaysFromDurationLabel_(durationLabel) ||
+    1;
   var season = pick_(r, ['season', 'Season']).toLowerCase();
   var tripType = pick_(r, ['tripType', 'Trip Type', 'trip_type']).toLowerCase();
   if (!tripType) {
@@ -935,7 +1274,7 @@ function normalizeTripRow_(r) {
   }
   var maxPax = pick_(r, ['maxPax', 'Max Pax', 'slotsMax', 'Slots Max']);
   return {
-    tourCode: pick_(r, ['tourCode', 'Tour Code', 'tour_code', 'tripCode']),
+    tourCode: pick_(r, ['tourCode', 'Trip Code', 'Tour Code', 'tour_code', 'tripCode']),
     tourName: pick_(r, ['tourName', 'Tour Name', 'tour_name']),
     countryTag: pick_(r, ['countryTag', 'Country Tag', 'country_tag']),
     weather: pick_(r, ['weather', 'Weather']),
@@ -944,12 +1283,11 @@ function normalizeTripRow_(r) {
     seasonGroup: season === 'all' ? 'all_year' : pick_(r, ['seasonGroup', 'Category', 'season_group']) || 'seasonal',
     city: pick_(r, ['city', 'City']),
     durationDays: durationDays,
-    priceStandardAud: pick_(r, ['priceStandardAud', 'Standard Price', 'standardPrice', 'Standard']),
+    priceStandardAud: pick_(r, ['priceStandardAud', 'Standard Price', 'standardPrice', 'Standard', 'Price']),
     pricePrivateAud: pick_(r, ['pricePrivateAud', 'Private Price', 'privatePrice', 'Private']),
     tripType: tripType,
     season: season,
-    highlights: pick_(r, ['highlights', 'Highlights']),
-    pickupType: pick_(r, ['pickupType', 'Pickup Type', 'pickup_type']),
+    highlights: highlightsFromTripInfoRow_(r),
     maxPax: maxPax,
     categoryCode: pick_(r, ['categoryCode', 'Tour Category Code']),
     categoryName: pick_(r, ['categoryName', 'Category Name']),
@@ -957,8 +1295,10 @@ function normalizeTripRow_(r) {
     depositAud: pick_(r, ['depositAud', 'Deposit']),
     dormitoryPolicy: pick_(r, ['dormitoryPolicy', 'Dormitory Policy']),
     dormUpgradeNote: pick_(r, ['dormUpgradeNote', 'Dorm Upgrade']),
-    departureStart: pick_(r, ['departureStart', 'Departure Start', 'Start Date']),
+    departureStart: pick_(r, ['departureStart', 'Departure Start', 'Departure Date', 'Start Date']),
     departureEnd: pick_(r, ['departureEnd', 'Departure End', 'End Date']),
+    sheetStatus: pick_(r, ['Status', 'status']),
+    pickupType: pick_(r, ['pickupType', 'Pickup Type', 'pickup_type']) || pick_(r, ['Meeting Point']),
     slotsBooked: pick_(r, ['slotsBooked', 'Slots Booked', 'Booked']),
     slotsMax: maxPax || pick_(r, ['slotsMax', 'Slots Max', 'Capacity']),
     spots: [],

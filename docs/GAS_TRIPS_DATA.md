@@ -20,7 +20,27 @@ This ID is the default in [`gas/Code.gs`](../gas/Code.gs). Override via Apps Scr
 - Tab name must be exactly **`Trip info`** (case-sensitive, including the space).
 - **Not** `Trips_Data` — the code maps that legacy name to `Trip info` in query params only.
 - Row 1 = headers; row 2+ = trip data.
-- Each data row needs **`Tour Code`** (or `tourCode`).
+- Each data row needs **`Trip Code`** (seed layout) or legacy **`Tour Code`** / `tourCode`.
+
+## Seed the Trip info tab (20 columns, 8 trips)
+
+If `getTrips` returns `Missing tab: "Trip info" (found: Trips_Data, …)`:
+
+```text
+GET {VITE_GAS_WEBAPP_URL}?action=seedTripInfoSheet
+```
+
+This creates or replaces the **`Trip info`** tab (does not remove `Trips_Data`). Row 1 uses the 20 Title Case headers (`Trip Code`, `Tour Name`, `Cover`, `Price`, …). Rows 2–9 are the eight real tour codes from `src/lib/realTourCodes.ts`. **Status:** `CONFIRMED` for `NZ-6D5N` and `TAS-3D2N`; `DRAFT` for the rest. **Departure Date** is left blank.
+
+Then verify:
+
+```text
+GET {VITE_GAS_WEBAPP_URL}?action=getTrips&debug=1
+```
+
+Expect `read.tab`: `"Trip info"`, `tripCount`: `8`, `totalRowsIncludingHeader`: `9`.
+
+Legacy master seed (old column layout): `?action=seedMasterTrips` — prefer `seedTripInfoSheet` for the v4 sheet.
 
 ## Owner: deploy Apps Script (manual — Google login required)
 
@@ -71,13 +91,21 @@ View execution logs: Apps Script → **Executions** (Logger output from `readTri
 
 ## Seed all 8 master trips
 
+**Preferred (Trip info 20-column layout):**
+
+```text
+GET {VITE_GAS_WEBAPP_URL}?action=seedTripInfoSheet
+```
+
+**Legacy (old Trips_Data-style headers via upsert):**
+
 ```text
 GET {VITE_GAS_WEBAPP_URL}?action=seedMasterTrips
 ```
 
 Or: `npm run seed:trips`
 
-Master tour codes: `MEL-4D3N`, `ULU-4D3N`, `NZ-6D5N`, `TAS-3D2N`, `TAS-LH-4D3N`, `KIA-1DAY`, `CAN-2D1N`, `SYD-1DAY`.
+Master tour codes: `TAS-3D2N`, `MEL-4D3N`, `ULU-4D3N`, `NZ-6D5N`, `TAS-LH-4D3N`, `KIA-1DAY`, `CAN-2D1N`, `SYD-1DAY`.
 
 ### Trip info — Cover column (Tasmania)
 
