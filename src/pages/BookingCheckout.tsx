@@ -11,6 +11,7 @@ import { quoteTripTotal, resolveTripSizeTier } from '../lib/bookingPolicy';
 import TripSizeTierBadge from '../components/cyber/TripSizeTierBadge';
 import BookingPolicyPanel from '../components/policy/BookingPolicyPanel';
 import { generateBookingRef } from '../lib/bookingRef';
+import { BookingDuplicateEmailError } from '../lib/bookingDuplicate';
 import {
   runPhase2Book,
   DateFullyBookedError,
@@ -415,6 +416,10 @@ export default function BookingCheckout() {
       if (err instanceof TripNotOpenError) {
         setSubmitError('ยังไม่มีวันเดินทาง กรุณาติดต่อเจ้าหน้าที่');
         setStep(1);
+        return;
+      }
+      if (err instanceof BookingDuplicateEmailError) {
+        setSubmitError(err.message);
         return;
       }
       const msg = err instanceof Error ? err.message : 'Booking failed';

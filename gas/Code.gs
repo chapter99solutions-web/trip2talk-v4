@@ -8,7 +8,7 @@
  */
 // ชื่อแท็บ (tab) ที่อ่านข้อมูลทริป — ใช้แท็บ "Trip info" ที่มีอยู่แล้วในชีตใหม่
 // (เดิมคือ 'Trips_Data'). เปลี่ยนมาอ่านจาก "Trip info" เพื่อไม่ต้องสร้างแท็บใหม่.
-const GAS_VERSION = '2.9';
+const GAS_VERSION = '3.0';
 const TRIPS_TAB = 'Trip info';
 const BOOKINGS_TAB = 'Customer_Bookings';
 // แท็บปลายทางสำหรับ append แถวการจอง + settlement (มีอยู่แล้วในชีตใหม่)
@@ -114,16 +114,7 @@ function doGet(e) {
     if (action === 'getPendingIntakes') {
       return json_(getPendingIntakes_());
     }
-    return json_({
-      ok: true,
-      status: 'ok',
-      version: GAS_VERSION,
-      trips: [],
-      data: [],
-      hint: 'Use ?action=getTrips or ?action=listTrips to read the Trip info tab',
-      spreadsheetId: spreadsheetId_(),
-      tab: TRIPS_TAB,
-    });
+    return json_(readTrips_({ debug: debug }));
   } catch (err) {
     return json_({ status: 'error', message: String(err) });
   }
@@ -295,7 +286,7 @@ function doPost(e) {
 }
 
 function upsertTrip_(trip) {
-  const ss = SpreadsheetApp.openById(spreadsheetId_());
+  const ss = ss_();
   var sh = ss.getSheetByName(TRIPS_TAB);
   if (!sh) {
     sh = ss.insertSheet(TRIPS_TAB);
@@ -500,7 +491,7 @@ function bookingPadRow_(cells) {
 }
 
 function readBookings_() {
-  var ss = SpreadsheetApp.openById(spreadsheetId_());
+  var ss = ss_();
   var sheet = ss.getSheetByName(BOOKINGS_TAB);
   if (!sheet || sheet.getLastRow() < 2) {
     return okBookings_([]);
@@ -591,7 +582,7 @@ function testBookingsSeed_() {
 }
 
 function seedTestBookings_() {
-  var ss = SpreadsheetApp.openById(spreadsheetId_());
+  var ss = ss_();
   var headers = bookingHeaders_();
   var sheet = getOrCreateSheet_(ss, BOOKINGS_TAB, headers);
   var lastRow = sheet.getLastRow();
@@ -619,7 +610,7 @@ function seedTestBookings() {
 }
 
 function appendBooking_(booking) {
-  var ss = SpreadsheetApp.openById(spreadsheetId_());
+  var ss = ss_();
   var sheet = getOrCreateSheet_(ss, BOOKINGS_TAB, bookingHeaders_());
   ensureBookingHeaders_(sheet);
   var b = booking || {};
@@ -644,7 +635,7 @@ function appendBooking_(booking) {
 }
 
 function createBooking_(data) {
-  var ss = SpreadsheetApp.openById(spreadsheetId_());
+  var ss = ss_();
   var sheet = getOrCreateSheet_(ss, BOOKINGS_TAB, bookingHeaders_());
   ensureBookingHeaders_(sheet);
   var bookingId = pick_(data, ['bookingId', 'Booking ID', 'Booking_ID']);
@@ -677,7 +668,7 @@ function createBooking_(data) {
 }
 
 function updateIntake_(data) {
-  var ss = SpreadsheetApp.openById(spreadsheetId_());
+  var ss = ss_();
   var sheet = ss.getSheetByName(BOOKINGS_TAB);
   if (!sheet) {
     return { status: 'error', message: 'Customer_Bookings sheet not found' };
@@ -728,7 +719,7 @@ function updateIntake_(data) {
 }
 
 function updateCheckedIn_(data) {
-  var ss = SpreadsheetApp.openById(spreadsheetId_());
+  var ss = ss_();
   var sheet = ss.getSheetByName(BOOKINGS_TAB);
   if (!sheet) {
     return { status: 'error', message: 'Customer_Bookings sheet not found' };
@@ -747,7 +738,7 @@ function updateCheckedIn_(data) {
 }
 
 function getBookingStatus_(data) {
-  var ss = SpreadsheetApp.openById(spreadsheetId_());
+  var ss = ss_();
   var sheet = ss.getSheetByName(BOOKINGS_TAB);
   if (!sheet || sheet.getLastRow() < 2) {
     return { status: 'ok', data: null };
@@ -778,7 +769,7 @@ function getBookingStatus_(data) {
 }
 
 function getPendingIntakes_() {
-  var ss = SpreadsheetApp.openById(spreadsheetId_());
+  var ss = ss_();
   var sheet = ss.getSheetByName(BOOKINGS_TAB);
   if (!sheet || sheet.getLastRow() < 2) {
     return { status: 'ok', data: [] };
@@ -816,7 +807,7 @@ function expenseHeaders_() {
 
 function appendExpense_(data) {
   var d = data || {};
-  var ss = SpreadsheetApp.openById(spreadsheetId_());
+  var ss = ss_();
   var sheet = getOrCreateSheet_(ss, 'Expenses', expenseHeaders_());
   var amount = Number(pick_(d, ['amount', 'Amount'])) || 0;
   var gst = Number(pick_(d, ['gst_amount', 'GST'])) || 0;
@@ -864,7 +855,7 @@ function settlementHeaders_() {
 
 function appendBookingRow_(data) {
   var d = data || {};
-  var ss = SpreadsheetApp.openById(spreadsheetId_());
+  var ss = ss_();
   // ใช้แท็บที่มีอยู่แล้ว ถ้าไม่มีจึงสร้างพร้อม header
   var sheet = getOrCreateSheet_(ss, SETTLEMENTS_TAB, settlementHeaders_());
   var amount = Number(pick_(d, ['amount', 'Amount', 'revenue', 'Revenue'])) || 0;
@@ -900,7 +891,7 @@ function incrementSlot_(data) {
   }
   var by = Number(pick_(d, ['by', 'amount'])) || 1;
 
-  var ss = SpreadsheetApp.openById(spreadsheetId_());
+  var ss = ss_();
   var sh = ss.getSheetByName(TRIPS_TAB);
   if (!sh) {
     return { status: 'error', message: 'Missing tab: ' + TRIPS_TAB };
@@ -1047,7 +1038,8 @@ function masterTripsSeed_() {
       maxPax: 6,
       highlights: 'Mt Wellington Aurora Hunt, Bruny Island, MONA',
       pickupType: 'airport_terminal',
-      coverUrl: 'https://images.unsplash.com/photo-1483347756197-71ef7742304b?w=1200&q=80',
+      coverUrl:
+        'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596811714_1428639069261190_2753284779604496226_n.jpg',
       messengerUrl: 'https://m.me/trip2talk.chapter99',
     },
     {
@@ -1063,7 +1055,8 @@ function masterTripsSeed_() {
       maxPax: 6,
       highlights: 'Bridestowe Lavender, Cradle Mountain, MONA',
       pickupType: 'airport_terminal',
-      coverUrl: 'https://images.unsplash.com/photo-1499002238440-d264edd596ec?w=1200&q=80',
+      coverUrl:
+        'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596371362_1428639202594510_8709278754225773992_n.jpg',
       messengerUrl: 'https://m.me/trip2talk.chapter99',
     },
     {

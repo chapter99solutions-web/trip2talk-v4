@@ -25,7 +25,7 @@ This ID is the default in [`gas/Code.gs`](../gas/Code.gs). Override via Apps Scr
 ## Owner: deploy Apps Script (manual — Google login required)
 
 1. Open the spreadsheet → **Extensions → Apps Script** (container-bound), **or** script.google.com for the standalone web app project tied to this `/exec` URL.
-2. Replace **Code.gs** with [`gas/Code.gs`](../gas/Code.gs) from this repo (**v2.9+**).
+2. Replace **Code.gs** with [`gas/Code.gs`](../gas/Code.gs) from this repo (**v3.0+**). All sheet access goes through `ss_()` (`getActiveSpreadsheet()` when bound, else `openById` for the web app).
 3. Optional: **Project settings → Script properties** → `SPREADSHEET_ID` = `1L1VUu0qvL0-G0C1z9byscU11kKcuMCM0iajNLjxH9eE`.
 4. **Deploy → Manage deployments → Edit (pencil) → New version → Deploy**
    - Execute as: **Me**
@@ -36,9 +36,10 @@ This ID is the default in [`gas/Code.gs`](../gas/Code.gs). Override via Apps Scr
 
 | Response | Meaning |
 |----------|---------|
-| `{"ok":true,"data":[]}` only | **Old stub** — ignores `?action=getTrips`. Redeploy required. |
-| `{"ok":true,"version":"2.9","trips":[...],"data":[...]}` | **Correct** — reading Trip info. |
-| `{"ok":true,"version":"2.9","trips":[],"data":[]}` | Deployed OK but tab empty or no Tour Code column. |
+| `{"ok":true,"data":{"status":"GAS running..."}}` | **Old health stub** — not reading Trip info. Redeploy v3.0 `Code.gs`. |
+| `{"ok":true,"data":[]}` only (no `version`, no `trips`) | **Legacy stub** — ignores `?action=getTrips`. Redeploy required. |
+| `{"ok":true,"version":"3.0","trips":[...],"data":[...]}` | **Correct** — reading Trip info. |
+| `{"ok":true,"version":"3.0","trips":[],"data":[]}` | Deployed OK but tab empty or no Tour Code column. |
 
 ## Verify after deploy
 
@@ -46,13 +47,13 @@ This ID is the default in [`gas/Code.gs`](../gas/Code.gs). Override via Apps Scr
 GET {VITE_GAS_WEBAPP_URL}?action=getTrips&debug=1
 ```
 
-Expected shape (v2.9+):
+Expected shape (v3.0+):
 
 ```json
 {
   "ok": true,
   "status": "ok",
-  "version": "2.9",
+  "version": "3.0",
   "trips": [ { "tourCode": "MEL-4D3N", "tourName": "...", ... } ],
   "data": [ ... ],
   "read": {
@@ -77,6 +78,15 @@ GET {VITE_GAS_WEBAPP_URL}?action=seedMasterTrips
 Or: `npm run seed:trips`
 
 Master tour codes: `MEL-4D3N`, `ULU-4D3N`, `NZ-6D5N`, `TAS-3D2N`, `TAS-LH-4D3N`, `KIA-1DAY`, `CAN-2D1N`, `SYD-1DAY`.
+
+### Trip info — Cover column (Tasmania)
+
+After `?action=seedMasterTrips`, set **Cover** for these rows if blank:
+
+| Tour Code | Cover URL |
+|-----------|-----------|
+| `TAS-3D2N` | `https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596811714_1428639069261190_2753284779604496226_n.jpg` |
+| `TAS-LH-4D3N` | `https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596371362_1428639202594510_8709278754225773992_n.jpg` |
 
 ## Customer_Bookings (portal login)
 

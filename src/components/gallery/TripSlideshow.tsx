@@ -4,13 +4,13 @@ import { supabase } from '../../lib/supabase';
 // ====================================================================
 // TripSlideshow — สไลด์โชว์ออโต้เพลย์ที่ใช้ซ้ำได้
 // ดึงรูปสดจากโฟลเดอร์ใน Supabase Storage (รองรับชื่อโฟลเดอร์ที่มีช่องว่าง
-// และโฟลเดอร์ซ้อน เช่น "Tasmania 02/Hobart")
+// และโฟลเดอร์ซ้อน เช่น "Tasmania/Hobart")
 // ====================================================================
 
 type TripSlideshowProps = {
   /** ชื่อ bucket ใน Supabase Storage เช่น "portfolio" */
   bucket: string;
-  /** path ของโฟลเดอร์ อาจมีช่องว่าง/ซ้อนกัน เช่น "Tasmania 02/Hobart" */
+  /** path ของโฟลเดอร์ อาจมีช่องว่าง/ซ้อนกัน เช่น "Tasmania/Hobart" */
   folder: string;
   /** ระยะเวลาเลื่อนสไลด์อัตโนมัติ (ms) ค่าเริ่มต้น 4000ms */
   intervalMs?: number;
@@ -51,7 +51,7 @@ export default function TripSlideshow({
 
     async function loadImages() {
       // ส่ง path ของโฟลเดอร์ซ้อน (ที่มีช่องว่าง) เป็น prefix ให้ list() ตรง ๆ
-      // Supabase list() รับ path prefix แบบ "Tasmania 02/Hobart" ได้เลย
+      // Supabase list() รับ path prefix แบบ "Tasmania/Hobart" ได้เลย
       const { data, error } = await supabase.storage.from(bucket).list(folder, {
         limit: 100,
         sortBy: { column: 'name', order: 'asc' },
@@ -74,7 +74,7 @@ export default function TripSlideshow({
         // เรียงชื่อไฟล์แบบ natural sort ก่อนสร้าง URL
         .sort((a, b) => naturalSort(a.name, b.name))
         .map((f) => {
-          // สร้าง full object path เช่น "Tasmania 02/Hobart/1.jpg"
+          // สร้าง full object path เช่น "Tasmania/Hobart/1.jpg"
           // *** สำคัญ: ส่ง path เต็มให้ getPublicUrl แล้วปล่อยให้ client encode เอง
           // ห้าม encodeURIComponent ซ้ำ ไม่งั้นช่องว่างจะกลายเป็น %2520 (double-encode)
           // ช่องว่างจะถูกแปลงเป็น %20 เพียงครั้งเดียวอย่างถูกต้อง ***

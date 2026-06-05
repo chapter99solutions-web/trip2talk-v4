@@ -93,7 +93,8 @@ const trips = [
     maxPax: 6,
     highlights: 'Mt Wellington Aurora Hunt, Bruny Island, MONA',
     pickupType: 'airport_terminal',
-    coverUrl: 'https://images.unsplash.com/photo-1483347756197-71ef7742304b?w=1200&q=80',
+    coverUrl:
+      'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596811714_1428639069261190_2753284779604496226_n.jpg',
     messengerUrl: 'https://m.me/trip2talk.chapter99',
   },
   {
@@ -109,7 +110,8 @@ const trips = [
     maxPax: 6,
     highlights: 'Bridestowe Lavender, Cradle Mountain, MONA',
     pickupType: 'airport_terminal',
-    coverUrl: 'https://images.unsplash.com/photo-1499002238440-d264edd596ec?w=1200&q=80',
+    coverUrl:
+      'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596371362_1428639202594510_8709278754225773992_n.jpg',
     messengerUrl: 'https://m.me/trip2talk.chapter99',
   },
   {

@@ -20,13 +20,13 @@ export const TOUR_COVER_MAP: Record<string, TourCoverMapping> = {
   'ULU-4D3N': { folder: 'Ulruru', file: '1.jpg' },
   'NZ-6D5N': { folder: 'New Zealand/Cover', file: '01.jpg' },
   'TAS-3D2N': {
-    folder: 'Tasmania/Hobart',
-    file: '1.jpg',
+    folder: 'Tasmania/Launceston',
+    file: '596811714_1428639069261190_2753284779604496226_n.jpg',
     publicUrl: TAS_3D2N_COVER_URL,
   },
   'TAS-LH-4D3N': {
     folder: 'Tasmania/Launceston',
-    file: '594961969_1428638085927955_7817067387013979508_n.jpg',
+    file: '596371362_1428639202594510_8709278754225773992_n.jpg',
     publicUrl: TAS_LH_4D3N_COVER_URL,
   },
   'KIA-1DAY': {

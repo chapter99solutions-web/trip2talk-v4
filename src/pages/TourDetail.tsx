@@ -340,7 +340,7 @@ export default function TourDetail() {
 
   const galleryPhotos = photos.length ? photos : hardcodedPhotos ?? [heroImage];
   const heroParallax = Math.min(scrollY * 0.4, 80);
-  const isHobartGallery = staticFallback?.galleryFolder === 'Tasmania 02/Hobart';
+  const isHobartGallery = staticFallback?.galleryFolder === 'Tasmania/Hobart';
 
   const toggleSave = () => {
     try {

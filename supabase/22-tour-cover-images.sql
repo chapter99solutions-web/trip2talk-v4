@@ -6,7 +6,7 @@ ALTER TABLE public.tours ADD COLUMN IF NOT EXISTS cover_image TEXT;
 COMMENT ON COLUMN public.tours.cover_image IS 'Public URL for trip card hero/cover (portfolio bucket)';
 
 UPDATE public.tours
-SET cover_image = 'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/gallery/photos/Tasmania/1650/596811714_1428639069261190_2753284779604496226_n.jpg'
+SET cover_image = 'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596811714_1428639069261190_2753284779604496226_n.jpg'
 WHERE trip_code = 'TAS-3D2N';
 
 UPDATE public.tours
@@ -22,7 +22,7 @@ SET cover_image = 'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/pu
 WHERE trip_code = 'NZ-6D5N';
 
 UPDATE public.tours
-SET cover_image = 'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/594961969_1428638085927955_7817067387013979508_n.jpg'
+SET cover_image = 'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596371362_1428639202594510_8709278754225773992_n.jpg'
 WHERE trip_code = 'TAS-LH-4D3N';
 
 UPDATE public.tours

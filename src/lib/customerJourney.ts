@@ -4,6 +4,7 @@
  */
 import { supabase } from './supabase';
 import { dispatchRetargetingNotification, dispatchTransactionNotification } from './notifications';
+import { assertBookingAllowed } from './bookingDuplicate';
 import { insertPlatformBookingRow } from './platformBookings';
 import { buildSettlementForTour, syncSettlementToGoogleSheets, SettlementSyncPayload } from './googleSync';
 import { syncBookingToSheet, syncSlotIncrementToSheet } from './gsheetSync';
@@ -376,6 +377,7 @@ export async function runPhase2Book(input: {
 }): Promise<{ clientId?: string; bookingId?: string; warnings: string[] }> {
   const warnings: string[] = [];
   const tripCode = input.tripCode.trim().toUpperCase();
+  await assertBookingAllowed(input.email, tripCode);
   const tenantId = await resolveBookingTenantId(tripCode);
   const { first, last } = splitFullName(input.fullName);
   const passportPlaceholder = `WEB-${input.referenceNumber.replace(/[^A-Z0-9]/gi, '')}`;

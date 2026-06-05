@@ -1,0 +1,140 @@
+# Project Vision: Trip2Talk V4
+# File: .cursorrules — place at project root
+# Chapter99 Solutions | Sydney, Australia
+
+## 1. Goal
+Build a premium PWA booking platform for Trip2Talk —
+photography tours led by Thai-speaking guides departing
+from Sydney International Airport. Target: Thai-speaking
+customers in Australia seeking guided photography travel.
+
+Business details:
+- Name: Trip2Talk
+- Domain: trip2talk.com.au
+- Leader: พี่แสน (Saen) — professional photographer
+- Co-host: Monsicha / Ploy
+- Departure: Sydney International Airport (all multi-day tours)
+- Language: Thai primary, English secondary
+- Business rule: ALWAYS use "ทริป" NEVER "ทัวร์"
+
+## 2. Technical Stack
+- Framework: React + TypeScript + Vite + PWA (vite-plugin-pwa)
+- Database: Supabase (project: rvcwprxnqwscgjusmjvj)
+- Supabase URL: https://rvcwprxnqwscgjusmjvj.supabase.co
+- Hosting: Vercel (trip2talk.com.au)
+- Repo: github.com/chapter99info-cell/trip2talk-v4
+- Styling: Tailwind CSS
+- Fonts: Fraunces (headings), Inter (body)
+- Animation: Framer Motion
+- Google Sheets: trip details read from "Trip info" tab
+- GAS Web App: https://script.google.com/macros/s/AKfycbzssDNtpEwb2l2V0foX0gAdkO20ucRVI3GJlbG9erhJrp1Q7D-XSNbv-OdSgC-LEU7m3g/exec
+
+## 3. Design System
+Dark luxury Gold theme — NON-NEGOTIABLE:
+- Background primary: #0A0A0A (near black)
+- Background card: #111111 / #1A1A1A
+- Gold accent: #C9A84C (warm gold)
+- Gold light: #E8C97A
+- Text primary: #FFFFFF
+- Text muted: #888888 / #999999
+- Border: #2A2A2A
+- Success: #22C55E
+- Error: #EF4444
+
+Typography:
+- Headings: Fraunces (serif, italic for hero)
+- Body: Inter (sans-serif)
+- Thai text: Noto Sans Thai
+- Price display: Fraunces bold, large
+
+Spacing: Tailwind defaults, generous padding (p-6 minimum on cards)
+
+## 4. Supabase Architecture (CRITICAL — DO NOT BREAK)
+
+Tables (23 total):
+tours, tour_bookings, trip_bookings, crm_clients,
+staff_profiles, expenses, gallery, gallery_posts,
+trip_gallery, client_guide_content, client_reviews,
+client_waivers, waivers, reviews, staff_commission_ledger,
+packing_items, emergency_contacts, offline_map_pins,
+tour_itinerary, tour_itinerary_blocks, tour_itinerary_days,
+tour_map_pins, gallery_likes
+
+RLS status: ENABLED on all tables (do not disable)
+
+Booking flow (ATOMIC — never break this):
+1. Frontend calls RPC: claim_seat_and_book (SECURITY DEFINER)
+2. RPC atomically: decrements seats + creates tour_booking row
+3. No direct UPDATE on seats from frontend — RPC only
+4. Overbooking prevention: hard-block when seats = 0
+
+Trip data source:
+- Google Sheet "Trip info" tab (NOT "Trips_Data")
+- 20-column Title-Case headers, data from row 2
+- Read via GAS Web App URL above
+- Supabase = single source of truth for seats
+
+## 5. PIN System (4 access levels)
+- 1111 = Staff (read bookings, view dashboard)
+- 4444 = Co-Host (adjust seats ±, view bookings)
+- 9999 = Owner (full access, all features)
+- 3501 = Platform (super admin, all Chapter99 data)
+
+PIN verified via: verify_pin RPC (client-side, NOT Supabase Auth)
+Dashboard policies named: *_dashboard_anon_* (hybrid RLS)
+
+## 6. The 8 Trips
+trip_code: TAS-3D2N, MEL-4D3N, ULU-4D3N, NZ-6D5N,
+           TAS-LH-4D3N, KIA-1DAY, CAN-2D1N, SYD-1DAY
+
+NZ-6D5N = FLAGSHIP (styled larger, price: A$2,350)
+Meeting point: Sydney International Airport (all multi-day)
+
+Storage bucket: "portfolio"
+Note: ULU folder misspelled "Ulruru" — use as-is
+Hobart images: "Tasmania/Hobart" folder
+
+## 7. Payment Rules
+- Deposit: A$100 (book now, pay later)
+- Installment 1: equal amount, 30 days post-booking
+- Installment 2: equal amount, 20 days before departure
+- No full payment upfront required
+
+## 8. Security Rules (NON-NEGOTIABLE)
+- Supabase anon key in .env only (VITE_SUPABASE_ANON_KEY)
+- service_role key NEVER in frontend — Edge Functions only
+- RLS enabled on ALL tables always
+- Google Sheet: Restricted access only (not public edit)
+- No sensitive booking data in console.log
+
+## 9. SEO + AI Friendly
+- Title: "Trip2Talk | ทริปถ่ายภาพสำหรับคนไทยในออสเตรเลีย"
+- Schema: TouristTrip + LocalBusiness
+- FAQ: ออกเดินทางจากไหน / ราคาเท่าไหร่ / จองยังไง
+- Language: Thai (th-AU) as primary
+
+## 10. Development Workflow
+- Read Google Sheet via GAS before any trip data change
+- Always test booking flow with claim_seat_and_book RPC
+- Check seats in Supabase directly to verify atomic lock
+- New features: test on mobile (iPhone) first
+- git commit: "feat: [thai description]"
+- Use Sonnet — NEVER Opus unless architecture/RPC work
+- NEVER Multitask
+- Push to GitHub = auto deploy to Vercel
+
+## 11. Current Task
+[REPLACE THIS: Describe the specific feature to build]
+Example: "Fix Co-Host Terminal ± seat controls"
+Example: "Add Hobart gallery slideshow"
+Example: "Fix GAS web app to read Trip info tab"
+Example: "Send Resend confirmation email after booking"
+
+## 12. Constraints
+- "ทริป" always — NEVER "ทัวร์" in any text
+- Seat count always visible on booking page
+- Hard-block booking when seats = 0 (no exceptions)
+- Trips without date = unbookable (date gate enforced)
+- Dark theme always — no light mode
+- Load time: under 3 seconds even with gallery images
+- Fraunces headings on all hero and tour title sections
