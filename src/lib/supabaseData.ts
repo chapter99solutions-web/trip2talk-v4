@@ -201,7 +201,11 @@ export const ACTIVE_TOUR_STATUSES: TourStatus[] = ['CONFIRMED', 'ACTIVE'];
 export async function fetchCashierPOSData(): Promise<CashierPOSData> {
   const [clientsRes, toursRes] = await Promise.all([
     supabase.from('crm_clients').select('*'),
-    supabase.from('tours').select('*').order('trip_code', { ascending: true }),
+    supabase
+      .from('tours')
+      .select('*')
+      .in('status', ACTIVE_TOUR_STATUSES)
+      .order('trip_code', { ascending: true }),
   ]);
 
   if (clientsRes.error) logSupabaseError('crm_clients query', clientsRes.error);
