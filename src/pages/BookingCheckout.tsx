@@ -26,6 +26,11 @@ import {
 import { ONE_DAY_PICKUP_OPTIONS, pickupShortLabel } from '../lib/pickup-options';
 import { sendConfirmationEmail } from '../lib/sendConfirmationEmail';
 import { fetchEnquiryGalleryPhotos, type EnquiryGalleryPhoto } from '../lib/galleryStorage';
+import {
+  fetchCheckoutTripSummary,
+  type CheckoutTripSummary,
+} from '../lib/checkoutTripSummary';
+import CheckoutTripSummaryCard from '../components/checkout/CheckoutTripSummaryCard';
 import WaiverForm from '../components/WaiverForm';
 import {
   buildMedicalNotesFromWaiver,
@@ -66,6 +71,8 @@ export default function BookingCheckout() {
   const [search] = useSearchParams();
   const [trip, setTrip] = useState<Awaited<ReturnType<typeof resolveTripById>>>(undefined);
   const [tripLookupDone, setTripLookupDone] = useState(!tourId);
+  const [tripSummary, setTripSummary] = useState<CheckoutTripSummary | null>(null);
+  const [tripSummaryLoading, setTripSummaryLoading] = useState(Boolean(tourId));
   const initialPax = Math.min(6, Math.max(1, Number(search.get('pax')) || 4));
   const [step, setStep] = useState<Step>(1);
   const [selectedDate, setSelectedDate] = useState('');
@@ -158,6 +165,31 @@ export default function BookingCheckout() {
       cancelled = true;
     };
   }, [tourId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!tourId) {
+      setTripSummary(null);
+      setTripSummaryLoading(false);
+      return;
+    }
+    setTripSummaryLoading(true);
+    void fetchCheckoutTripSummary(tourId).then((row) => {
+      if (cancelled) return;
+      setTripSummary(row);
+      setTripSummaryLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [tourId]);
+
+  useEffect(() => {
+    if (!selectedDateLabel) return;
+    setTripSummary((prev) =>
+      prev ? { ...prev, departureLabel: selectedDateLabel } : prev,
+    );
+  }, [selectedDateLabel]);
 
   const tripCodeForLookup = trip?.trip_code;
   const hasAvailableDates = availableDates.length > 0;
@@ -487,6 +519,15 @@ export default function BookingCheckout() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-10 space-y-6">
+      {tripSummaryLoading ? (
+        <div
+          className="rounded-2xl border border-sage-200 bg-sage-50 h-40 animate-pulse"
+          aria-label="Loading trip summary"
+        />
+      ) : tripSummary ? (
+        <CheckoutTripSummaryCard summary={tripSummary} />
+      ) : null}
+
       <Link to={`/tours/${tourId}`} className="text-xs text-slate-500 hover:text-teal">
         ← Trip details
       </Link>
