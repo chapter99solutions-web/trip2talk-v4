@@ -41,8 +41,8 @@ type PackageId = 'STANDARD' | 'SESSION' | 'VIP';
 const PAYID = 'trip2talk...';
 const FACEBOOK_CONTACT_URL = 'https://m.me/TriptoTalk';
 const ENQUIRY_EMAIL = 'trip2talksyd@gmail.com';
-const CHECKOUT_YOUTUBE_EMBED =
-  'https://www.youtube.com/embed/TJtTSnXPHeA?autoplay=1&mute=1&loop=1&playlist=TJtTSnXPHeA&controls=0&showinfo=0&rel=0&modestbranding=1';
+const CHECKOUT_BANNER_VIDEO_URL =
+  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/VDO/cover/make_this_come_alive_sec.mp4';
 
 const PACKAGES: Array<{
   id: PackageId;
@@ -465,12 +465,15 @@ export default function BookingCheckout() {
   return (
     <>
       <div className="relative w-full aspect-video max-h-[200px] sm:max-h-[300px] overflow-hidden bg-black">
-        <iframe
-          title="Trip2Talk journey preview"
-          src={CHECKOUT_YOUTUBE_EMBED}
-          className="absolute inset-0 h-full w-full pointer-events-none"
-          allow="autoplay; encrypted-media; picture-in-picture"
-          referrerPolicy="strict-origin-when-cross-origin"
+        <video
+          src={CHECKOUT_BANNER_VIDEO_URL}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          aria-hidden
+          className="absolute inset-0 h-full w-full object-cover pointer-events-none"
         />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/25 via-black/10 to-white" />
         <p
