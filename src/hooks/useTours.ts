@@ -16,7 +16,7 @@ export const PUBLIC_ACTIVE_TRIP_CODES = [
   'ULU-4D3N',
 ] as const;
 
-export const FLAGSHIP_TRIP_CODES = ['TAS-3D2N', 'TAS-LH-4D3N'] as const;
+export const FLAGSHIP_TRIP_CODES = ['TAS-3D2N'] as const;
 
 const ACTIVE_SET = new Set<string>(PUBLIC_ACTIVE_TRIP_CODES);
 const FLAGSHIP_SET = new Set<string>(FLAGSHIP_TRIP_CODES);
