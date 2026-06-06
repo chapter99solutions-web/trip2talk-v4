@@ -14,21 +14,15 @@ export default function CheckoutTripSummaryCard({ summary }: Props) {
   return (
     <article className="rounded-2xl border border-sage-200 bg-sage-50 overflow-hidden shadow-sm">
       <div className="flex gap-4 p-4 sm:p-5">
-        <img
-          src={summary.coverImageUrl}
-          alt=""
-          loading="eager"
-          decoding="async"
-          className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl object-cover shrink-0 border border-sage-200 bg-white"
-          onError={(e) => {
-            const img = e.currentTarget;
-            if (!img.dataset.fallback) {
-              img.dataset.fallback = '1';
-              img.src =
-                'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&q=80';
-            }
-          }}
-        />
+        {summary.coverImageUrl ? (
+          <img
+            src={summary.coverImageUrl}
+            alt=""
+            loading="eager"
+            decoding="async"
+            className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl object-cover shrink-0 border border-sage-200 bg-white"
+          />
+        ) : null}
 
         <div className="flex-1 min-w-0">
           <h2 className="font-serif text-lg sm:text-xl font-semibold text-slate-900 leading-snug">

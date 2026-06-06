@@ -1,10 +1,7 @@
 import { findTourFallbackByCode } from '../data/tours';
 import { fetchTripAvailability } from './customerJourney';
 import { PORTFOLIO_TOURS } from './portfolioTours';
-import {
-  fetchAvailableTourDates,
-  formatTourDateRangeLabel,
-} from './publicTours';
+import { formatTourDateRangeLabel } from './publicTours';
 import { supabase } from './supabase';
 import { fetchTripByCodeFromSheet } from './tripsSheetApi';
 
@@ -17,11 +14,49 @@ export type CheckoutTripSummary = {
   priceAud: number;
   maxPax: number;
   seatsLeft: number | null;
-  coverImageUrl: string;
+  coverImageUrl: string | null;
 };
 
-const FALLBACK_COVER =
-  'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&q=80';
+const FULL_TOUR_SELECT =
+  'trip_code, title, anonymized_title, destination, duration_text, duration_days, trip_date, standard_price, price_aud, price_per_person, max_pax, slots_booked, slots_max, departure_start, departure_end, start_date, end_date, cover_image, cover_image_url';
+
+const CORE_TOUR_SELECT =
+  'trip_code, title, anonymized_title, destination, duration_text, price_aud, price_per_person, max_pax, slots_booked, slots_max, departure_start, departure_end, start_date, end_date, cover_image, cover_image_url';
+
+function formatDurationDays(days: number, fallback: string): string {
+  if (!Number.isFinite(days) || days <= 0) return fallback;
+  const nights = Math.max(0, days - 1);
+  if (nights > 0) return `${days} Days ${nights} Nights`;
+  return days === 1 ? '1 Day' : `${days} Days`;
+}
+
+function nightsFromDateRange(startIso: string, endIso: string | null): number | null {
+  const start = new Date(`${startIso}T00:00:00`);
+  const end = endIso ? new Date(`${endIso}T00:00:00`) : null;
+  if (!Number.isFinite(start.getTime())) return null;
+  if (!end || !Number.isFinite(end.getTime())) return null;
+  const diff = Math.round((end.getTime() - start.getTime()) / 86_400_000);
+  return diff > 0 ? diff + 1 : null;
+}
+
+async function fetchTourRow(tripCode: string): Promise<Record<string, unknown> | null> {
+  const code = tripCode.trim().toUpperCase();
+  const run = async (select: string) =>
+    supabase.from('tours').select(select).eq('trip_code', code).limit(1).maybeSingle();
+
+  const full = await run(FULL_TOUR_SELECT);
+  if (!full.error) return (full.data as Record<string, unknown> | null) ?? null;
+
+  if (full.error.message.includes('does not exist')) {
+    const core = await run(CORE_TOUR_SELECT);
+    if (!core.error) return (core.data as Record<string, unknown> | null) ?? null;
+    console.warn('[Checkout] fetchCheckoutTripSummary:', core.error.message);
+    return null;
+  }
+
+  console.warn('[Checkout] fetchCheckoutTripSummary:', full.error.message);
+  return null;
+}
 
 export async function fetchCheckoutTripSummary(
   tripCode: string,
@@ -29,29 +64,16 @@ export async function fetchCheckoutTripSummary(
   const code = tripCode.trim().toUpperCase();
   if (!code) return null;
 
-  const [dbRes, sheet, availability, dates] = await Promise.all([
-    supabase
-      .from('tours')
-      .select(
-        'trip_code, title, anonymized_title, destination, duration_text, price_aud, max_pax, slots_booked, slots_max, departure_start, departure_end, cover_image, cover_image_url',
-      )
-      .eq('trip_code', code)
-      .limit(1)
-      .maybeSingle(),
+  const [row, sheet, availability] = await Promise.all([
+    fetchTourRow(code),
     fetchTripByCodeFromSheet(code).catch(() => null),
     fetchTripAvailability(code),
-    fetchAvailableTourDates(code),
   ]);
 
   const fallback = findTourFallbackByCode(code);
   const portfolio = PORTFOLIO_TOURS.find(
     (t) => t.id === code || t.tripCode.toUpperCase() === code,
   );
-
-  const row = dbRes.data as Record<string, unknown> | null;
-  if (dbRes.error) {
-    console.warn('[Checkout] fetchCheckoutTripSummary:', dbRes.error.message);
-  }
 
   const tripCodeOut = String(row?.trip_code ?? code).trim().toUpperCase();
   const tourName =
@@ -70,50 +92,68 @@ export async function fetchCheckoutTripSummary(
     fallback?.location?.split('·').pop()?.trim() ||
     'Australia';
 
-  const durationLabel =
+  const durationDaysRaw = Number(row?.duration_days);
+  const rangeDays = nightsFromDateRange(
+    String(row?.start_date ?? row?.departure_start ?? ''),
+    String(row?.end_date ?? row?.departure_end ?? '') || null,
+  );
+  const durationLabel = formatDurationDays(
+    Number.isFinite(durationDaysRaw) && durationDaysRaw > 0
+      ? durationDaysRaw
+      : rangeDays ?? sheet?.durationDays ?? 0,
     String(row?.duration_text ?? '').trim() ||
-    (sheet?.durationDays ? `${sheet.durationDays} Days` : '') ||
-    portfolio?.duration ||
-    fallback?.durationLabel ||
-    '—';
+      portfolio?.duration ||
+      fallback?.durationLabel ||
+      '—',
+  );
 
-  const departureStart =
-    availability?.departureStart ||
+  const tripDate =
+    String(row?.trip_date ?? '').trim() ||
     String(row?.departure_start ?? '').trim() ||
+    availability?.departureStart ||
     sheet?.departureStart ||
-    dates[0]?.start_date ||
+    String(row?.start_date ?? '').trim() ||
     '';
-  const departureEnd =
-    availability?.departureEnd ||
+  const tripDateEnd =
     String(row?.departure_end ?? '').trim() ||
+    availability?.departureEnd ||
     sheet?.departureEnd ||
-    dates[0]?.end_date ||
+    String(row?.end_date ?? '').trim() ||
     null;
-  const departureLabel = departureStart
-    ? formatTourDateRangeLabel(departureStart, departureEnd)
+  const departureLabel = tripDate
+    ? formatTourDateRangeLabel(tripDate, tripDateEnd)
     : 'เปิดจองเร็ว ๆ นี้ / Dates coming soon';
 
   const priceAud = Number(
-    row?.price_aud ?? sheet?.priceStandardAud ?? portfolio?.priceAud ?? fallback?.standardPrice ?? 0,
+    row?.standard_price ??
+      row?.price_aud ??
+      row?.price_per_person ??
+      sheet?.priceStandardAud ??
+      portfolio?.priceAud ??
+      fallback?.standardPrice ??
+      0,
   );
 
   const maxPax = Number(
     row?.slots_max ?? row?.max_pax ?? availability?.slotsMax ?? sheet?.slotsMax ?? sheet?.maxPax ?? fallback?.maxPax ?? 6,
   );
 
+  const slotsBooked =
+    row?.slots_booked != null
+      ? Number(row.slots_booked)
+      : availability?.slotsBooked != null
+        ? availability.slotsBooked
+        : NaN;
+  const slotsMax = Number(row?.slots_max ?? availability?.slotsMax ?? NaN);
   const seatsLeft =
     availability?.seatsLeft ??
-    (row?.slots_max != null && row?.slots_booked != null
-      ? Math.max(0, Number(row.slots_max) - Number(row.slots_booked))
+    (Number.isFinite(slotsMax) && Number.isFinite(slotsBooked)
+      ? Math.max(0, slotsMax - slotsBooked)
       : null);
 
-  const coverImageUrl =
-    String(row?.cover_image ?? '').trim() ||
-    String(row?.cover_image_url ?? '').trim() ||
-    sheet?.coverUrl?.trim() ||
-    portfolio?.image ||
-    fallback?.galleryPhotos?.[0] ||
-    FALLBACK_COVER;
+  const coverFromDb =
+    String(row?.cover_image ?? '').trim() || String(row?.cover_image_url ?? '').trim();
+  const coverImageUrl = coverFromDb || null;
 
   return {
     tourName,
