@@ -23,7 +23,8 @@ import {
   shouldBlockSharedLowPaxNearDate,
   PRICING,
 } from '../lib/bookingRules';
-import { ONE_DAY_PICKUP_OPTIONS } from '../lib/pickup-options';
+import { ONE_DAY_PICKUP_OPTIONS, pickupShortLabel } from '../lib/pickup-options';
+import { sendConfirmationEmail } from '../lib/sendConfirmationEmail';
 import { fetchEnquiryGalleryPhotos, type EnquiryGalleryPhoto } from '../lib/galleryStorage';
 import WaiverForm from '../components/WaiverForm';
 import {
@@ -369,27 +370,28 @@ export default function BookingCheckout() {
         return;
       }
 
-      // Task 3: Resend confirmation email (best-effort; do not block booking UI)
-      try {
-        await fetch('/api/send-confirmation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            bookingId,
-            bookingRef: reference_number,
-            customerName: fullName,
-            customerEmail: email,
-            tripCode: trip.trip_code,
-            tripName: tourName,
-            departureDate: selectedDate,
-            pax: partyPax,
-            totalAud,
-            payId: PAYID,
-          }),
-        });
-      } catch (e) {
-        console.warn('[Trip2Talk] send-confirmation failed:', e);
-      }
+      const pickupLabel =
+        pickupConfig.kind === 'day' && pickupLocation === 'route_waypoint' && hotelName.trim()
+          ? `${pickupShortLabel(pickupLocation, 'TH')} — ${hotelName.trim()}`
+          : pickupShortLabel(pickupLocation, 'TH');
+
+      void sendConfirmationEmail({
+        bookingId,
+        bookingRef: reference_number,
+        customerName: fullName,
+        customerEmail: email,
+        tripCode: trip.trip_code,
+        tripName: tourName,
+        departureDate: selectedDate,
+        pax: partyPax,
+        totalAud,
+        pickupPoint: pickupLabel,
+        payId: PAYID,
+      }).then((result) => {
+        if (!result.success) {
+          console.warn('[Trip2Talk] send-confirmation failed:', result.error);
+        }
+      });
 
       setBookingConfirmation({
         ref: reference_number,

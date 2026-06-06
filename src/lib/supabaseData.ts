@@ -39,7 +39,10 @@ export interface CashierPOSData {
 
 /** Normalized row for Owner / Staff dashboards (Supabase source of truth). */
 export type DashboardBookingRow = {
+  /** Customer-facing booking reference */
   bookingId: string;
+  /** Supabase tour_bookings.id (UUID) */
+  supabaseId: string;
   customerName: string;
   tourCode: string;
   tourName: string;
@@ -82,6 +85,7 @@ function mapBookingToDashboardRow(b: BookingWithRelations): DashboardBookingRow 
   const name = clientDisplayName(c);
   return {
     bookingId: b.reference_number || b.id,
+    supabaseId: b.id,
     customerName: name,
     tourCode: t?.trip_code ?? '',
     tourName: t?.destination ?? t?.trip_code ?? '',

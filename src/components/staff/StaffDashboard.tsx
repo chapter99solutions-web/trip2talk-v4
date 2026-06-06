@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import IntakeFormModal from '../IntakeFormModal';
 import { BookingsTableMissingError, fetchConfirmedBookings, type PlatformBooking } from '../../lib/platformBookings';
 import { fetchDashboardBookingsFromSupabase } from '../../lib/supabaseData';
+import { pickupShortLabel } from '../../lib/pickup-options';
+import { sendConfirmationEmail } from '../../lib/sendConfirmationEmail';
 import { logConsentToSheet } from '../../lib/tripsSheetApi';
 import { saveExpenseLocally } from '../../lib/expenseDb';
 import ReceiptUploadSection from './ReceiptUploadSection';
@@ -22,9 +24,14 @@ type Lang = 'TH' | 'EN';
 
 type IntakeBooking = {
   bookingId: string;
+  supabaseId?: string;
   customerName: string;
   tourCode: string;
+  tourName?: string;
   tourDate: string;
+  pax?: number;
+  totalAmount?: number;
+  email?: string;
   intakeStatus: string;
   bookingStatus: string;
   fullNamePassport: string;
@@ -36,6 +43,8 @@ type IntakeBooking = {
   photoStyle: string;
   pickupDisplay: string;
 };
+
+const STAFF_PAYID = 'trip2talk...';
 
 const NAVY = '#0d1b2a';
 const GOLD = '#d4af37';
@@ -161,6 +170,7 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
   const [intakeTarget, setIntakeTarget] = useState<PlatformBooking | null>(null);
   const [checkedIn, setCheckedIn] = useState<Set<string>>(() => new Set());
   const [checkingId, setCheckingId] = useState<string | null>(null);
+  const [emailSendingId, setEmailSendingId] = useState<string | null>(null);
   const [staffToast, setStaffToast] = useState<{ tone: 'ok' | 'err'; msg: string } | null>(null);
 
   // Quick expense drop (saved offline to IndexedDB, synced later).
@@ -174,6 +184,46 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
     setStaffToast({ tone, msg });
     window.setTimeout(() => setStaffToast(null), 2600);
   }, []);
+
+  const handleSendConfirmation = async (b: IntakeBooking) => {
+    const customerEmail = b.email?.trim() ?? '';
+    if (!customerEmail) {
+      flashToast('err', lang === 'TH' ? 'ไม่มีอีเมลลูกค้า' : 'No customer email on file');
+      return;
+    }
+    if (!b.tourDate || !b.tourCode || !b.totalAmount || !b.pax) {
+      flashToast('err', lang === 'TH' ? 'ข้อมูลจองไม่ครบสำหรับส่งอีเมล' : 'Booking data incomplete for email');
+      return;
+    }
+
+    setEmailSendingId(b.bookingId);
+    try {
+      const result = await sendConfirmationEmail({
+        bookingId: b.supabaseId || b.bookingId,
+        bookingRef: b.bookingId,
+        customerName: b.fullNamePassport || b.customerName,
+        customerEmail,
+        tripName: b.tourName || b.tourCode,
+        tripCode: b.tourCode,
+        departureDate: b.tourDate,
+        pax: b.pax,
+        totalAud: b.totalAmount,
+        pickupPoint: pickupShortLabel(b.pickupDisplay, lang) || b.pickupDisplay,
+        payId: STAFF_PAYID,
+      });
+      if (!result.success) {
+        throw new Error(result.error ?? 'Email failed');
+      }
+      flashToast(
+        'ok',
+        lang === 'TH' ? `ส่งอีเมลยืนยันให้ ${b.customerName} แล้ว` : `Confirmation email sent to ${b.customerName}`
+      );
+    } catch (e) {
+      flashToast('err', e instanceof Error ? e.message : 'Send confirmation failed');
+    } finally {
+      setEmailSendingId(null);
+    }
+  };
 
   const handleCheckIn = async (b: IntakeBooking) => {
     if (checkedIn.has(b.bookingId) || checkingId) return;
@@ -711,12 +761,13 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
                   <th className="p-3">Birthday</th>
                   <th className="p-3">Emergency</th>
                   <th className="p-3">Check-in</th>
+                  <th className="p-3">Email</th>
                 </tr>
               </thead>
               <tbody className="text-sm">
                 {scoped.length === 0 ? (
                   <tr>
-                    <td className="p-4 text-white/60" colSpan={7}>
+                    <td className="p-4 text-white/60" colSpan={8}>
                       {lang === 'TH' ? 'ไม่มีข้อมูลสำหรับทริปนี้' : 'No bookings for this trip'}
                     </td>
                   </tr>
@@ -765,6 +816,20 @@ export default function StaffDashboard({ onLogout }: { onLogout: () => void }) {
                               {checkingId === b.bookingId ? '…' : lang === 'TH' ? 'เช็คอิน' : 'Check in'}
                             </button>
                           )}
+                        </td>
+                        <td className="p-3">
+                          <button
+                            type="button"
+                            disabled={emailSendingId === b.bookingId || !b.email?.trim()}
+                            onClick={() => void handleSendConfirmation(b)}
+                            className="px-3 py-1.5 rounded-full text-xs font-semibold border border-amber-400/30 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20 disabled:opacity-40 whitespace-nowrap"
+                          >
+                            {emailSendingId === b.bookingId
+                              ? '…'
+                              : lang === 'TH'
+                                ? 'ส่งอีเมลยืนยัน'
+                                : 'Send Confirmation Email'}
+                          </button>
                         </td>
                       </tr>
                     );
