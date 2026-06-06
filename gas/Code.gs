@@ -8,7 +8,7 @@
  */
 // ชื่อแท็บ (tab) ที่อ่านข้อมูลทริป — ใช้แท็บ "Trip info" ที่มีอยู่แล้วในชีตใหม่
 // (เดิมคือ 'Trips_Data'). เปลี่ยนมาอ่านจาก "Trip info" เพื่อไม่ต้องสร้างแท็บใหม่.
-const GAS_VERSION = '3.0';
+const GAS_VERSION = '3.1';
 const TRIPS_TAB = 'Trip info';
 const BOOKINGS_TAB = 'Customer_Bookings';
 // แท็บปลายทางสำหรับ append แถวการจอง + settlement (มีอยู่แล้วในชีตใหม่)
@@ -596,8 +596,14 @@ function doPost(e) {
     if (body.action === 'addExpense') {
       return json_(appendExpense_(body));
     }
+    if (actionNorm === 'append_booking') {
+      return json_(appendBookingSettlement_(body));
+    }
+    if (actionNorm === 'append_pl') {
+      return json_(appendOrUpdatePlRow_(body));
+    }
     if (body.action === 'addBooking') {
-      return json_(appendBookingRow_(body));
+      return json_(appendBookingSettlement_(body));
     }
     // เพิ่มค่า "Slots Booked" ของทริปในแท็บ 'Trip info' (กระจกเงาให้เจ้าของ)
     if (body.action === 'incrementSlot') {
@@ -1148,25 +1154,25 @@ function appendExpense_(data) {
   return { status: 'ok', message: 'Expense saved' };
 }
 
-/**
- * Sync การจองจากเว็บไซต์ (doPost action: 'addBooking').
- * Append "หนึ่งแถว" ลงแท็บ Tax_Year_2025_2026_Settlements โดย map ค่าให้ตรง
- * คอลัมน์ A-I ตามที่ทีมใช้: Synced At | Tour Code | Revenue | Expenses |
- * Commissions | Net Profit | GST Collected | GST Claimed | Sync Date.
- * Supabase คือ source of truth — แถวนี้เป็นเพียง mirror สำหรับทีม.
- *
- * การ map การจอง → settlement:
- *   Revenue     = amount (ยอดมัดจำ/ยอดที่จ่าย)
- *   Expenses    = 0
- *   Commissions = 0
- *   Net Profit  = amount
- *   GST Collected = amount / 11 (GST แบบรวมในราคาของออสเตรเลีย)
- *   GST Claimed = 0
- */
-function settlementHeaders_() {
+/** Booking payment row — hybrid auto-sync (Part 1). */
+function bookingSettlementHeaders_() {
   return [
     'Synced At',
     'Tour Code',
+    'Booking ID',
+    'Customer Name',
+    'Pax',
+    'Total Paid',
+    'Payment Method',
+    'Payment Date',
+  ];
+}
+
+/** Trip P&L summary row — Close Trip & Sync P&L (Part 2). */
+function plSettlementHeaders_() {
+  return [
+    'Trip Code',
+    'Trip Name',
     'Revenue',
     'Expenses',
     'Commissions',
@@ -1177,26 +1183,111 @@ function settlementHeaders_() {
   ];
 }
 
-function appendBookingRow_(data) {
+/**
+ * Append one booking/payment row (doPost action: append_booking | addBooking).
+ * Columns: Synced At | Tour Code | Booking ID | Customer Name | Pax | Total Paid |
+ * Payment Method | Payment Date
+ */
+function appendBookingSettlement_(data) {
   var d = data || {};
   var ss = ss_();
-  // ใช้แท็บที่มีอยู่แล้ว ถ้าไม่มีจึงสร้างพร้อม header
-  var sheet = getOrCreateSheet_(ss, SETTLEMENTS_TAB, settlementHeaders_());
-  var amount = Number(pick_(d, ['amount', 'Amount', 'revenue', 'Revenue'])) || 0;
+  var sheet = getOrCreateSheet_(ss, SETTLEMENTS_TAB, bookingSettlementHeaders_());
   var nowIso = new Date().toISOString();
-  var gstCollected = amount > 0 ? Math.round((amount / 11) * 100) / 100 : 0;
+  var paymentDate =
+    pick_(d, ['payment_date', 'Payment Date', 'departure_date']) || nowIso.slice(0, 10);
   sheet.appendRow([
-    pick_(d, ['created_at', 'Synced At']) || nowIso, // A Synced At
-    pick_(d, ['tour_code', 'Tour Code']),            // B Tour Code
-    amount,                                          // C Revenue
-    0,                                               // D Expenses
-    0,                                               // E Commissions
-    amount,                                          // F Net Profit
-    gstCollected,                                    // G GST Collected
-    0,                                               // H GST Claimed
-    nowIso,                                          // I Sync Date
+    pick_(d, ['synced_at', 'created_at', 'Synced At']) || nowIso,
+    pick_(d, ['tour_code', 'Tour Code', 'tourCode']),
+    pick_(d, ['booking_id', 'booking_ref', 'Booking ID']),
+    pick_(d, ['client_name', 'customer_name', 'Customer Name']),
+    Number(pick_(d, ['pax', 'Pax', 'party_pax'])) || 1,
+    Number(pick_(d, ['total_paid', 'amount', 'Amount', 'Total Paid'])) || 0,
+    pick_(d, ['payment_method', 'Payment Method']) || 'PAYID',
+    paymentDate,
   ]);
-  return { status: 'ok', message: 'Booking row appended to ' + SETTLEMENTS_TAB };
+  return {
+    status: 'ok',
+    message: 'Booking payment appended to ' + SETTLEMENTS_TAB,
+    tab: SETTLEMENTS_TAB,
+  };
+}
+
+/**
+ * Append or update P&L row by Trip Code (doPost action: append_pl).
+ * P&L rows start with Trip Code in column A (distinct from booking rows).
+ */
+function appendOrUpdatePlRow_(data) {
+  var d = data || {};
+  var tripCode = String(pick_(d, ['trip_code', 'Trip Code', 'tour_code']) || '')
+    .trim()
+    .toUpperCase();
+  if (!tripCode) {
+    return { status: 'error', message: 'trip_code is required' };
+  }
+
+  var ss = ss_();
+  var sheet = ss.getSheetByName(SETTLEMENTS_TAB);
+  if (!sheet) {
+    sheet = getOrCreateSheet_(ss, SETTLEMENTS_TAB, plSettlementHeaders_());
+  }
+
+  var revenue = Number(pick_(d, ['revenue', 'Revenue'])) || 0;
+  var expenses = Number(pick_(d, ['expenses', 'Expenses'])) || 0;
+  var commissions = Number(pick_(d, ['commissions', 'Commissions'])) || 0;
+  var netProfit =
+    Number(pick_(d, ['net_profit', 'Net Profit'])) || revenue - expenses - commissions;
+  var gstCollected =
+    Number(pick_(d, ['gst_collected', 'GST Collected'])) ||
+    (revenue > 0 ? Math.round((revenue / 11) * 100) / 100 : 0);
+  var gstClaimed = Number(pick_(d, ['gst_claimed', 'GST Claimed'])) || 0;
+  var tripName = pick_(d, ['trip_name', 'Trip Name', 'title']) || tripCode;
+  var syncDate = pick_(d, ['sync_date', 'Sync Date', 'synced_at']) || new Date().toISOString();
+  var rowValues = [
+    tripCode,
+    tripName,
+    revenue,
+    expenses,
+    commissions,
+    netProfit,
+    gstCollected,
+    gstClaimed,
+    syncDate,
+  ];
+
+  var values = sheet.getDataRange().getValues();
+  var foundRow = -1;
+  for (var r = 1; r < values.length; r++) {
+    var code = String(values[r][0] || '').trim().toUpperCase();
+    var col3 = values[r][2];
+    var col3Num = Number(col3);
+    if (code === tripCode && !isNaN(col3Num) && String(col3).trim() !== '') {
+      foundRow = r + 1;
+      break;
+    }
+  }
+
+  if (foundRow > 0) {
+    sheet.getRange(foundRow, 1, 1, rowValues.length).setValues([rowValues]);
+    return {
+      status: 'ok',
+      message: 'P&L row updated in ' + SETTLEMENTS_TAB,
+      tripCode: tripCode,
+      tab: SETTLEMENTS_TAB,
+    };
+  }
+
+  sheet.appendRow(rowValues);
+  return {
+    status: 'ok',
+    message: 'P&L row appended to ' + SETTLEMENTS_TAB,
+    tripCode: tripCode,
+    tab: SETTLEMENTS_TAB,
+  };
+}
+
+/** @deprecated — use appendBookingSettlement_ (append_booking action). */
+function appendBookingRow_(data) {
+  return appendBookingSettlement_(data);
 }
 
 /**

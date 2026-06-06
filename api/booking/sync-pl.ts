@@ -1,11 +1,11 @@
 import { gasWebAppUrl, type VercelRequest, type VercelResponse } from '../lib/gas';
 
-function isBookingAppendOk(payload: unknown): boolean {
+function isPlAppendOk(payload: unknown): boolean {
   if (!payload || typeof payload !== 'object') return false;
   const o = payload as Record<string, unknown>;
   if (o.status === 'error' || o.ok === false) return false;
   const msg = String(o.message ?? '').toLowerCase();
-  return msg.includes('booking payment appended') || msg.includes('booking row appended');
+  return msg.includes('p&l row appended') || msg.includes('p&l row updated');
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -19,19 +19,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const body = (req.body ?? {}) as Record<string, unknown>;
-  const totalPaid = Number(body.total_paid ?? body.amount ?? 0) || 0;
+  const revenue = Number(body.revenue ?? 0) || 0;
+  const expenses = Number(body.expenses ?? 0) || 0;
+  const commissions = Number(body.commissions ?? 0) || 0;
   const payload = {
     ...body,
-    action: 'append_booking',
-    tour_code: body.tour_code ?? body.tourCode,
-    booking_id: body.booking_id ?? body.booking_ref,
-    client_name: body.client_name ?? body.customer_name,
-    pax: Number(body.pax ?? body.party_pax ?? 1) || 1,
-    total_paid: totalPaid,
-    payment_method: body.payment_method ?? 'PAYID',
-    payment_date:
-      body.payment_date ?? body.departure_date ?? new Date().toISOString().slice(0, 10),
-    synced_at: body.synced_at ?? body.created_at ?? new Date().toISOString(),
+    action: 'append_pl',
+    trip_code: body.trip_code ?? body.tour_code,
+    trip_name: body.trip_name ?? body.title ?? body.trip_code,
+    revenue,
+    expenses,
+    commissions,
+    net_profit: Number(body.net_profit ?? revenue - expenses - commissions),
+    gst_collected: Number(body.gst_collected ?? (revenue > 0 ? Math.round((revenue / 11) * 100) / 100 : 0)),
+    gst_claimed: Number(body.gst_claimed ?? 0),
+    sync_date: body.sync_date ?? new Date().toISOString(),
   };
 
   try {
@@ -54,13 +56,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(502).json({ success: false, error: `GAS HTTP ${gasRes.status}`, response: parsed });
     }
 
-    if (!isBookingAppendOk(parsed)) {
-      const o = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
-      const hint =
-        typeof o.data === 'object' && o.data && !Array.isArray(o.data)
-          ? 'Deploy gas/Code.gs v3.1 and verify append_booking handler'
-          : 'Unexpected GAS response — booking payment row was not appended';
-      return res.status(502).json({ success: false, error: hint, response: parsed });
+    if (!isPlAppendOk(parsed)) {
+      return res.status(502).json({
+        success: false,
+        error: 'Unexpected GAS response — P&L row was not written',
+        response: parsed,
+      });
     }
 
     return res.status(200).json({ success: true, response: parsed });

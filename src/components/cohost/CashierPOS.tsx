@@ -295,6 +295,7 @@ export default function CashierPOS({
         clientEmail: selectedClient.email,
         clientPhone: selectedClient.phone,
         tripCode,
+        partyPax,
       });
 
       if (warnings.length > 0) {

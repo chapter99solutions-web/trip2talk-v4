@@ -7,7 +7,7 @@ import { dispatchRetargetingNotification, dispatchTransactionNotification } from
 import { assertBookingAllowed } from './bookingDuplicate';
 import { insertPlatformBookingRow } from './platformBookings';
 import { buildSettlementForTour, syncSettlementToGoogleSheets, SettlementSyncPayload } from './googleSync';
-import { syncBookingToSheet, syncSlotIncrementToSheet } from './gsheetSync';
+import { syncBookingPaymentToSheet, syncSlotIncrementToSheet } from './gsheetSync';
 
 /**
  * error เฉพาะกรณี "วันนี้มีคนจองแล้ว" (ชน UNIQUE constraint บน trip_date).
@@ -541,20 +541,14 @@ export async function runPhase2Book(input: {
     // ถ้าเรียกทั้งสองทางจะได้แถวซ้ำ.)
     // await เพื่อให้ log เรียงลำดับ แต่ syncBookingToSheet จะ catch ภายในเสมอ
     // (ไม่ throw) — sync ที่ fail จะไม่ทำให้การจองพัง เพราะ Supabase บันทึกไปแล้ว.
-    const sheetSync = await syncBookingToSheet({
-      action: 'addBooking',
-      booking_ref: input.referenceNumber,
+    const sheetSync = await syncBookingPaymentToSheet({
+      tour_code: tripCode,
       booking_id: bookingRow.id,
       client_name: input.fullName,
-      email: input.email,
-      phone: input.phone,
-      tour_code: tripCode,
-      departure_date: input.departureDate || new Date().toISOString().slice(0, 10),
-      amount: input.depositAud,
-      pax: input.partyPax,
-      pickup: input.pickup,
-      status: 'PENDING',
-      created_at: new Date().toISOString(),
+      pax: input.partyPax ?? 1,
+      total_paid: input.depositAud,
+      payment_method: 'PAYID',
+      payment_date: input.departureDate || new Date().toISOString().slice(0, 10),
     });
     if (!sheetSync.success) {
       warnings.push(`GSheet sync: ${sheetSync.error ?? 'failed'}`);
@@ -679,6 +673,7 @@ export async function runPhase4OnTrip(input: {
   clientEmail?: string;
   clientPhone?: string;
   tripCode: string;
+  partyPax?: number;
   expense?: Omit<Expense, 'id' | 'created_at' | 'is_synced' | 'gst_amount_aud'> & {
     gst_amount_aud?: number;
   };
@@ -701,6 +696,9 @@ export async function runPhase4OnTrip(input: {
         ? 'DEPOSIT_PAID'
         : 'PENDING';
 
+  let bookingId = existing?.id ?? null;
+  let bookingDbOk = true;
+
   if (existing?.id) {
     const { error } = await supabase
       .from('tour_bookings')
@@ -711,7 +709,10 @@ export async function runPhase4OnTrip(input: {
         journey_phase: 'on_trip',
       })
       .eq('id', existing.id);
-    if (error) warnings.push(error.message);
+    if (error) {
+      bookingDbOk = false;
+      warnings.push(error.message);
+    }
   } else {
     const row: Record<string, unknown> = {
       tour_id: input.tourId,
@@ -721,10 +722,20 @@ export async function runPhase4OnTrip(input: {
       payment_method: input.paymentMethod,
       reference_number: input.referenceNumber,
       journey_phase: 'on_trip',
+      party_pax: input.partyPax ?? 1,
     };
     if (tenantId) row.tenant_id = tenantId;
-    const { error } = await supabase.from('tour_bookings').insert(row);
-    if (error) warnings.push(error.message);
+    const { data: inserted, error } = await supabase
+      .from('tour_bookings')
+      .insert(row)
+      .select('id')
+      .single();
+    if (error) {
+      bookingDbOk = false;
+      warnings.push(error.message);
+    } else if (inserted?.id) {
+      bookingId = inserted.id as string;
+    }
   }
 
   if (input.expense && tenantId) {
@@ -750,6 +761,21 @@ export async function runPhase4OnTrip(input: {
     payment_method: input.paymentMethod,
     booking_status: status,
   });
+
+  if (bookingDbOk) {
+    const sheetSync = await syncBookingPaymentToSheet({
+      tour_code: input.tripCode,
+      booking_id: bookingId ?? input.referenceNumber,
+      client_name: input.clientName,
+      pax: input.partyPax ?? 1,
+      total_paid: input.amountAud,
+      payment_method: input.paymentMethod,
+      payment_date: new Date().toISOString().slice(0, 10),
+    });
+    if (!sheetSync.success) {
+      warnings.push(`GSheet sync: ${sheetSync.error ?? 'failed'}`);
+    }
+  }
 
   return { warnings };
 }

@@ -16,6 +16,7 @@ import { generatePortalLink } from '../../lib/platformBookings';
 import { fetchDashboardBookingsFromSupabase } from '../../lib/supabaseData';
 import { supabase } from '../../lib/supabase';
 import { resolveDefaultTenantId } from '../../lib/customerJourney';
+import { closeTripPlFromSupabase } from '../../lib/gsheetSync';
 import type { TourStatus } from '../../types/tour';
 import IntakeFormModal from '../IntakeFormModal';
 import FBInboxTrigger from '../FBInboxTrigger';
@@ -68,6 +69,11 @@ type SupaTour = {
   environment_tags: string[] | null;
   description: string | null;
   cover_image_url: string | null;
+  slots_booked?: number | null;
+  slots_max?: number | null;
+  base_commission_rate?: number | null;
+  bonus_threshold_pax?: number | null;
+  bonus_amount_aud?: number | null;
 };
 
 type TripForm = {
@@ -251,6 +257,7 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
   const [tripForm, setTripForm] = useState<TripForm>(EMPTY_TRIP_FORM);
   const [savingTrip, setSavingTrip] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [closingTripId, setClosingTripId] = useState<string | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -374,6 +381,38 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
       showToast('err', e instanceof Error ? e.message : 'Save failed', 5000);
     } finally {
       setSavingTrip(false);
+    }
+  };
+
+  const closeTripAndSyncPl = async (row: SupaTour) => {
+    if (!row.trip_code) {
+      showToast('err', lang === 'TH' ? 'ไม่มีรหัสทริป' : 'Trip code missing');
+      return;
+    }
+    setClosingTripId(row.id);
+    try {
+      const { sheet, payload } = await closeTripPlFromSupabase(row);
+      if (!sheet.success) {
+        throw new Error(sheet.error ?? 'Google Sheets P&L sync failed');
+      }
+
+      const { error } = await supabase
+        .from('tours')
+        .update({ status: 'COMPLETED' })
+        .eq('id', row.id);
+      if (error) throw error;
+
+      showToast(
+        'ok',
+        lang === 'TH'
+          ? `ปิดทริป ${row.trip_code} แล้ว · รายได้ ${formatAud(payload.revenue)}`
+          : `Closed ${row.trip_code} · revenue ${formatAud(payload.revenue)} synced`
+      );
+      await loadSupaTours();
+    } catch (e) {
+      showToast('err', e instanceof Error ? e.message : 'Close trip failed');
+    } finally {
+      setClosingTripId(null);
     }
   };
 
@@ -1156,6 +1195,18 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
                                 : lang === 'TH'
                                   ? 'ตั้งเป็น Active'
                                   : 'Set Active'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={closingTripId === t.id || t.status === 'COMPLETED'}
+                            onClick={() => void closeTripAndSyncPl(t)}
+                            className="px-3 py-1.5 rounded-full text-xs font-semibold border border-amber-400/40 text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-40"
+                          >
+                            {closingTripId === t.id
+                              ? '…'
+                              : lang === 'TH'
+                                ? 'ปิดทริป & Sync P&L'
+                                : 'Close Trip & Sync P&L'}
                           </button>
                         </div>
                       </td>
