@@ -169,11 +169,12 @@ export default function CashierPOS({
 
   // ปุ่ม +/− พนักงาน: ปรับ slots_booked แบบ atomic ผ่าน RPC แล้วอ่านค่าสดกลับมา
   const handleSeatAdjust = async (delta: number) => {
-    if (!tripCode || seatBusy) return;
+    const code = selectedTour?.trip_code?.trim().toUpperCase() ?? tripCode;
+    if (!code || seatBusy) return;
     setSeatBusy(true);
     setSeatMsg(null);
     try {
-      const newBooked = await staffAdjustSeat(tripCode, delta);
+      const newBooked = await staffAdjustSeat(code, delta);
       const max = availability?.slotsMax ?? selectedTour?.slots_max ?? null;
       const left = max != null ? Math.max(0, max - newBooked) : null;
       setAvailability((prev) => ({
@@ -193,12 +194,12 @@ export default function CashierPOS({
           ),
         };
       });
-      void syncSlotIncrementToSheet(tripCode, delta);
+      void syncSlotIncrementToSheet(code, delta);
       showSeatToast(
         'ok',
         delta > 0
-          ? `Walk-in +1 · ${tripCode} (${newBooked}${max != null ? ` / ${max}` : ''})`
-          : `${tripCode} · ${newBooked} ผู้เดินทาง`
+          ? `Walk-in +1 · ${code} (${newBooked}${max != null ? ` / ${max}` : ''})`
+          : `${code} · ${newBooked} ผู้เดินทาง`
       );
     } catch (err) {
       if (err instanceof TripFullError) {
@@ -206,7 +207,7 @@ export default function CashierPOS({
         setSeatMsg(msg);
         showSeatToast('err', msg);
       } else if (err instanceof TripNotOpenError) {
-        const msg = `ไม่พบทริป ${tripCode} ใน Supabase — รัน seed SQL ก่อน`;
+        const msg = `ไม่พบทริป ${code} ใน Supabase — รัน seed SQL ก่อน`;
         setSeatMsg(msg);
         showSeatToast('err', msg);
       } else {
@@ -220,13 +221,17 @@ export default function CashierPOS({
     }
   };
 
-  const slotsMax = availability?.slotsMax ?? null;
-  const slotsBooked = availability?.slotsBooked ?? null;
-  const seatsLeft = availability?.seatsLeft ?? null;
+  const slotsMax = availability?.slotsMax ?? selectedTour?.slots_max ?? null;
+  const slotsBooked =
+    availability?.slotsBooked ?? selectedTour?.slots_booked ?? selectedTour?.current_pax ?? null;
+  const seatsLeft =
+    availability?.seatsLeft ??
+    (slotsMax != null && slotsBooked != null ? Math.max(0, slotsMax - slotsBooked) : null);
   const seatFull =
     slotsMax != null && slotsBooked != null ? slotsBooked >= slotsMax : seatsLeft != null && seatsLeft <= 0;
-  const plusDisabled = seatBusy || !tripCode || seatFull;
-  const minusDisabled = seatBusy || !tripCode || (slotsBooked != null && slotsBooked <= 0);
+  const activeTripCode = selectedTour?.trip_code?.trim().toUpperCase() ?? tripCode;
+  const plusDisabled = seatBusy || !activeTripCode || seatFull;
+  const minusDisabled = seatBusy || !activeTripCode || (slotsBooked != null && slotsBooked <= 0);
 
   const oshcWarning = useMemo(() => {
     if (!selectedClient) return null;

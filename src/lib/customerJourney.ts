@@ -110,11 +110,22 @@ export async function staffAdjustSeat(tourCode: string, delta: number): Promise<
   if (!code || delta === 0) throw new Error('Invalid trip code or delta');
 
   const tenantId = await resolveBookingTenantId(code);
-  const { data, error } = await supabase.rpc('staff_adjust_seat', {
-    p_tenant_id: tenantId,
-    p_tour_code: code,
-    p_delta: delta,
-  });
+
+  const callRpc = (tid: string | null) =>
+    supabase.rpc('staff_adjust_seat', {
+      p_tenant_id: tid,
+      p_tour_code: code,
+      p_delta: delta,
+    });
+
+  let { data, error } = await callRpc(tenantId);
+  if (
+    error &&
+    tenantId &&
+    (error.message?.includes('TRIP_NOT_OPEN') || error.message?.includes('tour not found'))
+  ) {
+    ({ data, error } = await callRpc(null));
+  }
   if (error) parseSeatRpcError(error);
   return (data as number) ?? 0;
 }

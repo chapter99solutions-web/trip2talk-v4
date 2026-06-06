@@ -196,16 +196,49 @@ export function tourRevenue(tourId: string, bookings: TourBooking[]): number {
   return bookings.filter((b) => b.tour_id === tourId).reduce((s, b) => s + b.amount_paid_aud, 0);
 }
 
+/** Co-Host / cashier dropdown — bookable tour statuses (not PLANNING/COMPLETED/CANCELLED). */
 export const ACTIVE_TOUR_STATUSES: TourStatus[] = ['CONFIRMED', 'ACTIVE'];
+
+function normalizeTourStatus(status: unknown): TourStatus {
+  const raw = String(status ?? '').trim().toUpperCase();
+  if (raw === 'ACTIVE' || raw === 'OPEN') return 'ACTIVE';
+  if (raw === 'CONFIRMED') return 'CONFIRMED';
+  if (raw === 'PLANNING') return 'PLANNING';
+  if (raw === 'COMPLETED') return 'COMPLETED';
+  if (raw === 'CANCELLED') return 'CANCELLED';
+  return 'CONFIRMED';
+}
+
+export function isCashierEligibleTourStatus(status: unknown): boolean {
+  const normalized = normalizeTourStatus(status);
+  return ACTIVE_TOUR_STATUSES.includes(normalized);
+}
+
+function mapSupabaseTourRow(row: Record<string, unknown>): Tour {
+  return {
+    id: String(row.id),
+    trip_code: String(row.trip_code ?? '').trim().toUpperCase(),
+    destination: (row.destination as Tour['destination']) ?? 'Sydney',
+    start_date: String(row.start_date ?? ''),
+    end_date: String(row.end_date ?? ''),
+    price_aud: Number(row.price_aud ?? 0),
+    max_pax: Number(row.max_pax ?? row.slots_max ?? 6),
+    current_pax: Number(row.slots_booked ?? row.current_pax ?? 0),
+    status: normalizeTourStatus(row.status),
+    base_commission_rate: Number(row.base_commission_rate ?? 0),
+    bonus_threshold_pax: Number(row.bonus_threshold_pax ?? 5),
+    bonus_amount_aud: Number(row.bonus_amount_aud ?? 0),
+    slots_booked: (row.slots_booked as number | null) ?? null,
+    slots_max: (row.slots_max as number | null) ?? null,
+    departure_start: (row.departure_start as string | null) ?? null,
+    departure_end: (row.departure_end as string | null) ?? null,
+  };
+}
 
 export async function fetchCashierPOSData(): Promise<CashierPOSData> {
   const [clientsRes, toursRes] = await Promise.all([
     supabase.from('crm_clients').select('*'),
-    supabase
-      .from('tours')
-      .select('*')
-      .in('status', ACTIVE_TOUR_STATUSES)
-      .order('trip_code', { ascending: true }),
+    supabase.from('tours').select('*').order('trip_code', { ascending: true }),
   ]);
 
   if (clientsRes.error) logSupabaseError('crm_clients query', clientsRes.error);
@@ -215,9 +248,14 @@ export async function fetchCashierPOSData(): Promise<CashierPOSData> {
     throw new Error(toursRes.error.message);
   }
 
+  const tours = ((toursRes.data ?? []) as Record<string, unknown>[])
+    .filter((row) => isCashierEligibleTourStatus(row.status))
+    .map(mapSupabaseTourRow)
+    .filter((t) => Boolean(t.trip_code));
+
   return {
     clients: (clientsRes.data ?? []) as CRMClient[],
-    tours: (toursRes.data ?? []) as Tour[],
+    tours,
   };
 }
 
