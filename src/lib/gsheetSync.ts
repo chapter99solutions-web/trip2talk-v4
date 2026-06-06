@@ -234,6 +234,110 @@ export async function syncTripPlToSheet(payload: TripPlSheetPayload): Promise<GS
   );
 }
 
+export type SyncAllBookingsResult = {
+  success: boolean;
+  total: number;
+  synced: number;
+  failed: number;
+  errors: string[];
+};
+
+type TourBookingSyncRow = {
+  id: string;
+  reference_number?: string | null;
+  amount_paid_aud?: number | null;
+  party_pax?: number | null;
+  trip_date?: string | null;
+  payment_method?: string | null;
+  created_at?: string | null;
+  status?: string | null;
+  crm_clients?: {
+    first_name_en?: string | null;
+    last_name_en?: string | null;
+    first_name_th?: string | null;
+    last_name_th?: string | null;
+  } | null;
+  tours?: { trip_code?: string | null } | null;
+};
+
+function bookingClientName(c: TourBookingSyncRow['crm_clients']): string {
+  if (!c) return 'Guest';
+  const en = `${c.first_name_en ?? ''} ${c.last_name_en ?? ''}`.trim();
+  if (en) return en;
+  const th = `${c.first_name_th ?? ''} ${c.last_name_th ?? ''}`.trim();
+  return th || 'Guest';
+}
+
+/** Owner dashboard — sync every tour_bookings row to Settlements via append_booking. */
+export async function syncAllBookingsToSheet(): Promise<SyncAllBookingsResult> {
+  const { data, error } = await supabase
+    .from('tour_bookings')
+    .select(
+      `
+      id,
+      reference_number,
+      amount_paid_aud,
+      party_pax,
+      trip_date,
+      payment_method,
+      created_at,
+      status,
+      crm_clients (first_name_en, last_name_en, first_name_th, last_name_th),
+      tours (trip_code)
+    `
+    )
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    return { success: false, total: 0, synced: 0, failed: 0, errors: [error.message] };
+  }
+
+  const rows = ((data ?? []) as TourBookingSyncRow[]).filter(
+    (r) => !String(r.status ?? '').toUpperCase().includes('CANCEL')
+  );
+  let synced = 0;
+  const errors: string[] = [];
+
+  for (const row of rows) {
+    const tripCode = String(row.tours?.trip_code ?? '').trim().toUpperCase();
+    if (!tripCode) {
+      errors.push(`${row.id}: missing trip_code`);
+      continue;
+    }
+
+    const paymentDate =
+      String(row.trip_date ?? '').slice(0, 10) ||
+      String(row.created_at ?? '').slice(0, 10) ||
+      new Date().toISOString().slice(0, 10);
+
+    const result = await syncBookingPaymentToSheet({
+      tour_code: tripCode,
+      booking_id: row.reference_number?.trim() || row.id,
+      client_name: bookingClientName(row.crm_clients),
+      pax: Number(row.party_pax ?? 1) || 1,
+      total_paid: Number(row.amount_paid_aud ?? 0),
+      payment_method: String(row.payment_method ?? 'PAYID').trim() || 'PAYID',
+      payment_date: paymentDate,
+    });
+
+    if (result.success) {
+      synced += 1;
+    } else {
+      errors.push(`${row.id}: ${result.error ?? 'GAS sync failed'}`);
+    }
+  }
+
+  const failed = rows.length - synced;
+
+  return {
+    success: failed === 0 && errors.length === 0,
+    total: rows.length,
+    synced,
+    failed,
+    errors,
+  };
+}
+
 /** Collect Supabase figures and sync P&L for one trip; returns payload + GAS result. */
 export async function closeTripPlFromSupabase(tour: {
   id: string;

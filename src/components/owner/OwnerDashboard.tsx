@@ -16,7 +16,7 @@ import { generatePortalLink } from '../../lib/platformBookings';
 import { fetchDashboardBookingsFromSupabase } from '../../lib/supabaseData';
 import { supabase } from '../../lib/supabase';
 import { resolveDefaultTenantId } from '../../lib/customerJourney';
-import { closeTripPlFromSupabase } from '../../lib/gsheetSync';
+import { closeTripPlFromSupabase, syncAllBookingsToSheet } from '../../lib/gsheetSync';
 import type { TourStatus } from '../../types/tour';
 import IntakeFormModal from '../IntakeFormModal';
 import FBInboxTrigger from '../FBInboxTrigger';
@@ -678,19 +678,43 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
   };
 
   const syncAll = async () => {
-    // Current repo uses `sync-pipeline` edge function for safe GAS writes.
-    // Here we only store a timestamp and provide a hook point (no destructive actions).
     setSyncing(true);
     try {
+      const result = await syncAllBookingsToSheet();
       const ts = new Date().toISOString();
-      localStorage.setItem('t2t_owner_last_synced', ts);
-      setLastSynced(ts);
-      setToast({ tone: 'ok', msg: lang === 'TH' ? 'บันทึกเวลา SYNC แล้ว' : 'Sync timestamp saved' });
+
+      if (result.synced > 0) {
+        localStorage.setItem('t2t_owner_last_synced', ts);
+        setLastSynced(ts);
+      }
+
+      if (result.total === 0) {
+        showToast('err', lang === 'TH' ? 'ไม่มีการจองใน Supabase' : 'No bookings in Supabase');
+        return;
+      }
+
+      if (result.failed === 0) {
+        showToast(
+          'ok',
+          lang === 'TH'
+            ? `ซิงก์ Google Sheets สำเร็จ ${result.synced}/${result.total} การจอง`
+            : `Synced ${result.synced}/${result.total} bookings to Google Sheets`
+        );
+        return;
+      }
+
+      const hint = result.errors[0] ?? 'GAS sync failed';
+      showToast(
+        'err',
+        lang === 'TH'
+          ? `ซิงก์บางรายการไม่สำเร็จ (${result.synced}/${result.total}) — ${hint}`
+          : `Partial sync (${result.synced}/${result.total}) — ${hint}`,
+        6000
+      );
     } catch (e) {
-      setToast({ tone: 'err', msg: e instanceof Error ? e.message : 'Sync failed' });
+      showToast('err', e instanceof Error ? e.message : 'Sync failed', 5000);
     } finally {
       setSyncing(false);
-      window.setTimeout(() => setToast(null), 2200);
     }
   };
 
@@ -1268,7 +1292,11 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
               className="px-4 py-3 rounded-full text-sm font-semibold border"
               style={{ borderColor: TEAL, color: NAVY, background: TEAL, opacity: syncing ? 0.7 : 1 }}
             >
-              🔄 {lang === 'TH' ? 'SYNC ALL TO GOOGLE SHEETS' : 'SYNC ALL TO GOOGLE SHEETS'}
+              {syncing
+                ? lang === 'TH'
+                  ? 'กำลังซิงก์…'
+                  : 'Syncing…'
+                : `🔄 ${lang === 'TH' ? 'SYNC ALL TO GOOGLE SHEETS' : 'SYNC ALL TO GOOGLE SHEETS'}`}
             </button>
             <p className="text-xs text-white/60 font-mono">
               {lang === 'TH' ? 'ซิงก์ล่าสุด' : 'Last synced'}:{' '}
