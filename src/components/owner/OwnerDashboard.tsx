@@ -243,6 +243,7 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
 
   const [toast, setToast] = useState<{ tone: 'ok' | 'err'; msg: string } | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<{ current: number; total: number } | null>(null);
   const [intakeBooking, setIntakeBooking] = useState<BookingRow | null>(null);
   const [portalBookingId, setPortalBookingId] = useState('');
   const [portalBusy, setPortalBusy] = useState(false);
@@ -405,8 +406,8 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
       showToast(
         'ok',
         lang === 'TH'
-          ? `ปิดทริป ${row.trip_code} แล้ว · รายได้ ${formatAud(payload.revenue)}`
-          : `Closed ${row.trip_code} · revenue ${formatAud(payload.revenue)} synced`
+          ? `ปิดทริป ${row.trip_code} แล้ว · Sync P&L complete ✅ ${formatAud(payload.revenue)}`
+          : `Close trip ${row.trip_code} · Sync P&L complete ✅ ${formatAud(payload.revenue)}`
       );
       await loadSupaTours();
     } catch (e) {
@@ -679,26 +680,29 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
 
   const syncAll = async () => {
     setSyncing(true);
+    setSyncProgress(null);
     try {
-      const result = await syncAllBookingsToSheet();
+      const result = await syncAllBookingsToSheet((current, total) => {
+        setSyncProgress({ current, total });
+      });
       const ts = new Date().toISOString();
-
-      if (result.synced > 0) {
-        localStorage.setItem('t2t_owner_last_synced', ts);
-        setLastSynced(ts);
-      }
 
       if (result.total === 0) {
         showToast('err', lang === 'TH' ? 'ไม่มีการจองใน Supabase' : 'No bookings in Supabase');
         return;
       }
 
+      if (result.synced > 0) {
+        localStorage.setItem('t2t_owner_last_synced', ts);
+        setLastSynced(ts);
+      }
+
       if (result.failed === 0) {
         showToast(
           'ok',
           lang === 'TH'
-            ? `ซิงก์ Google Sheets สำเร็จ ${result.synced}/${result.total} การจอง`
-            : `Synced ${result.synced}/${result.total} bookings to Google Sheets`
+            ? `Sync complete ✅ ${result.synced}/${result.total} การจอง`
+            : `Sync complete ✅ ${result.synced}/${result.total} bookings`
         );
         return;
       }
@@ -715,6 +719,7 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
       showToast('err', e instanceof Error ? e.message : 'Sync failed', 5000);
     } finally {
       setSyncing(false);
+      setSyncProgress(null);
     }
   };
 
@@ -1292,11 +1297,13 @@ export default function OwnerDashboard({ onLogout }: { onLogout: () => void }) {
               className="px-4 py-3 rounded-full text-sm font-semibold border"
               style={{ borderColor: TEAL, color: NAVY, background: TEAL, opacity: syncing ? 0.7 : 1 }}
             >
-              {syncing
-                ? lang === 'TH'
-                  ? 'กำลังซิงก์…'
-                  : 'Syncing…'
-                : `🔄 ${lang === 'TH' ? 'SYNC ALL TO GOOGLE SHEETS' : 'SYNC ALL TO GOOGLE SHEETS'}`}
+              {syncing && syncProgress
+                ? `Syncing ${syncProgress.current}/${syncProgress.total} bookings...`
+                : syncing
+                  ? lang === 'TH'
+                    ? 'กำลังซิงก์…'
+                    : 'Syncing…'
+                  : `🔄 ${lang === 'TH' ? 'SYNC ALL TO GOOGLE SHEETS' : 'SYNC ALL TO GOOGLE SHEETS'}`}
             </button>
             <p className="text-xs text-white/60 font-mono">
               {lang === 'TH' ? 'ซิงก์ล่าสุด' : 'Last synced'}:{' '}

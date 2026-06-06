@@ -5,9 +5,7 @@
  * Part 2 (manual): append_pl when Owner closes a trip.
  */
 
-import { buildSettlementForTour } from './googleSync';
 import { supabase } from './supabase';
-import type { Expense, Tour } from '../types/tour';
 
 const DEFAULT_GAS_WEBAPP_URL =
   'https://script.google.com/macros/s/AKfycbwR0VylDEfZZUdk49p_6TQeHggQp0U7gNRexJGpFkMvxCNM3KRrw-gXz2FRWVXhA6CVvg/exec';
@@ -178,10 +176,12 @@ async function postGasAction(
   console.log(`${LOG} ${action} →`, body);
 
   try {
+    const viaDirect = await postDirectGas(body, isOk);
+    if (viaDirect.success) return viaDirect;
+    console.warn(`${LOG} direct GAS failed, trying API proxy`, { error: viaDirect.error });
     const viaApi = await postViaApi(apiPath, body);
     if (viaApi.success) return viaApi;
-    console.warn(`${LOG} API proxy unavailable, trying direct GAS`, { error: viaApi.error });
-    return await postDirectGas(body, isOk);
+    return viaDirect.error ? viaDirect : viaApi;
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
     console.error(`${LOG} ${action} failed (non-blocking)`, { error, payload });
@@ -194,12 +194,14 @@ export async function syncBookingPaymentToSheet(
   payload: BookingPaymentSheetPayload
 ): Promise<GSheetSyncResult> {
   const nowIso = new Date().toISOString();
+  const clientName = payload.client_name.trim() || 'Guest';
   return postGasAction(
     'append_booking',
     {
       tour_code: payload.tour_code.trim().toUpperCase(),
       booking_id: payload.booking_id,
-      client_name: payload.client_name,
+      client_name: clientName,
+      customer_name: clientName,
       pax: payload.pax ?? 1,
       total_paid: payload.total_paid,
       payment_method: payload.payment_method,
@@ -268,8 +270,12 @@ function bookingClientName(c: TourBookingSyncRow['crm_clients']): string {
   return th || 'Guest';
 }
 
+export type SyncAllProgress = (current: number, total: number) => void;
+
 /** Owner dashboard — sync every tour_bookings row to Settlements via append_booking. */
-export async function syncAllBookingsToSheet(): Promise<SyncAllBookingsResult> {
+export async function syncAllBookingsToSheet(
+  onProgress?: SyncAllProgress
+): Promise<SyncAllBookingsResult> {
   const { data, error } = await supabase
     .from('tour_bookings')
     .select(
@@ -297,8 +303,12 @@ export async function syncAllBookingsToSheet(): Promise<SyncAllBookingsResult> {
   );
   let synced = 0;
   const errors: string[] = [];
+  const total = rows.length;
 
-  for (const row of rows) {
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    onProgress?.(i + 1, total);
+
     const tripCode = String(row.tours?.trip_code ?? '').trim().toUpperCase();
     if (!tripCode) {
       errors.push(`${row.id}: missing trip_code`);
@@ -338,21 +348,18 @@ export async function syncAllBookingsToSheet(): Promise<SyncAllBookingsResult> {
   };
 }
 
-/** Collect Supabase figures and sync P&L for one trip; returns payload + GAS result. */
+function gstFromInclusiveRevenue(revenue: number): number {
+  if (revenue <= 0) return 0;
+  return Math.round((revenue / 11) * 100) / 100;
+}
+
+/** Collect booking revenue and sync simplified P&L for one trip; returns payload + GAS result. */
 export async function closeTripPlFromSupabase(tour: {
   id: string;
   trip_code: string | null;
   title?: string | null;
   slots_booked?: number | null;
   slots_max?: number | null;
-  current_pax?: number | null;
-  price_aud?: number | null;
-  base_commission_rate?: number | null;
-  bonus_threshold_pax?: number | null;
-  bonus_amount_aud?: number | null;
-  destination?: string | null;
-  start_date?: string | null;
-  end_date?: string | null;
 }): Promise<{ sheet: GSheetSyncResult; payload: TripPlSheetPayload }> {
   const tripCode = (tour.trip_code ?? '').trim().toUpperCase();
   if (!tripCode) {
@@ -371,44 +378,40 @@ export async function closeTripPlFromSupabase(tour: {
     };
   }
 
-  const [bookingsRes, expensesRes] = await Promise.all([
-    supabase.from('tour_bookings').select('tour_id, amount_paid_aud').eq('tour_id', tour.id),
-    supabase.from('expenses').select('*').eq('tour_id', tour.id),
-  ]);
+  const { data: bookings, error } = await supabase
+    .from('tour_bookings')
+    .select('amount_paid_aud, status')
+    .eq('tour_id', tour.id);
 
-  const bookings = (bookingsRes.data ?? []).map((b) => ({
-    tour_id: tour.id,
-    amount_paid_aud: Number((b as { amount_paid_aud?: number }).amount_paid_aud ?? 0),
-  }));
-  const expenses = (expensesRes.data ?? []) as Expense[];
+  if (error) {
+    return {
+      sheet: { success: false, error: error.message },
+      payload: {
+        trip_code: tripCode,
+        trip_name: tour.title?.trim() || tripCode,
+        revenue: 0,
+        expenses: 0,
+        commissions: 0,
+        net_profit: 0,
+        gst_collected: 0,
+        gst_claimed: 0,
+      },
+    };
+  }
 
-  const tourForCalc: Tour = {
-    id: tour.id,
-    trip_code: tripCode,
-    destination: (tour.destination as Tour['destination']) ?? 'Sydney',
-    start_date: tour.start_date ?? new Date().toISOString().slice(0, 10),
-    end_date: tour.end_date ?? tour.start_date ?? new Date().toISOString().slice(0, 10),
-    price_aud: Number(tour.price_aud ?? 0),
-    max_pax: Number(tour.slots_max ?? tour.current_pax ?? 6),
-    current_pax: Number(tour.slots_booked ?? tour.current_pax ?? 0),
-    status: 'CONFIRMED',
-    base_commission_rate: Number(tour.base_commission_rate ?? 0),
-    bonus_threshold_pax: Number(tour.bonus_threshold_pax ?? 5),
-    bonus_amount_aud: Number(tour.bonus_amount_aud ?? 0),
-    slots_booked: tour.slots_booked ?? null,
-    slots_max: tour.slots_max ?? null,
-  };
+  const revenue = (bookings ?? [])
+    .filter((b) => !String((b as { status?: string }).status ?? '').toUpperCase().includes('CANCEL'))
+    .reduce((sum, b) => sum + Number((b as { amount_paid_aud?: number }).amount_paid_aud ?? 0), 0);
 
-  const settlement = buildSettlementForTour(tourForCalc, bookings, expenses);
   const plPayload: TripPlSheetPayload = {
     trip_code: tripCode,
     trip_name: tour.title?.trim() || tripCode,
-    revenue: settlement.revenue,
-    expenses: settlement.expenses,
-    commissions: settlement.commissions,
-    net_profit: settlement.netProfit,
-    gst_collected: settlement.gstCollected,
-    gst_claimed: settlement.gstClaimed,
+    revenue,
+    expenses: 0,
+    commissions: 0,
+    net_profit: revenue,
+    gst_collected: gstFromInclusiveRevenue(revenue),
+    gst_claimed: 0,
     slots_booked: tour.slots_booked ?? null,
     slots_max: tour.slots_max ?? null,
   };
