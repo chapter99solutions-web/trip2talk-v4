@@ -85,60 +85,51 @@ export default function PublicPortfolio() {
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="relative min-h-[88vh] flex items-center justify-center overflow-hidden bg-[#0d1b2a]">
+      {/* Hero — image-first: minimal overlay, headline + bottom CTAs only */}
+      <section className="relative min-h-[88vh] flex flex-col overflow-hidden bg-[#0d1b2a]">
         <HeroSlideshowBackground maxPhotos={20} />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-black/60 z-[3]" />
-        <div className="relative z-10 max-w-4xl mx-auto px-4 text-center text-white">
-          <p className="flex items-center justify-center gap-2 text-sm font-medium mb-6">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
-            </span>
-            <span className="text-emerald-300 italic font-medium">Now booking July 2026</span>
-          </p>
-          <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold leading-snug tracking-tight max-w-3xl mx-auto">
-            ประสบการณ์ถ่ายภาพระดับ premium
-            <br className="hidden sm:block" />
-            สำหรับคนไทยในออสเตรเลีย
+        <div className="absolute inset-0 bg-black/30 z-[3]" aria-hidden />
+
+        <p className="absolute top-5 left-4 md:top-6 md:left-8 z-10 flex items-center gap-1.5 text-[11px] md:text-xs text-white/80 font-medium">
+          <span className="relative flex h-1.5 w-1.5 shrink-0">
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400/90" />
+          </span>
+          <span className="italic">Now booking July 2026</span>
+        </p>
+
+        <div className="relative z-10 flex-1 flex items-center justify-center px-4 pt-14 pb-6">
+          <h1 className="font-serif text-xl sm:text-2xl md:text-3xl lg:text-4xl font-semibold leading-snug tracking-tight text-center text-white drop-shadow-md max-w-4xl">
+            ประสบการณ์ถ่ายภาพระดับ premium สำหรับคนไทยในออสเตรเลีย
           </h1>
-          <div className="mt-5 max-w-2xl mx-auto text-center space-y-3">
-            <p className="font-light text-base md:text-lg text-emerald-100/95 leading-relaxed">
-              ทริปส่วนตัวกลุ่มเล็ก นำโดยช่างภาพไทยมืออาชีพ
-              <br className="hidden sm:block" />
-              ที่รู้จักแสง รู้จักมุม และรู้จักออสเตรเลียดีกว่าใคร
-            </p>
-            <p className="font-light text-lg text-white">
-              Small group. Real light. Photos you&apos;ll actually keep.
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
-            <button
-              type="button"
-              onClick={() => scrollToSection('tours')}
-              className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full bg-slate-900 text-white text-sm font-semibold tracking-wide shadow-lg shadow-black/20 hover:bg-slate-800 hover:-translate-y-0.5 transition-all duration-300"
-            >
-              {t.view_all_trips}
-            </button>
-            <button
-              type="button"
-              onClick={() => scrollToSection('reviews')}
-              className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full border border-white/40 bg-transparent text-white text-sm font-semibold tracking-wide hover:bg-white/10 hover:border-white/60 transition-all duration-300"
-            >
-              {t.read_reviews}
-            </button>
-          </div>
-          <p className="mt-6 text-xs md:text-sm text-white/75 max-w-2xl mx-auto leading-relaxed">
-            ช่างภาพ professional 10+ ปี · คนไทยในออสที่รู้จักทุกมุมแสง · กลุ่มสูงสุด 8 คน
-          </p>
-          <div className="mt-12 grid grid-cols-3 gap-6 max-w-lg mx-auto border-t border-white/20 pt-8">
-            {STATS.map((s) => (
-              <div key={s.label}>
-                <p className="font-serif text-2xl md:text-3xl font-semibold">{s.value}</p>
-                <p className="text-xs text-white/70 mt-1 uppercase tracking-wide">{s.label}</p>
-              </div>
-            ))}
-          </div>
+        </div>
+
+        <div className="relative z-10 flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center px-4 pb-10 md:pb-14">
+          <button
+            type="button"
+            onClick={() => scrollToSection('tours')}
+            className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full bg-slate-900/90 text-white text-sm font-semibold tracking-wide shadow-lg shadow-black/25 hover:bg-slate-800 hover:-translate-y-0.5 transition-all duration-300 backdrop-blur-sm"
+          >
+            {t.view_all_trips}
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToSection('reviews')}
+            className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full border border-white/50 bg-black/20 text-white text-sm font-semibold tracking-wide hover:bg-white/15 hover:border-white/70 transition-all duration-300 backdrop-blur-sm"
+          >
+            {t.read_reviews}
+          </button>
+        </div>
+      </section>
+
+      {/* Hero stats — below the photo, not on the overlay */}
+      <section className="bg-white border-b border-slate-100 py-8 md:py-10">
+        <div className="max-w-lg mx-auto px-4 grid grid-cols-3 gap-6 text-center">
+          {STATS.map((s) => (
+            <div key={s.label}>
+              <p className="font-serif text-2xl md:text-3xl font-semibold text-slate-900">{s.value}</p>
+              <p className="text-xs text-slate-500 mt-1 uppercase tracking-wide">{s.label}</p>
+            </div>
+          ))}
         </div>
       </section>
 
