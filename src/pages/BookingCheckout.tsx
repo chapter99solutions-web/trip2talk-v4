@@ -39,7 +39,7 @@ type VisaType = 'student' | 'other';
 type PackageId = 'STANDARD' | 'SESSION' | 'VIP';
 
 const PAYID = 'trip2talk...';
-const FACEBOOK_CONTACT_URL = 'https://m.me/trip_to_talk';
+const FACEBOOK_CONTACT_URL = 'https://m.me/TriptoTalk';
 const ENQUIRY_EMAIL = 'trip2talksyd@gmail.com';
 const CHECKOUT_YOUTUBE_EMBED =
   'https://www.youtube.com/embed/TJtTSnXPHeA?autoplay=1&mute=1&loop=1&playlist=TJtTSnXPHeA&controls=0&showinfo=0&rel=0&modestbranding=1';
