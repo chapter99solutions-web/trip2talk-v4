@@ -66,6 +66,11 @@ body {
   }
 }
 
+.animate-hobart-ken-burns {
+  animation: heroKenBurns 4s ease-out forwards;
+  will-change: transform;
+}
+
 .scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;

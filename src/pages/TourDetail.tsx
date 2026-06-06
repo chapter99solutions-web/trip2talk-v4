@@ -340,7 +340,7 @@ export default function TourDetail() {
 
   const galleryPhotos = photos.length ? photos : hardcodedPhotos ?? [heroImage];
   const heroParallax = Math.min(scrollY * 0.4, 80);
-  const isHobartGallery = staticFallback?.galleryFolder === 'Tasmania/Hobart';
+  const showHobartSlideshow = tourId === 'TAS-3D2N';
 
   const toggleSave = () => {
     try {
@@ -489,6 +489,14 @@ export default function TourDetail() {
         )}
       </section>
 
+      {/* ============ HOBART CINEMATIC SLIDESHOW (TAS-3D2N only) ============ */}
+      {showHobartSlideshow && (
+        <HobartTripSlideshow
+          folder="Tasmania 02/Hobart"
+          fallbackFolder="Tasmania/Hobart"
+        />
+      )}
+
       {/* ============ SOCIAL PROOF + PRICE ANCHOR ============ */}
       <div className="bg-white border-b border-slate-100">
         <div className="max-w-3xl mx-auto px-5 sm:px-8 py-4 flex flex-wrap items-center justify-between gap-4">
@@ -530,6 +538,7 @@ export default function TourDetail() {
       </div>
 
       {/* ============ CINEMATIC GALLERY ============ */}
+      {!showHobartSlideshow && (
       <section className="py-8 bg-slate-50 overflow-hidden">
         <div className="max-w-3xl mx-auto px-5 sm:px-8 flex items-center justify-between mb-4">
           <h2 className="font-serif text-2xl font-semibold text-slate-900">Gallery</h2>
@@ -537,11 +546,6 @@ export default function TourDetail() {
         </div>
 
         <div className="relative">
-          {isHobartGallery ? (
-            <div className="max-w-3xl mx-auto px-5 sm:px-8">
-              <HobartTripSlideshow images={galleryPhotos} />
-            </div>
-          ) : (
             <div
               ref={galleryRef}
               onScroll={handleGalleryScroll}
@@ -577,10 +581,9 @@ export default function TourDetail() {
                 );
               })}
             </div>
-          )}
 
           {/* Slide counter */}
-          {!isHobartGallery && galleryPhotos.length > 1 && (
+          {galleryPhotos.length > 1 && (
             <div className="max-w-3xl mx-auto px-5 sm:px-8 -mt-1">
               <div className="flex justify-end">
                 <span className="px-3 py-1 rounded-full bg-slate-900/85 text-white text-xs font-semibold tracking-wide">
@@ -591,6 +594,7 @@ export default function TourDetail() {
           )}
         </div>
       </section>
+      )}
 
       {/* ============ MAIN CONTENT ============ */}
       <div className="max-w-3xl mx-auto px-5 sm:px-8 py-8 space-y-12" id="trip-details">

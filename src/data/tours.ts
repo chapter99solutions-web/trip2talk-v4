@@ -357,7 +357,7 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
     ],
     heroVideoUrl: `${PORTFOLIO_BASE}/Tasmania/VDO/tas01.mp4`,
     // ใช้กลไกแกลเลอรีเดียวกับ CAN-2D1N: ดึงรูปสดจากโฟลเดอร์ portfolio แบบ auto-populate
-    galleryFolder: 'Tasmania/Hobart',
+    galleryFolder: 'Tasmania 02/Hobart',
   },
   {
     tourCode: 'TAS-LH-4D3N',

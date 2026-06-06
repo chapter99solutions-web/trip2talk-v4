@@ -1,158 +1,199 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+
+const BUCKET = 'portfolio';
+const AUTO_MS = 4000;
+const CROSSFADE_MS = 700;
+const SWIPE_THRESHOLD_PX = 48;
+const IMAGE_EXT = /\.(jpe?g|png|webp|gif)$/i;
 
 type Props = {
-  images: string[];
-  /** autoplay interval (ms) */
-  intervalMs?: number;
+  /** Portfolio bucket folder, e.g. "Tasmania 02/Hobart" */
+  folder: string;
+  /** Fallback folder if primary list is empty */
+  fallbackFolder?: string;
 };
 
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
+function naturalSort(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 }
 
-export default function HobartTripSlideshow({ images, intervalMs = 4500 }: Props) {
-  const list = useMemo(() => images.filter(Boolean), [images]);
+function isStorageFile(
+  name: string,
+  id: string | null | undefined,
+  metadata: Record<string, unknown> | null | undefined,
+): boolean {
+  if (!name || name.startsWith('.')) return false;
+  if (id) return true;
+  return metadata !== null && metadata !== undefined;
+}
+
+async function listFolderImages(folder: string): Promise<string[]> {
+  const { data, error } = await supabase.storage.from(BUCKET).list(folder, {
+    limit: 100,
+    sortBy: { column: 'name', order: 'asc' },
+  });
+
+  if (error || !data?.length) return [];
+
+  return data
+    .filter((f) => {
+      const meta = f.metadata as Record<string, unknown> | null;
+      return isStorageFile(f.name, f.id, meta) && IMAGE_EXT.test(f.name);
+    })
+    .sort((a, b) => naturalSort(a.name, b.name))
+    .map((f) => {
+      const path = `${folder}/${f.name}`;
+      return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+    })
+    .filter(Boolean);
+}
+
+export default function HobartTripSlideshow({ folder, fallbackFolder }: Props) {
+  const [images, setImages] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
-  const thumbsRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+
+    async function load() {
+      let urls = await listFolderImages(folder);
+      if (!urls.length && fallbackFolder) {
+        urls = await listFolderImages(fallbackFolder);
+      }
+      if (!cancelled) {
+        setImages(urls);
+        setLoading(false);
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [folder, fallbackFolder]);
 
   useEffect(() => {
     setCurrent(0);
-  }, [list.length]);
+  }, [images.length]);
 
   useEffect(() => {
-    if (paused || list.length < 2) return;
+    if (paused || images.length < 2) return;
     const id = window.setInterval(() => {
-      setCurrent((c) => (c + 1) % list.length);
-    }, intervalMs);
+      setCurrent((c) => (c + 1) % images.length);
+    }, AUTO_MS);
     return () => window.clearInterval(id);
-  }, [paused, list.length, intervalMs]);
-
-  const go = useCallback(
-    (idx: number) => {
-      const next = clamp(idx, 0, Math.max(0, list.length - 1));
-      setCurrent(next);
-      // keep selected thumb in view
-      const el = thumbsRef.current?.querySelector<HTMLButtonElement>(`button[data-idx="${next}"]`);
-      el?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-    },
-    [list.length]
-  );
+  }, [paused, images.length]);
 
   const prev = useCallback(() => {
-    setCurrent((c) => (c - 1 + list.length) % list.length);
-  }, [list.length]);
+    if (!images.length) return;
+    setCurrent((c) => (c - 1 + images.length) % images.length);
+  }, [images.length]);
 
   const next = useCallback(() => {
-    setCurrent((c) => (c + 1) % list.length);
-  }, [list.length]);
+    if (!images.length) return;
+    setCurrent((c) => (c + 1) % images.length);
+  }, [images.length]);
 
-  if (list.length === 0) return null;
+  const onTouchStart = (e: React.TouchEvent) => {
+    setPaused(true);
+    touchStartX.current = e.touches[0]?.clientX ?? null;
+  };
+
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const start = touchStartX.current;
+    touchStartX.current = null;
+    const endX = e.changedTouches[0]?.clientX;
+    if (start != null && endX != null) {
+      const delta = endX - start;
+      if (delta > SWIPE_THRESHOLD_PX) prev();
+      else if (delta < -SWIPE_THRESHOLD_PX) next();
+    }
+    window.setTimeout(() => setPaused(false), 1200);
+  };
+
+  if (loading) {
+    return (
+      <section
+        aria-label="Trip photo gallery loading"
+        className="w-full aspect-[16/9] min-h-[220px] sm:min-h-[320px] bg-slate-900 animate-pulse"
+      />
+    );
+  }
+
+  if (!images.length) return null;
 
   return (
-    <div className="space-y-3">
-      <div
-        className="relative w-full aspect-[16/10] sm:aspect-[16/9] rounded-2xl overflow-hidden bg-slate-900 shadow-xl shadow-black/10 select-none"
-        onMouseEnter={() => setPaused(true)}
-        onMouseLeave={() => setPaused(false)}
-        onTouchStart={() => setPaused(true)}
-        onTouchEnd={() => setPaused(false)}
-      >
-        {list.map((src, idx) => (
-          <img
+    <section
+      className="relative w-full aspect-[16/9] min-h-[220px] sm:min-h-[360px] max-h-[72vh] bg-slate-950 overflow-hidden select-none"
+      aria-roledescription="carousel"
+      aria-label="Hobart trip photo slideshow"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      {images.map((src, idx) => {
+        const active = idx === current;
+        return (
+          <div
             key={src}
-            src={src}
-            alt=""
-            loading={idx === 0 ? 'eager' : 'lazy'}
-            decoding="async"
-            className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-in-out"
-            style={{ opacity: idx === current ? 1 : 0 }}
-          />
-        ))}
+            className="absolute inset-0 transition-opacity ease-in-out"
+            style={{
+              opacity: active ? 1 : 0,
+              transitionDuration: `${CROSSFADE_MS}ms`,
+              pointerEvents: active ? 'auto' : 'none',
+            }}
+            aria-hidden={!active}
+          >
+            <img
+              key={active ? `active-${current}` : src}
+              src={src}
+              alt=""
+              loading={idx <= 1 ? 'eager' : 'lazy'}
+              decoding="async"
+              className={`absolute inset-0 h-full w-full object-cover ${
+                active ? 'animate-hobart-ken-burns' : ''
+              }`}
+            />
+          </div>
+        );
+      })}
 
-        {list.length > 1 && (
-          <>
-            <button
-              type="button"
-              aria-label="Previous photo"
-              onClick={prev}
-              className="absolute left-3 top-1/2 -translate-y-1/2 grid place-items-center w-10 h-10 rounded-full bg-white/85 hover:bg-white text-slate-900 shadow-md transition-colors"
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <path d="M15 18l-6-6 6-6" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              aria-label="Next photo"
-              onClick={next}
-              className="absolute right-3 top-1/2 -translate-y-1/2 grid place-items-center w-10 h-10 rounded-full bg-white/85 hover:bg-white text-slate-900 shadow-md transition-colors"
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <path d="M9 18l6-6-6-6" />
-              </svg>
-            </button>
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20"
+        aria-hidden
+      />
 
-            <div className="absolute bottom-3 right-3 px-3 py-1 rounded-full bg-slate-900/80 text-white text-xs font-semibold tracking-wide">
-              {current + 1} / {list.length}
-            </div>
-          </>
-        )}
-      </div>
-
-      {list.length > 1 && (
-        <div
-          ref={thumbsRef}
-          className="flex gap-2 overflow-x-auto pb-1 scrollbar-none"
-          style={{ WebkitOverflowScrolling: 'touch' }}
-        >
-          {list.map((src, idx) => {
-            const active = idx === current;
-            return (
-              <button
-                key={`${src}-thumb`}
-                type="button"
-                data-idx={idx}
-                onClick={() => go(idx)}
-                aria-label={`View photo ${idx + 1}`}
-                className={`relative shrink-0 rounded-xl overflow-hidden border transition-colors ${
-                  active ? 'border-emerald-400' : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <img
-                  src={src}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                  className="w-16 h-12 sm:w-20 sm:h-14 object-cover"
-                  style={{ opacity: active ? 1 : 0.85 }}
-                />
-              </button>
-            );
-          })}
-        </div>
+      {images.length > 1 && (
+        <>
+          <button
+            type="button"
+            aria-label="Previous photo"
+            onClick={prev}
+            className="absolute left-3 sm:left-5 top-1/2 z-20 -translate-y-1/2 grid h-10 w-10 sm:h-11 sm:w-11 place-items-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur-md transition hover:bg-black/60"
+          >
+            <ChevronLeft size={20} strokeWidth={2} aria-hidden />
+          </button>
+          <button
+            type="button"
+            aria-label="Next photo"
+            onClick={next}
+            className="absolute right-3 sm:right-5 top-1/2 z-20 -translate-y-1/2 grid h-10 w-10 sm:h-11 sm:w-11 place-items-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur-md transition hover:bg-black/60"
+          >
+            <ChevronRight size={20} strokeWidth={2} aria-hidden />
+          </button>
+        </>
       )}
-    </div>
+
+      <div className="absolute bottom-4 right-4 sm:bottom-5 sm:right-5 z-20 px-3 py-1.5 rounded-full bg-black/55 backdrop-blur-md text-white text-xs sm:text-sm font-semibold tabular-nums tracking-wide">
+        {current + 1} / {images.length}
+      </div>
+    </section>
   );
 }
-
