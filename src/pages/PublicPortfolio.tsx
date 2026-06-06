@@ -5,7 +5,7 @@ import TestimonialsSection from '../components/public/TestimonialsSection';
 import PortfolioGallery from '../components/public/PortfolioGallery';
 import LanguageToggle from '../components/i18n/LanguageToggle';
 import { usePublicStrings } from '../lib/publicI18n';
-import HeroSlideshowBackground from '../components/public/HeroSlideshowBackground';
+import HeroVideoBackground from '../components/public/HeroVideoBackground';
 import TargetAudienceSection from '../components/public/TargetAudienceSection';
 import TripListingSection from '../components/trips/TripListingSection';
 function scrollToSection(id: string) {
@@ -87,7 +87,7 @@ export default function PublicPortfolio() {
 
       {/* Hero — image-first: minimal overlay, headline + bottom CTAs only */}
       <section className="relative min-h-[88vh] flex flex-col overflow-hidden bg-[#0d1b2a]">
-        <HeroSlideshowBackground maxPhotos={20} />
+        <HeroVideoBackground />
         <div className="absolute inset-0 bg-black/30 z-[3]" aria-hidden />
 
         <p className="absolute top-5 left-4 md:top-6 md:left-8 z-10 flex items-center gap-1.5 text-[11px] md:text-xs text-white/80 font-medium">
