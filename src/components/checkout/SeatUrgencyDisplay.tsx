@@ -15,8 +15,8 @@ export default function SeatUrgencyDisplay({
   variant = 'card',
 }: Props) {
   const banner = variant === 'banner';
-  const urgent1Class = banner ? 'text-amber-300' : 'text-amber-600';
-  const urgent2Class = banner ? 'text-amber-200' : 'text-amber-500';
+  const urgent1Class = banner ? 'text-orange-300' : 'text-orange-600';
+  const urgent2Class = banner ? 'text-orange-200' : 'text-orange-500';
   const calmClass = banner ? 'text-white/95' : 'text-slate-800';
 
   if (seatsRemaining === 0) {
@@ -42,7 +42,7 @@ export default function SeatUrgencyDisplay({
     return (
       <p
         className={`font-bold leading-snug ${urgent1Class} ${
-          banner ? 'text-xl sm:text-2xl text-center' : 'text-lg sm:text-xl'
+          banner ? 'text-2xl sm:text-3xl text-center' : 'text-xl sm:text-2xl'
         }`}
         role="status"
       >
