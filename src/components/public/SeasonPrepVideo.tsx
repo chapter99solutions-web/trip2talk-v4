@@ -1,5 +1,5 @@
 const SEASON_PREP_VIDEO_URL =
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/VDO/cover/make_this_come_alive_sec.mp4';
+  'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/VDO/cover/make_this_come_alive_sec.mp4';
 
 export default function SeasonPrepVideo() {
   return (

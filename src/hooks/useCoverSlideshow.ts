@@ -1,21 +1,16 @@
 import { useEffect, useState } from 'react';
-import { listPortfolioCoverImages } from '../lib/galleryStorage';
-import { portfolioPublicUrl } from '../lib/portfolioUrls';
+import { listGalleryMixPhotosImages } from '../lib/galleryStorage';
+import { MIX_GALLERY_FALLBACK_URLS } from '../lib/mixGallerySlides';
 
 const PER_FOLDER_LIMIT = 100;
-
-/** Verified Cover/Mixed files — used if storage listing returns nothing. */
-const FALLBACK_URLS: string[] = ['01.jpg', '02.jpg', '03.jpg', '04.jpg', '05.png', '06.jpg', '07.jpg'].map(
-  (file) => portfolioPublicUrl(`Cover/Mixed/${file}`),
-);
 
 let cachedUrls: string[] | null = null;
 let fetchPromise: Promise<string[]> | null = null;
 
 async function fetchCoverUrls(): Promise<string[]> {
-  const urls = await listPortfolioCoverImages(PER_FOLDER_LIMIT);
-  console.log('[useCoverSlideshow] portfolio/Cover images:', urls.length);
-  return urls.length > 0 ? urls : FALLBACK_URLS;
+  const urls = await listGalleryMixPhotosImages(PER_FOLDER_LIMIT);
+  console.log('[useCoverSlideshow] gallery/Mix photos images:', urls.length);
+  return urls.length > 0 ? urls : MIX_GALLERY_FALLBACK_URLS;
 }
 
 function loadCoverUrls(): Promise<string[]> {
@@ -30,8 +25,8 @@ function loadCoverUrls(): Promise<string[]> {
       })
       .catch((e) => {
         console.warn('[useCoverSlideshow] fetch error — using fallback:', e);
-        cachedUrls = FALLBACK_URLS;
-        return FALLBACK_URLS;
+        cachedUrls = MIX_GALLERY_FALLBACK_URLS;
+        return MIX_GALLERY_FALLBACK_URLS;
       })
       .finally(() => {
         fetchPromise = null;
@@ -40,7 +35,7 @@ function loadCoverUrls(): Promise<string[]> {
   return fetchPromise;
 }
 
-/** Hero slideshow: all images under portfolio/Cover/ (recursive). */
+/** Hero slideshow: images from gallery bucket → photos/Mix photos/ */
 export function useCoverSlideshow(_folder?: string, _listLimit?: number) {
   const [urls, setUrls] = useState<string[]>(() => cachedUrls ?? []);
   const [loading, setLoading] = useState(() => cachedUrls === null);

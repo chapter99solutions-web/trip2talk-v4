@@ -113,8 +113,8 @@ After `?action=seedMasterTrips`, set **Cover** for these rows if blank:
 
 | Tour Code | Cover URL |
 |-----------|-----------|
-| `TAS-3D2N` | `https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596811714_1428639069261190_2753284779604496226_n.jpg` |
-| `TAS-LH-4D3N` | `https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596371362_1428639202594510_8709278754225773992_n.jpg` |
+| `TAS-3D2N` | `https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596811714_1428639069261190_2753284779604496226_n.jpg` |
+| `TAS-LH-4D3N` | `https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596371362_1428639202594510_8709278754225773992_n.jpg` |
 
 ## Customer_Bookings (portal login)
 

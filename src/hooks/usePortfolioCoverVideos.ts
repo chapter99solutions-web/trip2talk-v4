@@ -5,10 +5,10 @@ const VDO_COVER_FOLDER = 'VDO/cover';
 
 /** Verified public portfolio cover clips — used when storage list is empty. */
 const KNOWN_COVER_VIDEOS = [
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/VDO/cover/videomp_.mp4',
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/VDO/cover/Copy%20of%202026%20t2t%20tripLandscape.mp4',
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/VDO/cover/make_this_come_alive_sec.mp4',
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/VDO/cover/0606%20(2).mp4',
+  'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/VDO/cover/videomp_.mp4',
+  'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/VDO/cover/Copy%20of%202026%20t2t%20tripLandscape.mp4',
+  'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/VDO/cover/make_this_come_alive_sec.mp4',
+  'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/VDO/cover/0606%20(2).mp4',
 ] as const;
 
 const isVideoUrl = (url: string) => /\.(mp4|webm|mov)(\?|$)/i.test(url);

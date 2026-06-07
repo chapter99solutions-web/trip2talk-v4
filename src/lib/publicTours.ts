@@ -75,7 +75,7 @@ export function findTripByRef(ref: string): Tour | undefined {
   return findTripById(ref);
 }
 
-/** Load tour row from Supabase `tours` by `trip_code` (niuibpznjvytprbrzvnn source of truth). */
+/** Load tour row from Supabase `tours` by `trip_code` (rvcwprxnqwscgjusmjvj source of truth). */
 export async function fetchTourByTripCodeFromDb(tripCode: string): Promise<Tour | null> {
   const code = tripCode.trim().toUpperCase();
   if (!code) return null;

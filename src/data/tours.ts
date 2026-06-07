@@ -352,8 +352,8 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
     // รูปปกใช้ภาพจริงจากโฟลเดอร์ Hobart (1.jpg) แทนภาพโพสต์ FB เดิมที่มีกล่องค้นหา "#Trip 2 Talk" ติดมาในรูป
     // ส่ง path เต็มแบบเข้ารหัส %20 ครั้งเดียว (ห้าม double-encode) ให้ตรงรูปแบบเดียวกับ CAN-2D1N
     galleryPhotos: [
-      'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596811714_1428639069261190_2753284779604496226_n.jpg',
-      'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Tasmania/Hobart/1.jpg',
+      'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596811714_1428639069261190_2753284779604496226_n.jpg',
+      'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/Tasmania/Hobart/1.jpg',
     ],
     heroVideoUrl: `${PORTFOLIO_BASE}/Tasmania/VDO/tas01.mp4`,
     // ใช้กลไกแกลเลอรีเดียวกับ CAN-2D1N: ดึงรูปสดจากโฟลเดอร์ portfolio แบบ auto-populate
@@ -414,7 +414,7 @@ export const TOUR_FALLBACK_DATA: TourFallback[] = [
     excluded: ['ตั๋วเครื่องบิน', 'อาหารทุกมื้อ', 'ประกันการเดินทาง'],
     accommodation: 'Dormitory/Hostel/Motel อัปเกรดห้องเดี่ยวเพิ่ม $250-$550 AUD/คืน',
     galleryPhotos: [
-      'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596371362_1428639202594510_8709278754225773992_n.jpg',
+      'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596371362_1428639202594510_8709278754225773992_n.jpg',
     ],
     galleryFolder: 'Tasmania/Launceston',
   },

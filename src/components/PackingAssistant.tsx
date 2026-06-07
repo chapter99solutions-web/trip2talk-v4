@@ -279,7 +279,7 @@ export default function PackingAssistant({ tourCode, language: initialLang, stor
     <div className="min-h-screen bg-gray-50 pb-28">
       {/* Intro video */}
       <video
-        src="https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/VDO/AD/t2t%20oneday%20tripAdventure.mp4"
+        src="https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/VDO/AD/t2t%20oneday%20tripAdventure.mp4"
         autoPlay
         muted
         loop

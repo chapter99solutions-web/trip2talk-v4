@@ -9,7 +9,7 @@ const CORPORATE_ADDRESS = 'Chapter 99 Photography, Warrawee NSW 2074, Australia'
 const EMAIL = 'trip2talksyd@gmail.com';
 const FACEBOOK_PAGE_URL = 'https://www.facebook.com/TriptoTalk';
 const CONTACT_HERO_IMAGE =
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Ulruru/11.jpg';
+  'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/Ulruru/11.jpg';
 
 type FormState = {
   firstName: string;

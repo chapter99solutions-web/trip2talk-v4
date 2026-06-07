@@ -8,10 +8,10 @@ export type CrewMember = {
 };
 
 const SAEN_PHOTO =
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Meet%20the%20Crew/saen%20man.jpg';
+  'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/Meet%20the%20Crew/saen%20man.jpg';
 
 const MONSICHA_PHOTO =
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Meet%20the%20Crew/Ploy.jpg';
+  'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/Meet%20the%20Crew/Ploy.jpg';
 
 const FALLBACK_SAEN =
   'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=85&auto=format&fit=crop';

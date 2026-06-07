@@ -286,7 +286,7 @@ function padHighlights_(list) {
 
 /** Canonical 8 trips — aligned with src/data/tours.ts + src/lib/realTourCodes.ts */
 function tripInfoSeedDefinitions_() {
-  var portfolio = 'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio';
+  var portfolio = 'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio';
   return [
     {
       tourCode: 'TAS-3D2N',
@@ -1470,7 +1470,7 @@ function masterTripsSeed_() {
       highlights: 'Mt Wellington Aurora Hunt, Bruny Island, MONA',
       pickupType: 'airport_terminal',
       coverUrl:
-        'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596811714_1428639069261190_2753284779604496226_n.jpg',
+        'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596811714_1428639069261190_2753284779604496226_n.jpg',
       messengerUrl: 'https://m.me/trip2talk.chapter99',
     },
     {
@@ -1487,7 +1487,7 @@ function masterTripsSeed_() {
       highlights: 'Bridestowe Lavender, Cradle Mountain, MONA',
       pickupType: 'airport_terminal',
       coverUrl:
-        'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596371362_1428639202594510_8709278754225773992_n.jpg',
+        'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596371362_1428639202594510_8709278754225773992_n.jpg',
       messengerUrl: 'https://m.me/trip2talk.chapter99',
     },
     {

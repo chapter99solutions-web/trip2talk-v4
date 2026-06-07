@@ -14,7 +14,9 @@ if (!supabaseConfigured) {
   );
 }
 
+export const SUPABASE_PROJECT_URL = 'https://rvcwprxnqwscgjusmjvj.supabase.co';
+
 export const supabase = createClient(
-  supabaseUrl || 'https://niuibpznjvytprbrzvnn.supabase.co',
+  supabaseUrl || SUPABASE_PROJECT_URL,
   supabaseKey || 'missing-anon-key',
 );

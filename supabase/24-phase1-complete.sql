@@ -1,4 +1,4 @@
--- Phase 1 complete: RLS for dashboards, cover images, seat RPCs (niuibpznjvytprbrzvnn)
+-- Phase 1 complete: RLS for dashboards, cover images, seat RPCs (rvcwprxnqwscgjusmjvj)
 -- Safe to re-run (idempotent).
 
 -- ---------------------------------------------------------------------------
@@ -25,28 +25,28 @@ CREATE POLICY anon_update_tour_bookings ON public.tour_bookings
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.tours ADD COLUMN IF NOT EXISTS cover_image TEXT;
 
-UPDATE public.tours SET cover_image = 'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596811714_1428639069261190_2753284779604496226_n.jpg'
+UPDATE public.tours SET cover_image = 'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596811714_1428639069261190_2753284779604496226_n.jpg'
 WHERE trip_code = 'TAS-3D2N';
 
-UPDATE public.tours SET cover_image = 'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Melbourne/01.jpg'
+UPDATE public.tours SET cover_image = 'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/Melbourne/01.jpg'
 WHERE trip_code = 'MEL-4D3N';
 
-UPDATE public.tours SET cover_image = 'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Ulruru/1.jpg'
+UPDATE public.tours SET cover_image = 'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/Ulruru/1.jpg'
 WHERE trip_code = 'ULU-4D3N';
 
-UPDATE public.tours SET cover_image = 'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/New%20Zealand/Cover/01.jpg'
+UPDATE public.tours SET cover_image = 'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/New%20Zealand/Cover/01.jpg'
 WHERE trip_code = 'NZ-6D5N';
 
-UPDATE public.tours SET cover_image = 'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596371362_1428639202594510_8709278754225773992_n.jpg'
+UPDATE public.tours SET cover_image = 'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/Tasmania/Launceston/596371362_1428639202594510_8709278754225773992_n.jpg'
 WHERE trip_code = 'TAS-LH-4D3N';
 
-UPDATE public.tours SET cover_image = 'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/One%20day%20trip%20SYD/35225886_2066269863700629_8276990772163641344_n.jpg'
+UPDATE public.tours SET cover_image = 'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/One%20day%20trip%20SYD/35225886_2066269863700629_8276990772163641344_n.jpg'
 WHERE trip_code = 'KIA-1DAY';
 
-UPDATE public.tours SET cover_image = 'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Cowra/1.jpg'
+UPDATE public.tours SET cover_image = 'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/Cowra/1.jpg'
 WHERE trip_code = 'CAN-2D1N';
 
-UPDATE public.tours SET cover_image = 'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/One%20day%20trip%20SYD/35225886_2066269863700629_8276990772163641344_n.jpg'
+UPDATE public.tours SET cover_image = 'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/One%20day%20trip%20SYD/35225886_2066269863700629_8276990772163641344_n.jpg'
 WHERE trip_code = 'SYD-1DAY';
 
 -- ---------------------------------------------------------------------------

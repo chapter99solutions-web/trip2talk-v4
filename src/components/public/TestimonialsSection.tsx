@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 // Two cover videos played back-to-back (1 → 2 → 1) behind the reviews intro.
 const REVIEW_VIDEOS = [
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/VDO/cover/videomp_.mp4',
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/VDO/cover/Copy%20of%202026%20t2t%20tripLandscape.mp4',
+  'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/VDO/cover/videomp_.mp4',
+  'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/VDO/cover/Copy%20of%202026%20t2t%20tripLandscape.mp4',
 ];
 
 function ReviewsVideoBackground() {

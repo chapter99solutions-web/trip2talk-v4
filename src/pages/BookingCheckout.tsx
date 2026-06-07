@@ -49,7 +49,7 @@ const PAYID = 'trip2talk...';
 const FACEBOOK_CONTACT_URL = 'https://m.me/TriptoTalk';
 const ENQUIRY_EMAIL = 'trip2talksyd@gmail.com';
 const CHECKOUT_BANNER_VIDEO_URL =
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/VDO/cover/make_this_come_alive_sec.mp4';
+  'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/portfolio/VDO/cover/make_this_come_alive_sec.mp4';
 
 const PACKAGES: Array<{
   id: PackageId;

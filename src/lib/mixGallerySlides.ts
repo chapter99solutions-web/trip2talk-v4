@@ -1,16 +1,10 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase, SUPABASE_PROJECT_URL } from './supabase';
 
-const GALLERY_PROJECT_URL = 'https://rvcwprxnqwscgjusmjvj.supabase.co';
-const gallerySupabase = createClient(
-  GALLERY_PROJECT_URL,
-  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim() || 'public-anon',
-);
+const STORAGE_FOLDER = 'photos/Mix photos/gallary';
 
 /** Public gallery bucket on rvcwprxnqwscgjusmjvj */
 export const MIX_GALLERY_STORAGE_BASE =
-  'https://rvcwprxnqwscgjusmjvj.supabase.co/storage/v1/object/public/gallery/photos/Mix%20photos/gallary/';
-
-const STORAGE_FOLDER = 'photos/Mix photos/gallary';
+  `${SUPABASE_PROJECT_URL}/storage/v1/object/public/gallery/photos/Mix%20photos/gallary/`;
 
 /** Slide order — simple numbered files plus Facebook-style names (prefix before “…”). */
 export const MIX_GALLERY_SLIDE_ENTRIES = [
@@ -48,7 +42,7 @@ export async function resolveMixGallerySlideUrls(): Promise<string[]> {
   const prefixToFile = new Map<string, string>();
 
   if (prefixEntries.length > 0) {
-    const { data, error } = await gallerySupabase.storage.from('gallery').list(STORAGE_FOLDER, {
+    const { data, error } = await supabase.storage.from('gallery').list(STORAGE_FOLDER, {
       limit: 100,
       sortBy: { column: 'name', order: 'asc' },
     });

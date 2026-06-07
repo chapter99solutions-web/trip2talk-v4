@@ -1,4 +1,4 @@
--- Trip2Talk V4 — seed 8 core trips for seat availability (Supabase: niuibpznjvytprbrzvnn)
+-- Trip2Talk V4 — seed 8 core trips for seat availability (Supabase: rvcwprxnqwscgjusmjvj)
 -- Run in SQL Editor after 00–16 schemas. Safe to re-run (upsert by tour/trip code).
 --
 -- V4 booking reads: public.tours (trip_code, slots_booked, slots_max)

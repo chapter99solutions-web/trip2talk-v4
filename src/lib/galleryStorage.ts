@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase, SUPABASE_PROJECT_URL } from './supabase';
 import { portfolioPublicUrl } from './portfolioUrls';
 
 const BUCKET = 'portfolio';
@@ -133,6 +133,54 @@ export async function getPortfolioPhotoUrl(
 
 const GALLERY_BUCKET = 'gallery';
 const GALLERY_PHOTOS_ROOT = 'photos';
+/** Hero slideshow + mix gallery — `gallery/photos/Mix photos/` (incl. subfolders). */
+export const GALLERY_MIX_PHOTOS_FOLDER = 'photos/Mix photos';
+
+export function galleryPublicUrl(objectPath: string): string {
+  const encoded = objectPath
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+  return `${SUPABASE_PROJECT_URL}/storage/v1/object/public/${GALLERY_BUCKET}/${encoded}`;
+}
+
+/** List image files under gallery/photos/Mix photos/ (recursive). */
+export async function listGalleryMixPhotosImages(maxFiles = 100): Promise<string[]> {
+  const urls: string[] = [];
+
+  async function walk(folder: string): Promise<void> {
+    if (urls.length >= maxFiles) return;
+
+    const { data, error } = await supabase.storage.from(GALLERY_BUCKET).list(folder, {
+      limit: 100,
+      sortBy: { column: 'name', order: 'asc' },
+    });
+
+    if (error) {
+      console.warn(`[galleryStorage] gallery list failed for ${folder}:`, error.message);
+      return;
+    }
+    if (!data?.length) return;
+
+    for (const entry of data) {
+      if (urls.length >= maxFiles) break;
+      const meta = entry.metadata as Record<string, unknown> | null;
+      const relPath = `${folder}/${entry.name}`;
+
+      if (isStorageFile(entry.name, entry.id, meta) && isImageFileName(entry.name)) {
+        urls.push(galleryPublicUrl(relPath));
+        continue;
+      }
+
+      if (!isStorageFile(entry.name, entry.id, meta)) {
+        await walk(relPath);
+      }
+    }
+  }
+
+  await walk(GALLERY_MIX_PHOTOS_FOLDER);
+  return urls.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+}
 
 async function collectGalleryPhotoUrls(folder: string, urls: string[], limit: number): Promise<void> {
   if (urls.length >= limit) return;
