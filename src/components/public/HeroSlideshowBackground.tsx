@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useCoverSlideshow } from '../../hooks/useCoverSlideshow';
 
+// hero slideshow v2
 const SLIDE_MS = 5000;
 const FADE_MS = 1000;
 
