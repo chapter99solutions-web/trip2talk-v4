@@ -1,15 +1,14 @@
 import { formatAUD } from '../../lib/payidCalc';
 import type { CheckoutTripSummary } from '../../lib/checkoutTripSummary';
+import SeatUrgencyDisplay from './SeatUrgencyDisplay';
 
 type Props = {
   summary: CheckoutTripSummary;
 };
 
 export default function CheckoutTripSummaryCard({ summary }: Props) {
-  const seatsLabel =
-    summary.seatsLeft != null
-      ? `${summary.seatsLeft} remaining`
-      : `Max ${summary.maxPax} pax`;
+  const seatsRemaining = summary.seatsLeft;
+  const soldOut = seatsRemaining === 0;
 
   return (
     <article className="rounded-2xl border border-sage-200 bg-sage-50 overflow-hidden shadow-sm">
@@ -50,15 +49,19 @@ export default function CheckoutTripSummaryCard({ summary }: Props) {
           </dt>
           <dd className="mt-0.5 font-medium text-slate-800">{summary.departureLabel}</dd>
         </div>
-        <div className="rounded-xl bg-white/70 border border-sage-100 px-3 py-2.5">
+        <div
+          className={`rounded-xl bg-white/70 border px-3 py-2.5 ${
+            soldOut ? 'border-red-200 sm:col-span-2' : 'border-sage-100'
+          }`}
+        >
           <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
             Seats
           </dt>
-          <dd className="mt-0.5 font-medium text-slate-800">
-            {seatsLabel}
-            {summary.seatsLeft != null && (
-              <span className="text-slate-500 font-normal"> · max {summary.maxPax}</span>
-            )}
+          <dd className="mt-1">
+            <SeatUrgencyDisplay
+              seatsRemaining={seatsRemaining}
+              maxPax={summary.maxPax}
+            />
           </dd>
         </div>
       </dl>

@@ -31,6 +31,7 @@ import {
   type CheckoutTripSummary,
 } from '../lib/checkoutTripSummary';
 import CheckoutTripSummaryCard from '../components/checkout/CheckoutTripSummaryCard';
+import SeatUrgencyDisplay, { isTripSoldOut } from '../components/checkout/SeatUrgencyDisplay';
 import WaiverForm from '../components/WaiverForm';
 import {
   buildMedicalNotesFromWaiver,
@@ -294,7 +295,11 @@ export default function BookingCheckout() {
   const fmtThaiDate = (d: Date) =>
     d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
 
-  const canProceedStep1 = hasAvailableDates && Boolean(selectedDate) && quote?.valid;
+  const seatsRemaining = tripSummary?.seatsLeft ?? null;
+  const isSoldOut = isTripSoldOut(seatsRemaining);
+  const maxPaxForSeats = tripSummary?.maxPax ?? trip.max_pax ?? 6;
+
+  const canProceedStep1 = hasAvailableDates && Boolean(selectedDate) && quote?.valid && !isSoldOut;
 
   const pickupRequiresSuburb =
     pickupConfig.kind === 'day' && pickupLocation === 'route_waypoint';
@@ -319,6 +324,11 @@ export default function BookingCheckout() {
     });
 
     if (submitting) return;
+    if (isSoldOut) {
+      setSubmitError('ทริปนี้เต็มแล้ว — ไม่สามารถจองได้');
+      setStep(1);
+      return;
+    }
     if (!selectedDate) {
       setSubmitError('กรุณาเลือกรอบเดินทางที่เปิดรับจอง');
       setStep(1);
@@ -510,12 +520,28 @@ export default function BookingCheckout() {
           className="absolute inset-0 h-full w-full object-cover pointer-events-none"
         />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/25 via-black/10 to-white" />
-        <p
-          className="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-base sm:text-lg font-bold text-white"
-          style={{ textShadow: '0 2px 12px rgba(0,0,0,0.85)' }}
-        >
-          🔥 ที่นั่งใกล้เต็มแล้ว — จองก่อนหมด
-        </p>
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-4">
+          {tripSummary && seatsRemaining != null ? (
+            <div
+              className={`max-w-lg w-full rounded-2xl px-4 py-3 ${
+                isSoldOut ? '' : 'bg-black/55 backdrop-blur-sm'
+              }`}
+            >
+              <SeatUrgencyDisplay
+                seatsRemaining={seatsRemaining}
+                maxPax={maxPaxForSeats}
+                variant="banner"
+              />
+            </div>
+          ) : (
+            <p
+              className="text-center text-base sm:text-lg font-bold text-white"
+              style={{ textShadow: '0 2px 12px rgba(0,0,0,0.85)' }}
+            >
+              🔥 ที่นั่งใกล้เต็มแล้ว — จองก่อนหมด
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-10 space-y-6">
@@ -576,7 +602,12 @@ export default function BookingCheckout() {
 
       {/* Step 1 */}
       {step === 1 && (
-        <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-5 space-y-5">
+        <fieldset
+          disabled={isSoldOut}
+          className={`rounded-2xl bg-white border border-slate-100 shadow-sm p-5 space-y-5 ${
+            isSoldOut ? 'opacity-70' : ''
+          }`}
+        >
           <h2 className="font-serif text-xl font-semibold text-slate-900">เลือกรอบ &amp; จำนวนผู้เดินทาง</h2>
 
           {datesLoading ? (
@@ -684,7 +715,7 @@ export default function BookingCheckout() {
             </div>
           )}
 
-          {hasAvailableDates && (
+          {hasAvailableDates && !isSoldOut && (
             <div className="flex justify-end">
               <button
                 type="button"
@@ -696,7 +727,7 @@ export default function BookingCheckout() {
               </button>
             </div>
           )}
-        </div>
+        </fieldset>
       )}
 
       {/* Step 2 */}
@@ -739,8 +770,9 @@ export default function BookingCheckout() {
           <div className="flex justify-end">
             <button
               type="button"
+              disabled={isSoldOut}
               onClick={() => setStep(3)}
-              className="px-5 py-2.5 rounded-full bg-teal text-navy font-semibold text-sm"
+              className="px-5 py-2.5 rounded-full bg-teal text-navy font-semibold text-sm disabled:opacity-40"
             >
               Continue <span aria-hidden>→</span>
             </button>
@@ -861,7 +893,7 @@ export default function BookingCheckout() {
           <div className="flex justify-end">
             <button
               type="button"
-              disabled={!canProceedStep3}
+              disabled={!canProceedStep3 || isSoldOut}
               onClick={() => setStep(4)}
               className="px-5 py-2.5 rounded-full bg-teal text-navy font-semibold text-sm disabled:opacity-40"
             >
@@ -878,7 +910,7 @@ export default function BookingCheckout() {
           <div className="flex justify-end">
             <button
               type="button"
-              disabled={!canProceedStep4}
+              disabled={!canProceedStep4 || isSoldOut}
               onClick={() => setStep(5)}
               className="px-5 py-2.5 rounded-full bg-teal text-navy font-semibold text-sm disabled:opacity-40"
             >
@@ -1051,6 +1083,7 @@ export default function BookingCheckout() {
             type="button"
             onClick={() => void handleConfirm()}
             disabled={
+              isSoldOut ||
               submitting ||
               !termsAccepted ||
               !canProceedStep4 ||
@@ -1059,7 +1092,9 @@ export default function BookingCheckout() {
             }
             className="w-full inline-flex justify-center items-center py-3 rounded-xl bg-teal text-navy font-semibold text-sm disabled:opacity-40"
           >
-            {submitting
+            {isSoldOut
+              ? 'ทริปเต็มแล้ว — ปิดรับจอง'
+              : submitting
               ? 'Confirming…'
               : !termsAccepted
                 ? 'Accept terms to confirm'
