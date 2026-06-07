@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
+import { portfolioPublicUrl } from './portfolioUrls';
 
 const BUCKET = 'portfolio';
+const COVER_ROOT = 'Cover';
 
 /** Root-level portfolio folder for hero, terms, landscape & season galleries. */
 export const MIXED_COVER_FOLDER = 'Mixed Cover';
@@ -22,6 +24,10 @@ function isStorageFile(
   if (!name || name.startsWith('.')) return false;
   if (id) return true;
   return metadata !== null && metadata !== undefined;
+}
+
+function isImageFileName(name: string): boolean {
+  return /\.(jpe?g|png|webp|gif)$/i.test(name);
 }
 
 export async function listPortfolioFolder(folder: string, limit: number): Promise<string[]> {
@@ -48,6 +54,40 @@ export async function listPortfolioFolder(folder: string, limit: number): Promis
       return urlData.publicUrl;
     })
     .filter(Boolean);
+}
+
+/** Recursively list image files under portfolio/Cover/ (includes subfolders e.g. Cover/Mixed/). */
+export async function listPortfolioCoverImages(maxFiles = 100): Promise<string[]> {
+  const urls: string[] = [];
+
+  async function walk(folder: string): Promise<void> {
+    if (urls.length >= maxFiles) return;
+
+    const { data, error } = await supabase.storage.from(BUCKET).list(folder, {
+      limit: 100,
+      sortBy: { column: 'name', order: 'asc' },
+    });
+
+    if (error || !data?.length) return;
+
+    for (const entry of data) {
+      if (urls.length >= maxFiles) break;
+      const meta = entry.metadata as Record<string, unknown> | null;
+      const relPath = `${folder}/${entry.name}`;
+
+      if (isStorageFile(entry.name, entry.id, meta) && isImageFileName(entry.name)) {
+        urls.push(portfolioPublicUrl(relPath));
+        continue;
+      }
+
+      if (!isStorageFile(entry.name, entry.id, meta)) {
+        await walk(relPath);
+      }
+    }
+  }
+
+  await walk(COVER_ROOT);
+  return urls.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 }
 
 export async function fetchShuffledMixedCover(maxTotal = 30): Promise<string[]> {
@@ -93,10 +133,6 @@ export async function getPortfolioPhotoUrl(
 
 const GALLERY_BUCKET = 'gallery';
 const GALLERY_PHOTOS_ROOT = 'photos';
-
-function isImageFileName(name: string): boolean {
-  return /\.(jpe?g|png|webp|gif)$/i.test(name);
-}
 
 async function collectGalleryPhotoUrls(folder: string, urls: string[], limit: number): Promise<void> {
   if (urls.length >= limit) return;

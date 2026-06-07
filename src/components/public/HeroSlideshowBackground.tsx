@@ -1,20 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useCoverSlideshow } from '../../hooks/useCoverSlideshow';
 
 const SLIDE_MS = 5000;
 const FADE_MS = 1000;
-
-// Hardcoded hero media — no Supabase storage.list() / async fetching.
-// Every URL below was verified to return HTTP 200 from the public portfolio bucket.
-// Real photos live under Cover/Mixed/ (the top-level "Mixed Cover" folder does not exist).
-const HERO_MEDIA = [
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Cover/Mixed/01.jpg',
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Cover/Mixed/02.jpg',
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Cover/Mixed/03.jpg',
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Cover/Mixed/04.jpg',
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Cover/Mixed/05.png',
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Cover/Mixed/06.jpg',
-  'https://niuibpznjvytprbrzvnn.supabase.co/storage/v1/object/public/portfolio/Cover/Mixed/07.jpg',
-];
 
 const isVideo = (url: string) => /\.(mp4|webm|mov)(\?|$)/i.test(url);
 
@@ -24,14 +12,19 @@ type Props = {
 };
 
 export default function HeroSlideshowBackground({
-  maxPhotos = 20,
+  maxPhotos = 50,
   pauseOnHover = true,
 }: Props) {
-  const media = maxPhotos ? HERO_MEDIA.slice(0, maxPhotos) : HERO_MEDIA;
+  const { urls, loading } = useCoverSlideshow();
+  const media = maxPhotos ? urls.slice(0, maxPhotos) : urls;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [paused, setPaused] = useState(false);
 
   const isPaused = pauseOnHover && paused;
+
+  useEffect(() => {
+    setCurrentIndex(0);
+  }, [media.length]);
 
   useEffect(() => {
     if (media.length < 2 || isPaused) return;
@@ -41,7 +34,7 @@ export default function HeroSlideshowBackground({
     return () => window.clearInterval(id);
   }, [isPaused, media.length]);
 
-  // Preload the next image so the crossfade is smooth.
+  // Preload the next slide before crossfade.
   useEffect(() => {
     if (media.length < 2) return;
     const next = media[(currentIndex + 1) % media.length];
@@ -53,15 +46,19 @@ export default function HeroSlideshowBackground({
 
   return (
     <div
-      className="absolute inset-0 bg-[#0d1b2a]"
+      className="absolute inset-0 z-[1] bg-[#0d1b2a]"
       onMouseEnter={pauseOnHover ? () => setPaused(true) : undefined}
       onMouseLeave={pauseOnHover ? () => setPaused(false) : undefined}
     >
+      {loading && media.length === 0 ? (
+        <div className="absolute inset-0 animate-pulse bg-[#0d1b2a]" aria-hidden />
+      ) : null}
+
       {media.map((url, i) => {
         const active = i === currentIndex;
         return (
           <div
-            key={`${url}-${i}`}
+            key={url}
             className="absolute inset-0 overflow-hidden"
             style={{
               opacity: active ? 1 : 0,
@@ -86,7 +83,7 @@ export default function HeroSlideshowBackground({
                 src={url}
                 alt=""
                 className="absolute inset-0 w-full h-full object-cover"
-                loading={i < 3 ? 'eager' : 'lazy'}
+                loading={i < 2 ? 'eager' : 'lazy'}
                 decoding={i === 0 ? 'sync' : 'async'}
                 fetchPriority={i === 0 ? 'high' : 'low'}
               />
