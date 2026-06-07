@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { listGalleryMixPhotosImages } from '../lib/galleryStorage';
-import { MIX_GALLERY_FALLBACK_URLS } from '../lib/mixGallerySlides';
+import {
+  HERO_GALLERY_MIX_PHOTOS_FALLBACK_URLS,
+  listGalleryMixPhotosImages,
+} from '../lib/galleryStorage';
 
 const PER_FOLDER_LIMIT = 100;
 
@@ -10,7 +12,7 @@ let fetchPromise: Promise<string[]> | null = null;
 async function fetchCoverUrls(): Promise<string[]> {
   const urls = await listGalleryMixPhotosImages(PER_FOLDER_LIMIT);
   console.log('[useCoverSlideshow] gallery/Mix photos images:', urls.length);
-  return urls.length > 0 ? urls : MIX_GALLERY_FALLBACK_URLS;
+  return urls.length > 0 ? urls : HERO_GALLERY_MIX_PHOTOS_FALLBACK_URLS;
 }
 
 function loadCoverUrls(): Promise<string[]> {
@@ -25,8 +27,8 @@ function loadCoverUrls(): Promise<string[]> {
       })
       .catch((e) => {
         console.warn('[useCoverSlideshow] fetch error — using fallback:', e);
-        cachedUrls = MIX_GALLERY_FALLBACK_URLS;
-        return MIX_GALLERY_FALLBACK_URLS;
+        cachedUrls = HERO_GALLERY_MIX_PHOTOS_FALLBACK_URLS;
+        return HERO_GALLERY_MIX_PHOTOS_FALLBACK_URLS;
       })
       .finally(() => {
         fetchPromise = null;
@@ -35,7 +37,7 @@ function loadCoverUrls(): Promise<string[]> {
   return fetchPromise;
 }
 
-/** Hero slideshow: images from gallery bucket → photos/Mix photos/ */
+/** Hero slideshow: gallery bucket → Mix photos/ */
 export function useCoverSlideshow(_folder?: string, _listLimit?: number) {
   const [urls, setUrls] = useState<string[]>(() => cachedUrls ?? []);
   const [loading, setLoading] = useState(() => cachedUrls === null);

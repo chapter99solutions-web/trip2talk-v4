@@ -133,8 +133,8 @@ export async function getPortfolioPhotoUrl(
 
 const GALLERY_BUCKET = 'gallery';
 const GALLERY_PHOTOS_ROOT = 'photos';
-/** Hero slideshow + mix gallery — `gallery/photos/Mix photos/` (incl. subfolders). */
-export const GALLERY_MIX_PHOTOS_FOLDER = 'photos/Mix photos';
+/** Hero slideshow — `gallery/Mix photos/` on rvcwprxnqwscgjusmjvj */
+export const GALLERY_MIX_PHOTOS_FOLDER = 'Mix photos';
 
 export function galleryPublicUrl(objectPath: string): string {
   const encoded = objectPath
@@ -144,7 +144,19 @@ export function galleryPublicUrl(objectPath: string): string {
   return `${SUPABASE_PROJECT_URL}/storage/v1/object/public/${GALLERY_BUCKET}/${encoded}`;
 }
 
-/** List image files under gallery/photos/Mix photos/ (recursive). */
+/** Public URL for a file in gallery/Mix photos/[filename] */
+export function heroGalleryMixPhotoUrl(fileName: string): string {
+  return galleryPublicUrl(`${GALLERY_MIX_PHOTOS_FOLDER}/${fileName}`);
+}
+
+const HERO_MIX_PHOTO_FALLBACK_FILES = ['01.jpg', '03.jpg', '04.jpg', '05.jpg', '07.jpg', '08.jpg', '09.jpg'];
+
+/** Used when storage list fails — matches gallery/Mix photos/[filename] URL shape */
+export const HERO_GALLERY_MIX_PHOTOS_FALLBACK_URLS: string[] = HERO_MIX_PHOTO_FALLBACK_FILES.map(
+  heroGalleryMixPhotoUrl,
+);
+
+/** List image files under gallery/Mix photos/ (recursive for nested folders). */
 export async function listGalleryMixPhotosImages(maxFiles = 100): Promise<string[]> {
   const urls: string[] = [];
 
