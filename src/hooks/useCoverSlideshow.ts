@@ -11,7 +11,7 @@ let fetchPromise: Promise<string[]> | null = null;
 
 async function fetchCoverUrls(): Promise<string[]> {
   const urls = await listGalleryMixPhotosImages(PER_FOLDER_LIMIT);
-  console.log('[useCoverSlideshow] gallery/Mix photos images:', urls.length);
+  console.log('[useCoverSlideshow] portfolio/Mixed images:', urls.length);
   return urls.length > 0 ? urls : HERO_GALLERY_MIX_PHOTOS_FALLBACK_URLS;
 }
 
@@ -37,7 +37,7 @@ function loadCoverUrls(): Promise<string[]> {
   return fetchPromise;
 }
 
-/** Hero slideshow: gallery bucket → Mix photos/ */
+/** Hero slideshow: portfolio bucket → Mixed/ */
 export function useCoverSlideshow(_folder?: string, _listLimit?: number) {
   const [urls, setUrls] = useState<string[]>(() => cachedUrls ?? []);
   const [loading, setLoading] = useState(() => cachedUrls === null);

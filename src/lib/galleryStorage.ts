@@ -133,8 +133,8 @@ export async function getPortfolioPhotoUrl(
 
 const GALLERY_BUCKET = 'gallery';
 const GALLERY_PHOTOS_ROOT = 'photos';
-/** Hero slideshow — `gallery/Mix photos/` on rvcwprxnqwscgjusmjvj */
-export const GALLERY_MIX_PHOTOS_FOLDER = 'Mix photos';
+/** Hero slideshow — `portfolio/Mixed/` on rvcwprxnqwscgjusmjvj */
+export const GALLERY_MIX_PHOTOS_FOLDER = 'Mixed';
 
 export function galleryPublicUrl(objectPath: string): string {
   const encoded = objectPath
@@ -144,32 +144,32 @@ export function galleryPublicUrl(objectPath: string): string {
   return `${SUPABASE_PROJECT_URL}/storage/v1/object/public/${GALLERY_BUCKET}/${encoded}`;
 }
 
-/** Public URL for a file in gallery/Mix photos/[filename] */
+/** Public URL for a file in portfolio/Mixed/[filename] */
 export function heroGalleryMixPhotoUrl(fileName: string): string {
-  return galleryPublicUrl(`${GALLERY_MIX_PHOTOS_FOLDER}/${fileName}`);
+  return portfolioPublicUrl(`${GALLERY_MIX_PHOTOS_FOLDER}/${fileName}`);
 }
 
 const HERO_MIX_PHOTO_FALLBACK_FILES = ['01.jpg', '03.jpg', '04.jpg', '05.jpg', '07.jpg', '08.jpg', '09.jpg'];
 
-/** Used when storage list fails — matches gallery/Mix photos/[filename] URL shape */
+/** Used when storage list fails — matches portfolio/Mixed/[filename] URL shape */
 export const HERO_GALLERY_MIX_PHOTOS_FALLBACK_URLS: string[] = HERO_MIX_PHOTO_FALLBACK_FILES.map(
   heroGalleryMixPhotoUrl,
 );
 
-/** List image files under gallery/Mix photos/ (recursive for nested folders). */
+/** List image files under portfolio/Mixed/ (recursive for nested folders). */
 export async function listGalleryMixPhotosImages(maxFiles = 100): Promise<string[]> {
   const urls: string[] = [];
 
   async function walk(folder: string): Promise<void> {
     if (urls.length >= maxFiles) return;
 
-    const { data, error } = await supabase.storage.from(GALLERY_BUCKET).list(folder, {
+    const { data, error } = await supabase.storage.from(BUCKET).list(folder, {
       limit: 100,
       sortBy: { column: 'name', order: 'asc' },
     });
 
     if (error) {
-      console.warn(`[galleryStorage] gallery list failed for ${folder}:`, error.message);
+      console.warn(`[galleryStorage] portfolio list failed for ${folder}:`, error.message);
       return;
     }
     if (!data?.length) return;
@@ -180,7 +180,7 @@ export async function listGalleryMixPhotosImages(maxFiles = 100): Promise<string
       const relPath = `${folder}/${entry.name}`;
 
       if (isStorageFile(entry.name, entry.id, meta) && isImageFileName(entry.name)) {
-        urls.push(galleryPublicUrl(relPath));
+        urls.push(portfolioPublicUrl(relPath));
         continue;
       }
 
